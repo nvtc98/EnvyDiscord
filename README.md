@@ -1,0 +1,2 @@
+# EnvyDiscord
+A discord bot
