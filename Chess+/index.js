@@ -10,7 +10,7 @@ updateParameters();
 //#region	//! Discord
 const bot = new discord.Client();
 // const token = fs.readFileSync("./appdata/token.txt", "utf-8");
-const token = 'ODIzODU5MDU1Nzk2OTQ0OTA3.YFm8iQ.4ggXwHReB8D4Adpg06Z5O0H7TQw';
+const token = ''; // change this before running
 bot.login(token);
 bot.on("ready", () => {
     generateLog('Ready', 'Bot');
