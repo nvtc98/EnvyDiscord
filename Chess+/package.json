@@ -1,7 +1,7 @@
 {
-  "name": "discord-bot",
+  "name": "chess-plus",
   "version": "1.0.0",
-  "description": "Discord bot for SitePoint",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,12 +9,11 @@
     "debug": "node --inspect index.js",
     "deploy": "git add . && git commit -m\"deploy\" && git push heroku master"
   },
-  "author": "Michiel Mulders",
+  "author": "CCheukKa",
   "license": "ISC",
   "dependencies": {
+    "canvas": "^2.6.1",
     "discord.js": "^11.5.1",
-    "dotenv": "^8.1.0",
-    "lodash": "^4.17.21",
-    "moment": "^2.29.1"
+    "fs": "0.0.1-security"
   }
 }

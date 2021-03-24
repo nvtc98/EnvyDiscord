@@ -1,0 +1,13 @@
+Here is my list of commands: (Prefix: `! / . ,`)
+**General:**
+> `help`: This
+> `adminHelp`: A list of admin commands (To be implemented)
+**Board:** (Append `@<someone>` to access their board data)
+> `board`: See the current board state of your game
+> `material`: Shows the material evaluation of the current board position
+> `move <coord1> <coord2>`: Move a piece from `<coord1>` to `<coord2>`
+> `printstate`: Output the current board state to save it for later
+**Invitation:**
+> `invite @<someone>`: Invite `@<someone>` to a game
+> `accept @<someone>`: accept an invite from `@<someone>`
+> `decline @<someone>`: decline an invite from `@<someone>`
