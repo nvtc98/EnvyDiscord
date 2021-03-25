@@ -57,7 +57,7 @@ const parseCommonSentences = (msg) => {
 }
 
 const parseCommand = (bot, msg) => {
-    if (!prefix.includes(msg.substr(0, 1))) {
+    if (!prefix.includes(msg.content.substr(0, 1))) {
         return;
     }
 
