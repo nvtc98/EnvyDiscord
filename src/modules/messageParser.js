@@ -1,4 +1,4 @@
-const { channel } = require('../constants/discord.json');
+const { channel, prefix } = require('../constants/discord.json');
 const _ = require('lodash');
 
 const { test, area51, general } = channel;
@@ -6,11 +6,17 @@ const { test, area51, general } = channel;
 let memeCount = 0;
 
 module.exports = (bot, msg) => {
-    if (_.get(msg,'member.id','') == bot.user.id) { return; }
+    if (_.get(msg, 'member.id', '') == bot.user.id) { return; }
 
     countMeme(msg);
 
-    checkCommonSentences(msg);
+    if (!msg.content) {
+        return;
+    }
+
+    parseCommonSentences(msg);
+
+    parseCommand(msg);
 }
 
 const countMeme = (msg) => {
@@ -31,10 +37,7 @@ const countMeme = (msg) => {
     }
 }
 
-const checkCommonSentences = (msg) => {
-    if(!msg.content) {
-        return;
-    }
+const parseCommonSentences = (msg) => {
     const message = msg.content.toLowerCase();
 
     switch (message) {
@@ -42,8 +45,8 @@ const checkCommonSentences = (msg) => {
             return msg.channel.send('Ngon ^^');
         case 'envy':
             return msg.channel.send('Chủ nhân gọi tôi');
-        case 'lmao':
-            return msg.channel.send('ler mao', { tts: true });
+        // case 'lmao':
+        //     return msg.channel.send('ler mao', { tts: true });
     }
 
     if (message === 'ngon') {
@@ -51,4 +54,32 @@ const checkCommonSentences = (msg) => {
     }
     // if (m)
 
+}
+
+const parseCommand = (msg) => {
+    if (!prefix.includes(msg.subStr(0, 1))) {
+        return;
+    }
+
+    try {
+        const messageParts = msg.content.split(' ');
+        const command = messageParts[0].substr(1);
+        const content = msg.content.substr(command.length + 2);
+        switch (command) {
+            case 'setmemecount':
+                memeCount = messageParts[1];
+                return;
+
+            case 'say':
+                const generalChannel = bot.channels.get(general);
+                generalChannel.send(content);
+                return;
+
+            default:
+                break;
+        }
+    } catch (error) {
+        console.log("Error in parseCommand:");
+        console.error(error);
+    }
 }

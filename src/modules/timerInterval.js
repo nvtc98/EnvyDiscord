@@ -4,10 +4,10 @@ const { channel } = require('../constants/discord.json');
 const { test, area51, general } = channel;
 
 module.exports = (bot) => {
-    let time = moment();
+    let time = moment().utcOffset(420);
 
     setInterval(() => {
-        let newTime = moment();
+        let newTime = moment().utcOffset(420);
         const voiceChannel = bot.channels.get(area51);
         const generalChannel = bot.channels.get(general);
         const hour = newTime.get('hour');
@@ -15,8 +15,8 @@ module.exports = (bot) => {
 
         if (newTime.format('hhmm') !== time.format('hhmm')) {
             time = newTime;
-            console.log('update time: ', hour, minute);
-            voiceChannel.setName(`Bây giờ là ${hour}h${minute}'`).then((channel) => { console.log("updated channel name to: " + channel.name) }).catch(console.error);
+            console.log('current time: ', hour, minute);
+            // voiceChannel.setName(`Bây giờ là ${hour}h${minute}'`).then((channel) => { console.log("updated channel name to: " + channel.name) }).catch(console.error);
             if (hour === 17 && minute === 30) {
                 generalChannel.send('Go homo ^^');
                 generalChannel.send('https://media1.tenor.com/images/bb516b458a66c715aca4c7f6076813bb/tenor.gif?itemid=14806536');
