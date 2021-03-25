@@ -16,7 +16,7 @@ module.exports = (bot, msg) => {
 
     parseCommonSentences(msg);
 
-    parseCommand(msg);
+    parseCommand(bot, msg);
 }
 
 const countMeme = (msg) => {
@@ -56,8 +56,8 @@ const parseCommonSentences = (msg) => {
 
 }
 
-const parseCommand = (msg) => {
-    if (!prefix.includes(msg.subStr(0, 1))) {
+const parseCommand = (bot, msg) => {
+    if (!prefix.includes(msg.substr(0, 1))) {
         return;
     }
 
@@ -68,6 +68,7 @@ const parseCommand = (msg) => {
         switch (command) {
             case 'setmemecount':
                 memeCount = messageParts[1];
+                msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[1]}.`);
                 return;
 
             case 'say':
