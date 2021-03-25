@@ -4,11 +4,14 @@ const _ = require('lodash');
 const { test, area51, general } = channel;
 
 let memeCount = 0;
+let rankData = {};
 
 module.exports = (bot, msg) => {
     if (_.get(msg, 'member.id', '') == bot.user.id) { return; }
 
     countMeme(msg);
+
+    trackRank(msg);
 
     if (!msg.content) {
         return;
@@ -21,9 +24,9 @@ module.exports = (bot, msg) => {
 
 const countMeme = (msg) => {
     if (msg.attachments && !msg.content) {
-        ++memeCount;
         const data = Array.from(msg.attachments);
         if (data.length === 1) {
+            ++memeCount;
             if (memeCount < 10) {
                 msg.channel.send('Tổng số meme đã gửi hôm nay là ' + memeCount);
                 msg.channel.send('Cố gắng đạt 10 meme mỗi ngày nhé các mêm lỏd ^^');
@@ -37,6 +40,10 @@ const countMeme = (msg) => {
             }
         }
     }
+}
+
+const trackRank = (msg) => {
+    // if()
 }
 
 const parseCommonSentences = (msg) => {
