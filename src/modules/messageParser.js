@@ -29,10 +29,12 @@ const countMeme = (msg) => {
                 msg.channel.send('Cố gắng đạt 10 meme mỗi ngày nhé các mêm lỏd ^^');
                 return;
             }
-            // msg.channel.send('KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^', { files: ["https://i.pinimg.com/474x/c6/73/75/c673752c8ddb995b795111a63174263f.jpg"] });
-            msg.channel.send('KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^');
-            msg.channel.send('https://imgur.com/a/lfHWSr4');
-            return;
+            else if (memeCount === 10) {
+                // msg.channel.send('KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^', { files: ["https://i.pinimg.com/474x/c6/73/75/c673752c8ddb995b795111a63174263f.jpg"] });
+                msg.channel.send('KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^');
+                msg.channel.send('https://imgur.com/a/lfHWSr4');
+                return;
+            }
         }
     }
 }
@@ -70,7 +72,7 @@ const parseCommand = (bot, msg) => {
                 switch (messageParts[1]) {
                     case 'set':
                         memeCount = messageParts[2];
-                        msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[1]}.`);
+                        msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[2]}.`);
                         return;
                     case 'check':
                         msg.channel.send(`Tổng số meme trong ngày hôm nay là ${memeCount} ^^`);
