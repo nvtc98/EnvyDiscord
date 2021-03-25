@@ -12,9 +12,12 @@ bot.login(TOKEN);
 
 bot.on('ready', () => {
     console.info(`Logged in as ${bot.user.tag}!`);
+    console.log(`Logged in as ${bot.user.tag}!`);
     bot.user.setActivity("Huy = gà", { type: "PLAYING" });
     const channel = bot.channels.get(area51);
     channel.join();
+    const generalChannel = bot.channels.get(general);
+    generalChannel.send('Chủ nhân, tôi đã trở lại ^^');
 
     timerInterval(bot);
 });
