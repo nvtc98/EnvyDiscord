@@ -20,10 +20,10 @@ module.exports = (bot, msg) => {
 }
 
 const countMeme = (msg) => {
-    if (msg.attachments && !msg.content && memeCount < 11) {
+    if (msg.attachments && !msg.content && memeCount < 10) {
+        ++memeCount;
         const data = Array.from(msg.attachments);
         if (data.length === 1) {
-            ++memeCount;
             if (memeCount < 10) {
                 msg.channel.send('Tổng số meme đã gửi hôm nay là ' + memeCount);
                 msg.channel.send('Cố gắng đạt 10 meme mỗi ngày nhé các mêm lỏd ^^');
@@ -69,6 +69,10 @@ const parseCommand = (bot, msg) => {
             case 'setmemecount':
                 memeCount = messageParts[1];
                 msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[1]}.`);
+                return;
+
+            case 'countmeme':
+                msg.channel.send(`Tổng số meme trong ngày hôm nay là ${memeCount} ^^`);
                 return;
 
             case 'say':
