@@ -20,7 +20,7 @@ module.exports = (bot, msg) => {
 }
 
 const countMeme = (msg) => {
-    if (msg.attachments && !msg.content && memeCount < 10) {
+    if (msg.attachments && !msg.content) {
         ++memeCount;
         const data = Array.from(msg.attachments);
         if (data.length === 1) {
@@ -66,24 +66,24 @@ const parseCommand = (bot, msg) => {
         const command = messageParts[0].substr(1);
         const content = msg.content.substr(command.length + 2);
         switch (command) {
-            case 'setmemecount':
-                memeCount = messageParts[1];
-                msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[1]}.`);
-                return;
-
-            case 'countmeme':
-                msg.channel.send(`Tổng số meme trong ngày hôm nay là ${memeCount} ^^`);
-                return;
+            case 'meme':
+                switch (messageParts[1]) {
+                    case 'set':
+                        memeCount = messageParts[2];
+                        msg.channel.send(`Đã set số meme trong ngày thành ${messageParts[1]}.`);
+                        return;
+                    case 'check':
+                        msg.channel.send(`Tổng số meme trong ngày hôm nay là ${memeCount} ^^`);
+                        return;
+                }
 
             case 'say':
                 const generalChannel = bot.channels.get(general);
                 generalChannel.send(content);
                 return;
-
-            default:
-                break;
         }
     } catch (error) {
+        msg.channel.send(`Trời đất dung hoa, vạn vật sinh sôi, nói nhảm gì thế bạn tôi?`);
         console.log("Error in parseCommand:");
         console.error(error);
     }
