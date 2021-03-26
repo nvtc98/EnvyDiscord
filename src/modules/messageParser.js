@@ -11,13 +11,11 @@ module.exports = (bot, msg) => {
 
     countMeme(msg);
 
-    trackRank(msg);
+    track(msg);
 
     if (!msg.content) {
         return;
     }
-
-    parseCommonSentences(msg);
 
     parseCommand(bot, msg);
 }
@@ -42,12 +40,14 @@ const countMeme = (msg) => {
     }
 }
 
-const trackRank = (msg) => {
-    // if()
-}
-
-const parseCommonSentences = (msg) => {
+const track = (msg) => {
+    const userId = _.get(msg, 'author.id', '');
     const message = msg.content.toLowerCase();
+
+    if (!rankData[userId]) {
+        rankData[userId] = { messages: 0, ngon: 0, lmao: 0, play: 0 };
+    }
+    ++rankData[userId].messages;
 
     switch (message) {
         case 'ngon':
@@ -58,11 +58,15 @@ const parseCommonSentences = (msg) => {
         //     return msg.channel.send('ler mao', { tts: true });
     }
 
-    if (message === 'ngon') {
-        msg.channel.send('Ngon ^^');
+    if (message.search('ngon' !== -1)) {
+        ++rankData[userId].ngon;
     }
-    // if (m)
-
+    if (message.search('lmao') !== -1) {
+        ++rankData[userId].lmao;
+    }
+    if (message.substr(0, 5) === '-play') {
+        ++rankData[userId].play;
+    }
 }
 
 const parseCommand = (bot, msg) => {
@@ -90,6 +94,19 @@ const parseCommand = (bot, msg) => {
                 const generalChannel = bot.channels.get(general);
                 generalChannel.send(content);
                 return;
+
+            case 'rank':
+                const { id } = msg.author;
+                const user = msg.author.toString();
+                if (!rankData[id]) {
+                    return msg.channel.send('Bạn là ai, tớ chưa có thông tin');
+                }
+                const { messages, ngon, lmao, play } = rankData[id];
+                msg.channel.send(`Rank của ${user}: chưa có`);
+                msg.channel.send(`${user} đã cào phím ${messages} lần hôm nay`);
+                msg.channel.send(`${user} đã nói từ ngon ${ngon} lần hôm nay`);
+                msg.channel.send(`${user} đã nói từ lmao ${lmao} lần hôm nay`);
+                msg.channel.send(`${user} đã đòi bé groovy hát hò ${play} lần hôm nay`);
         }
     } catch (error) {
         msg.channel.send(`Trời đất dung hoa, vạn vật sinh sôi, nói nhảm gì thế bạn tôi?`);

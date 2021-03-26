@@ -12,11 +12,11 @@ bot.login(TOKEN);
 
 bot.on('ready', () => {
     console.info(`Logged in as ${bot.user.tag}!`);
-    bot.user.setActivity("Huy = gà", { type: "PLAYING" });
-    const channel = bot.channels.get(area51);
-    channel.join();
-    const testChannel = bot.channels.get(test);
-    testChannel.send('Chủ nhân, tôi đã trở lại ^^');
+    // bot.user.setActivity("Huy = gà", { type: "PLAYING" });
+    // const channel = bot.channels.get(area51);
+    // channel.join();
+    // const testChannel = bot.channels.get(test);
+    // testChannel.send('Chủ nhân, tôi đã trở lại ^^');
 
     timerInterval(bot);
 });
