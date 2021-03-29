@@ -16,7 +16,7 @@ bot.on('ready', () => {
     const testChannel = bot.channels.get(test);
     const voiceChannel = bot.channels.get(area51);
     testChannel.send('Chủ nhân, tôi đã trở lại ^^');
-    voiceChannel.join().catch(()=>console.log("Không thể truy cập voice channel."));
+    voiceChannel.join().catch(() => console.log("Không thể truy cập voice channel."));
 
     timerInterval(bot);
 });

@@ -1,4 +1,5 @@
 const { channel, prefix } = require('../constants/discord.json');
+const generateImage = require('../utilities/imageGenerator');
 const _ = require('lodash');
 
 const { test, area51, general } = channel;
@@ -43,22 +44,38 @@ const countMeme = (msg) => {
 const track = (msg) => {
     const userId = _.get(msg, 'author.id', '');
     const message = msg.content.toLowerCase();
+    const user = msg.author.toString();
 
     if (!global.rankData[userId]) {
         global.rankData[userId] = { messages: 0, ngon: 0, lmao: 0, play: 0 };
     }
     ++global.rankData[userId].messages;
 
-    parseCommonMessages(msg, message)
+    parseCommonMessages(msg, message);
 
-    if (message.search('ngon' !== -1)) {
+    if (message.search('ngon') !== -1) {
         ++global.rankData[userId].ngon;
+        if (global.rankData[userId].ngon === 5) {
+            msg.channel.send(`${user} đã đạt thành tích: nói NGON mỗi ngày ^^`, { files: [generateImage()] });
+        }
+        else if (global.rankData[userId].ngon === 10) {
+            // msg.channel.send(`${user} đã đạt thành tích: nói Ngon nhiều hơn  ^^`, { files: [generateImage()] });
+        }
     }
     if (message.search('lmao') !== -1) {
         ++global.rankData[userId].lmao;
+        if (global.rankData[userId].lmao === 5) {
+            // msg.channel.send(`${user} đã đạt thành tích:  ^^`, { files: [generateImage()] });
+        }
     }
     if (message.substr(0, 5) === '-play') {
         ++global.rankData[userId].play;
+        if (global.rankData[userId].lmao === 10) {
+            // msg.channel.send(`${user} đã đạt thành tích: Groovy ^^`, { files: [generateImage()] });
+        }
+        if (global.rankData[userId].lmao === 5) {
+            msg.channel.send(`${user} đã đạt thành tích: Trẻ trâu không nằm ở độ tuổi, trẻ trâu nằm ở nhà nghe nhạc trên discord ^^`, { files: [generateImage()] });
+        }
     }
 }
 
