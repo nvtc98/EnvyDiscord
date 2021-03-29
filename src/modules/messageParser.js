@@ -50,15 +50,25 @@ const track = (msg) => {
         global.rankData[userId] = { messages: 0, ngon: 0, lmao: 0, play: 0 };
     }
     ++global.rankData[userId].messages;
+    if (global.rankData[userId].messages === 20) {
+        msg.channel.send(`${user} đã nhắn 20 tin nhắn trong ngày`);
+        msg.channel.send(`${user} đã đạt thành tích: chat khỏe như thần trùng ^^`, { files: [generateImage()] });
+    }
+    if (global.rankData[userId].messages === 50) {
+        msg.channel.send(`${user} đã nhắn 50 tin nhắn trong ngày`);
+        msg.channel.send(`${user} đã đạt thành tích: tay gắn nitro ^^`, { files: [generateImage()] });
+    }
 
     parseCommonMessages(msg, message);
 
     if (message.search('ngon') !== -1) {
         ++global.rankData[userId].ngon;
         if (global.rankData[userId].ngon === 5) {
+            msg.channel.send(`${user} đã nói từ ngon 5 lần hôm nay`);
             msg.channel.send(`${user} đã đạt thành tích: nói NGON mỗi ngày ^^`, { files: [generateImage()] });
         }
         else if (global.rankData[userId].ngon === 10) {
+            // msg.channel.send(`${user} đã nói từ ngon 5 lần hôm nay`);
             // msg.channel.send(`${user} đã đạt thành tích: nói Ngon nhiều hơn  ^^`, { files: [generateImage()] });
         }
     }
@@ -70,10 +80,11 @@ const track = (msg) => {
     }
     if (message.substr(0, 5) === '-play') {
         ++global.rankData[userId].play;
-        if (global.rankData[userId].lmao === 10) {
+        if (global.rankData[userId].play === 5) {
             // msg.channel.send(`${user} đã đạt thành tích: Groovy ^^`, { files: [generateImage()] });
         }
-        if (global.rankData[userId].lmao === 5) {
+        if (global.rankData[userId].play === 10) {
+            msg.channel.send(`${user} đã nghe nhạc 10 lần hôm nay`);
             msg.channel.send(`${user} đã đạt thành tích: Trẻ trâu không nằm ở độ tuổi, trẻ trâu nằm ở nhà nghe nhạc trên discord ^^`, { files: [generateImage()] });
         }
     }
