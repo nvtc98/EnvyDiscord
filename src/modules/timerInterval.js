@@ -10,6 +10,7 @@ module.exports = (bot) => {
         let newTime = moment().utcOffset(420);
         const voiceChannel = bot.channels.get(area51);
         const generalChannel = bot.channels.get(general);
+        const testChannel = bot.channels.get(test);
         const hour = newTime.get('hour');
         const minute = newTime.get('minute');
 
@@ -23,6 +24,11 @@ module.exports = (bot) => {
             }
             if (hour === 12 && minute === 0) {
                 generalChannel.send('Ăn ăn ăn ^^', { files: ["https://i.redd.it/hpelggvvfih31.png"] });
+            }
+            if (hour === 0 && minute === 0) {
+                global.memeCount = 0;
+                global.rankData = {};
+                testChannel.send("Đã reset data cho ngày mới.");
             }
         }
     }, 10000);
