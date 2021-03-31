@@ -165,7 +165,7 @@ const parseCommand = (bot, msg) => {
                 return;
                 
             case 'csgoquote':
-                msg.channel.send(`generateCsgoQuote()`);
+                msg.channel.send(generateCsgoQuote());
         }
     } catch (error) {
         msg.channel.send(`Trời đất dung hoa, vạn vật sinh sôi, nói nhảm gì thế bạn tôi?`);
