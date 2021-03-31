@@ -1,5 +1,6 @@
 const { channel, prefix } = require('../constants/discord.json');
 const generateImage = require('../utilities/imageGenerator');
+const generateCsgoQuote = require('../utilities/csgoQuote');
 const _ = require('lodash');
 
 const { test, area51, general } = channel;
@@ -8,7 +9,9 @@ global.memeCount = 0;
 global.rankData = {};
 
 module.exports = (bot, msg) => {
-    if (_.get(msg, 'member.id', '') == bot.user.id) { return; }
+    if (
+        // _.get(msg, 'member.id', '') == bot.user.id ||
+     _.get(msg, 'author.bot', false)) { return; }
 
     countMeme(msg);
 
@@ -58,35 +61,45 @@ const track = (msg) => {
         msg.channel.send(`${user} đã nhắn 50 tin nhắn trong ngày`);
         msg.channel.send(`${user} đã đạt thành tích: tay gắn nitro ^^`, { files: [generateImage()] });
     }
+    if (global.rankData[userId].messages === 100) {
+        msg.channel.send(`${user} đã nhắn 100 tin nhắn trong ngày`);
+        msg.channel.send(`${user} đã đạt thành tích: lời nói chẳng mất tiền mua, spam nhiều như thế là sure ăn đập ^^`, { files: [generateImage()] });
+    }
+    if (global.rankData[userId].messages === 200) {
+        msg.channel.send(`${user} đã nhắn 200 tin nhắn trong ngày`);
+        msg.channel.send(`${user} đã đạt thành tích: còn nói còn achievement ^^`, { files: [generateImage()] });
+    }
 
     parseCommonMessages(msg, message);
 
     if (message.search('ngon') !== -1) {
         ++global.rankData[userId].ngon;
-        if (global.rankData[userId].ngon === 5) {
-            msg.channel.send(`${user} đã nói từ ngon 5 lần hôm nay`);
+        if (global.rankData[userId].ngon === 10) {
+            msg.channel.send(`${user} đã nói từ ngon 10 lần hôm nay`);
             msg.channel.send(`${user} đã đạt thành tích: nói NGON mỗi ngày ^^`, { files: [generateImage()] });
         }
-        else if (global.rankData[userId].ngon === 10) {
-            // msg.channel.send(`${user} đã nói từ ngon 5 lần hôm nay`);
-            // msg.channel.send(`${user} đã đạt thành tích: nói Ngon nhiều hơn  ^^`, { files: [generateImage()] });
+        else if (global.rankData[userId].ngon === 25) {
+            msg.channel.send(`${user} đã nói từ ngon 25 lần hôm nay`);
+            msg.channel.send(`${user} đã đạt thành tích: nói Ngon nhiều hơn số đạn của USP-S ^^`, { files: [generateImage()] });
         }
     }
     if (message.search('lmao') !== -1) {
         ++global.rankData[userId].lmao;
-        if (global.rankData[userId].lmao === 5) {
-            // msg.channel.send(`${user} đã đạt thành tích:  ^^`, { files: [generateImage()] });
+        if (global.rankData[userId].lmao === 9) {
+            msg.channel.send(`${user} đã nói từ lmao 9 lần hôm nay`);
+            msg.channel.send(`${user} đã đạt thành tích: voi 9 ngà, gà 9 cựa, ngựa 9 lmao ^^`, { files: [generateImage()] });
         }
     }
-    if (message.substr(0, 5) === '-play') {
+    if (message.substr(0, 5) === '-play' || message.substr(0, 2) === '-p') {
         ++global.rankData[userId].play;
-        if (global.rankData[userId].play === 5) {
-            // msg.channel.send(`${user} đã đạt thành tích: Groovy ^^`, { files: [generateImage()] });
-        }
         if (global.rankData[userId].play === 10) {
             msg.channel.send(`${user} đã nghe nhạc 10 lần hôm nay`);
             msg.channel.send(`${user} đã đạt thành tích: Trẻ trâu không nằm ở độ tuổi, trẻ trâu nằm ở nhà nghe nhạc trên discord ^^`, { files: [generateImage()] });
         }
+        // if (global.rankData[userId].play === 20) {
+        //     msg.channel.send(`${user} đã nghe nhạc 20 lần hôm nay`);
+        //     msg.channel.send(`${user} đã đạt thành tích:  ^^`, { files: [generateImage()] });
+        // }
     }
 }
 
@@ -96,8 +109,18 @@ const parseCommonMessages = (msg, message) => {
             return msg.channel.send('Ngon ^^');
         case 'envy':
             return msg.channel.send('Chủ nhân gọi tôi');
+        // case 'wibu':
+        //     return msg.channel.send('https://tenor.com/view/gabriel-gif-9035030');
         // case 'lmao':
         //     return msg.channel.send('ler mao', { tts: true });
+    }
+
+    if (message.search('wibu') !== -1 && message.search('bot') !== -1) {
+        msg.channel.send('https://tenor.com/view/gabriel-gif-9035030');
+    }
+
+    if (message.search('thua') !== -1) {
+        msg.channel.send('Thắng làm vua, thuaaaaaaaa rồi ba');
     }
 }
 
@@ -139,6 +162,10 @@ const parseCommand = (bot, msg) => {
                 msg.channel.send(`${user} đã nói từ ngon ${ngon} lần hôm nay`);
                 msg.channel.send(`${user} đã nói từ lmao ${lmao} lần hôm nay`);
                 msg.channel.send(`${user} đã đòi bé groovy hát hò ${play} lần hôm nay`);
+                return;
+                
+            case 'csgoquote':
+                msg.channel.send(`generateCsgoQuote()`);
         }
     } catch (error) {
         msg.channel.send(`Trời đất dung hoa, vạn vật sinh sôi, nói nhảm gì thế bạn tôi?`);
