@@ -10,7 +10,7 @@ updateParameters();
 //#region	//! Discord
 const bot = new discord.Client();
 // const token = fs.readFileSync("./appdata/token.txt", "utf-8");
-const token = ''; // change this before running
+const token = 'ODIzODU5MDU1Nzk2OTQ0OTA3.YFm8iQ.lAalHOc-LVkOuk5w4e6DAbEYc5g'; // change this before running
 bot.login(token);
 bot.on("ready", () => {
     generateLog('Ready', 'Bot');
@@ -277,8 +277,22 @@ bot.on("message", (message) => {
 //#region   // Custom functions
 //#region   //! Print interface
 function sendBoard(channel) {
-    const attachment = new discord.MessageAttachment(canvas.toBuffer("image/png"));
-    channel.send(attachment);
+    // const attachment = new discord.MessageAttachment(canvas.toBuffer("image/png"));
+    // console.log("attachment",attachment);
+    // channel.send(attachment);
+    channel.send({
+        files: [{
+          attachment: 'https://i.pinimg.com/originals/57/dc/69/57dc695c383af1aaf38798eaccceb4e5.jpg',
+          name: 'filehehe.jpg'
+        }]
+      }).catch(console.error);
+
+    channel.send({
+        files: [{
+          attachment: canvas.toBuffer("image/png"),
+          name: 'filehehe.jpg'
+        }]
+      }).catch(console.error);
     return;
 }
 
