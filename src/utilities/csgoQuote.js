@@ -12,6 +12,7 @@ const list = [
   "Ăn trông nồi, ngồi ngay đó nó lại chả prefire vào",
   "Tiên học smoke hậu học aim",
   "Cá không ăn muối cá luôn, nó yếu lắm rồiii",
+  "Chưa thấy quan tài chưa bể đầu",
 ];
 
 let currentIndex = 0;
