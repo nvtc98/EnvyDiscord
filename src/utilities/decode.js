@@ -1,3 +1,3 @@
-const decode = (value) => value.replace(/[-]/g, "");
+const decode = (value) => value.replace(/[|]/g, "");
 
 module.exports = decode;
