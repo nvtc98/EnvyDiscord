@@ -8,7 +8,6 @@ module.exports = (bot) => {
 
   setInterval(() => {
     let newTime = moment().utcOffset(420);
-    console.log(newTime.day());
     const voiceChannel = bot.channels.get(area51);
     const generalChannel = bot.channels.get(general);
     const testChannel = bot.channels.get(test);
