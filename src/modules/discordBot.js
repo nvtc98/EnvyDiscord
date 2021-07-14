@@ -17,7 +17,7 @@ bot.login(TOKEN);
 
 bot.on("ready", () => {
   console.info(`Logged in as ${bot.user.tag}!`);
-  bot.user.setActivity("Huy = gà", { type: "PLAYING" });
+  bot.user.setActivity("Gabriel Dropout", { type: "WATCHING" });
   const testChannel = bot.channels.get(test);
   const voiceChannel = bot.channels.get(area51);
   testChannel.send("Chủ nhân, tôi đã trở lại ^^");
