@@ -8,7 +8,7 @@ const list = [
   "Một điều nhịn là chín đứa bu vô chửi",
   "Một cây làm chẳng nên non, ba cây chụm lại nó cầm negev ra sấy thì bể đầu",
   "Còn nước còn tap",
-  "Thất bại là úiiiiii bắn vậy mà -99 cay thế nhờ",
+  "Thất bại là mẹ bắn vậy mà -99 cay thế nhờ",
   "Ăn trông nồi, ngồi ngay đó nó lại chả prefire vào",
   "Tiên học smoke hậu học aim",
   "Cá không ăn muối cá luôn, nó yếu lắm rồiii",
