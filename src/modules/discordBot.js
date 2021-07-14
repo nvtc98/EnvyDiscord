@@ -1,4 +1,5 @@
 require("dotenv").config();
+const ytdl = require("ytdl-core");
 // const ceasar = require('../utilities/ceasar');
 const decode = require("../utilities/decode");
 const timerInterval = require("./timerInterval");
@@ -15,17 +16,14 @@ const TOKEN = decode(token);
 
 bot.login(TOKEN);
 
-bot.on("ready", () => {
+bot.on("ready", async () => {
   console.info(`Logged in as ${bot.user.tag}!`);
   bot.user.setActivity("Gabriel Dropout", { type: "WATCHING" });
-  const testChannel = bot.channels.get(test);
-  const voiceChannel = bot.channels.get(idle);
+  const testChannel = bot.channels.cache.get(test);
   testChannel.send("Chủ nhân, tôi đã trở lại ^^");
-  voiceChannel
-    .join()
-    .catch(() => console.log("Không thể truy cập voice channel."));
 
   timerInterval(bot);
+  voice(bot);
 });
 
 bot.on("message", (msg) => {

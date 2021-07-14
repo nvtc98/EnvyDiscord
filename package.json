@@ -13,11 +13,12 @@
   "license": "ISC",
   "dependencies": {
     "@discordjs/opus": "^0.5.3",
-    "discord.js": "^11.5.1",
+    "discord.js": "^12.5.3",
     "dotenv": "^8.1.0",
     "ffmpeg": "^0.0.4",
     "ffmpeg-static": "^4.4.0",
     "lodash": "^4.17.21",
-    "moment": "^2.29.1"
+    "moment": "^2.29.1",
+    "ytdl-core": "^4.8.3"
   }
 }

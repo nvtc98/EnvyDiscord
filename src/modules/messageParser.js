@@ -176,7 +176,7 @@ const parseCommand = (bot, msg) => {
         }
 
       case "say":
-        const generalChannel = bot.channels.get(general);
+        const generalChannel = bot.channels.cache.get(general);
         generalChannel.send(content);
         return;
 
