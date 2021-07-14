@@ -6,7 +6,7 @@ const parseMessage = require("./messageParser");
 const {
   token,
   shift,
-  channel: { area51, general, test },
+  channel: { idle, general, test },
 } = require("../constants/discord.json");
 
 const Discord = require("discord.js");
@@ -19,7 +19,7 @@ bot.on("ready", () => {
   console.info(`Logged in as ${bot.user.tag}!`);
   bot.user.setActivity("Gabriel Dropout", { type: "WATCHING" });
   const testChannel = bot.channels.get(test);
-  const voiceChannel = bot.channels.get(area51);
+  const voiceChannel = bot.channels.get(idle);
   testChannel.send("Chủ nhân, tôi đã trở lại ^^");
   voiceChannel
     .join()
