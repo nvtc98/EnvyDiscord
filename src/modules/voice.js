@@ -1,8 +1,9 @@
 const {
   channel: { idle },
 } = require("../constants/discord.json");
+const ytdl = require("ytdl-core");
 
-module.exports = (bot) => {
+module.exports = async (bot) => {
   const voiceChannel = bot.channels.cache.get(idle);
   const connection = await voiceChannel
     .join()
