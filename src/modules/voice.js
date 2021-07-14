@@ -15,11 +15,13 @@ module.exports = async (bot) => {
     ytdl("https://www.youtube.com/watch?v=a-Nj6S74MoI", { filter: "audioonly" })
   );
   const restart = () => {
+    console.log("restart");
     dispatcher = connection.play(
       ytdl("https://www.youtube.com/watch?v=a-Nj6S74MoI", {
         filter: "audioonly",
       })
     );
+    dispatcher.on("finish", restart);
   };
   dispatcher.on("finish", restart);
 };
