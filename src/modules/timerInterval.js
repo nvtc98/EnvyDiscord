@@ -16,7 +16,7 @@ module.exports = (bot) => {
 
     if (newTime.format("hhmm") !== time.format("hhmm")) {
       time = newTime;
-      console.log("current time: ", hour, minute);
+      // console.log("current time: ", hour, minute);
       // voiceChannel.setName(`Bây giờ là ${hour}h${minute}'`).then((channel) => { console.log("updated channel name to: " + channel.name) }).catch(console.error);
       // if (hour === 17 && minute === 30) {
       //     generalChannel.send('Go homo ^^');
@@ -31,5 +31,5 @@ module.exports = (bot) => {
         testChannel.send("Đã reset data cho ngày mới.");
       }
     }
-  }, 10000);
+  }, 30000);
 };
