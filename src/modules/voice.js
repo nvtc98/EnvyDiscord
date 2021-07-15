@@ -5,9 +5,9 @@ const ytdl = require("ytdl-core");
 
 module.exports = async (bot) => {
   const voiceChannel = bot.channels.cache.get(idle);
-  // const connection = await voiceChannel
-  //   .join()
-  //   .catch(() => console.log("Không thể truy cập voice channel."));
+  const connection = await voiceChannel
+    .join()
+    .catch(() => console.log("Không thể truy cập voice channel."));
   // if (!connection) {
   //   return;
   // }
