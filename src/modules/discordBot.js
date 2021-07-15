@@ -30,28 +30,23 @@ bot.on("message", (msg) => {
   parseMessage(bot, msg);
 });
 
-// bot.on("guildMemberAdd", (member) => {
-//   const channel = member.guild.channels.cache.find((ch) => {
-//     console.log(ch);
-//   });
-//   console.log("member", member, channel);
-//   if (!channel) return;
-//   channel.send(`Bầu trời thì xanh biếc,`);
-//   channel.send(`${member} thì vào rạp xiếc!`);
-//   channel.send(`Hajimemashite, ${member} ^^`);
-//   channel.send(
-//     `https://image.myanimelist.net/ui/5pjpFizOF0WqHWXSGonzMWlyScxw1Dp5y-h9v_vvWt3CpaPd9w8YoGHyeQVCXT7tlJwHhC1emkSd7IV4F1b0pgMZOXLCMl_HgCC6lYwmHeM`
-//   );
-// });
+bot.on("guildMemberAdd", (member) => {
+  const channel = member.guild.channels.cache.find((ch) => ch.id === general);
+  if (!channel) return;
+  channel.send(`Bầu trời thì xanh biếc,`);
+  channel.send(`${member} thì vào rạp xiếc!`);
+  channel.send(`Hajimemashite, ${member} ^^`);
+  channel.send(
+    `https://i.pinimg.com/originals/27/b9/8a/27b98ad826e261e76f21009d1900baa1.png`
+  );
+});
 
-// bot.on("guildMemberRemove", (member) => {
-//   const channel = member.guild.channels.cache.find(
-//     (ch) => ch.name === "member-log"
-//   );
-//   if (!channel) return;
-//   channel.send(`Chotto-, ${member} rời khỏi rạp xiếc ư`);
-//   channel.send(
-//     `https://64.media.tumblr.com/6ebf792c1e396c1546a133eef46337f3/tumblr_onhjo0dDu01qa94xto1_540.gifv`
-//   );
-//   channel.send(`Ara ara, nói xấu ${member} thôi Ｏ(≧▽≦)Ｏ`);
-// });
+bot.on("guildMemberRemove", (member) => {
+  const channel = member.guild.channels.cache.find((ch) => ch.id === general);
+  if (!channel) return;
+  channel.send(`Chotto- ${member} rời khỏi rạp xiếc ư`);
+  channel.send(
+    `https://64.media.tumblr.com/6ebf792c1e396c1546a133eef46337f3/tumblr_onhjo0dDu01qa94xto1_540.gifv`
+  );
+  channel.send(`Ara ara, nói xấu ${member} thôi Ｏ(≧▽≦)Ｏ`);
+});
