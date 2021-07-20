@@ -1,5 +1,6 @@
 const { channel, prefix } = require("../constants/discord.json");
 const generateImage = require("../utilities/imageGenerator");
+const generateAngryImage = require("../utilities/angryImageGenerator");
 const generateCsgoQuote = require("../utilities/csgoQuote");
 const _ = require("lodash");
 
@@ -38,7 +39,9 @@ const countMeme = (msg) => {
         return;
       } else if (global.memeCount === 10) {
         // msg.channel.send('KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^', { files: ["https://i.pinimg.com/474x/c6/73/75/c673752c8ddb995b795111a63174263f.jpg"] });
-        msg.channel.send("KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^");
+        msg.channel.send(
+          "KPI hoàn thành: Đã đạt đủ 10 meme trong ngày ^^ Cả server đã nhận được thành tích: MÊM LỎD BỦH BỦH LMAO ^^"
+        );
         msg.channel.send(
           "https://steamuserimages-a.akamaihd.net/ugc/842588658443747114/A714EC406BFA22397E34737790465AAD673D0A13/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false"
         );
@@ -142,11 +145,25 @@ const parseCommonMessages = (msg, message) => {
   }
 
   if (message.search("wibu") !== -1 && message.search("bot") !== -1) {
-    msg.channel.send("https://tenor.com/view/gabriel-gif-9035030");
+    const content = generateAngryImage();
+    if (content) {
+      msg.channel.send(content);
+      return;
+    }
+    msg.channel.send(
+      "Envy đã đến giới hạn của mình. Cả server đã nhận được thành tích: Những kẻ chọc chó ^^"
+    );
+    msg.channel.send(
+      "https://remyfool.files.wordpress.com/2017/03/vlcsnap-2017-03-13-18h48m23s126.jpg?w=924"
+    );
   }
 
   if (message.search("thua") !== -1) {
     msg.channel.send("Thắng làm vua, thuaaaaaaaa rồi ba");
+  }
+
+  if (message.search("non") !== -1) {
+    msg.channel.send("https://data.whicdn.com/images/317943374/original.png");
   }
 };
 
