@@ -3,7 +3,7 @@ require("dotenv").config();
 const decode = require("../utilities/decode");
 const timerInterval = require("./timerInterval");
 const parseMessage = require("./messageParser");
-const voice = require("./voice");
+const { enterVoiceChannel } = require("./voice");
 const {
   token,
   shift,
@@ -23,7 +23,7 @@ bot.on("ready", async () => {
   testChannel.send("Chủ nhân, tôi đã trở lại ^^");
 
   timerInterval(bot);
-  voice(bot);
+  enterVoiceChannel(bot);
 });
 
 bot.on("message", (msg) => {

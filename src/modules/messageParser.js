@@ -2,6 +2,8 @@ const { channel, prefix } = require("../constants/discord.json");
 const generateImage = require("../utilities/imageGenerator");
 const generateAngryImage = require("../utilities/angryImageGenerator");
 const generateCsgoQuote = require("../utilities/csgoQuote");
+const { playYoutube, setVolume } = require("./voice");
+const { helpList } = require("../utilities/texts");
 const _ = require("lodash");
 
 const { test, area51, general } = channel;
@@ -213,6 +215,19 @@ const parseCommand = (bot, msg) => {
 
       case "csgoquote":
         msg.channel.send(generateCsgoQuote());
+
+      case "envyplay":
+      case "ep":
+        playYoutube(content);
+        return;
+      case "envyvolume":
+      case "ev":
+        setVolume(content);
+        return;
+      case "help":
+      case "envyhelp":
+        msg.channel.send(helpList);
+        return;
     }
   } catch (error) {
     msg.channel.send(
