@@ -3,9 +3,9 @@ const helpList = `Danh sách lệnh của Envy nè ^^
 -envyplay <link youtube> (hoặc -ev): cosplay Groovy
 -envyvolume <value> (hoặc -ev): banh miệng hoặc nhét giẻ vào mồm tớ ^^
 -envystop (hoặc -es): khóa mõm tớ ^^
--meme check: kiểm tra xem các mêm lỏd đã đăng bao nhiêm mêm trong ngày
+-meme check: xem các mêm lỏd tài ba cỡ nào
 -meme set <number>: đặt số lượng mêm
--say <content>: nhờ tớ nói hộ gì đó ^^
+-say <content>: thay lời muốn nói
 -csgoquote: tớ sẽ nói ngẫu nhiên một câu nói vớ vẩn về CSGO
 -envyhelp (hoặc -help, -envy): xem tớ làm được trò gì nha ^^`;
 
