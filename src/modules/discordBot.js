@@ -18,7 +18,7 @@ bot.login(TOKEN);
 
 bot.on("ready", async () => {
   console.info(`Logged in as ${bot.user.tag}!`);
-  bot.user.setActivity("Gabriel Dropout", { type: "WATCHING" });
+  bot.user.setActivity("-envyhelp for commands", { type: "PLAYING" });
   const testChannel = bot.channels.cache.get(test);
   testChannel.send("Chủ nhân, tôi đã trở lại ^^");
 

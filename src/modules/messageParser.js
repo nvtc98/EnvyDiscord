@@ -2,7 +2,7 @@ const { channel, prefix } = require("../constants/discord.json");
 const generateImage = require("../utilities/imageGenerator");
 const generateAngryImage = require("../utilities/angryImageGenerator");
 const generateCsgoQuote = require("../utilities/csgoQuote");
-const { playYoutube, setVolume } = require("./voice");
+const { playYoutube, setVolume, stopVoice } = require("./voice");
 const { helpList } = require("../utilities/texts");
 const _ = require("lodash");
 
@@ -224,8 +224,14 @@ const parseCommand = (bot, msg) => {
       case "ev":
         setVolume(content);
         return;
+      case "envystop":
+      case "es":
+        stopVoice();
+        return;
+
       case "help":
       case "envyhelp":
+      case "envy":
         msg.channel.send(helpList);
         return;
     }

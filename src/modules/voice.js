@@ -39,4 +39,8 @@ const setVolume = (value) => {
   dispatcher.setVolume(value);
 };
 
-module.exports = { enterVoiceChannel, playYoutube, setVolume };
+const stopVoice = () => {
+  dispatcher.destroy();
+};
+
+module.exports = { enterVoiceChannel, playYoutube, setVolume, stopVoice };
