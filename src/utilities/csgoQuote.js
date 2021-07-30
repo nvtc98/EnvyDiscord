@@ -13,6 +13,7 @@ const list = [
   "Tiên học smoke hậu học aim",
   "Cá không ăn muối cá luôn, nó yếu lắm rồiii",
   "Chưa thấy quan tài chưa bể đầu",
+  "Trong 36 kế kế nhau ăn lửa là kẹt hết",
 ];
 
 let currentIndex = 0;
