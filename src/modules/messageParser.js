@@ -12,10 +12,7 @@ global.memeCount = 0;
 global.rankData = {};
 
 module.exports = (bot, msg) => {
-  if (
-    // _.get(msg, 'member.id', '') == bot.user.id ||
-    _.get(msg, "author.bot", false)
-  ) {
+  if (_.get(msg, "author.bot", false)) {
     return;
   }
 
@@ -231,6 +228,7 @@ const parseCommand = (bot, msg) => {
 
       case "help":
       case "envyhelp":
+      case "eh":
       case "envy":
         msg.channel.send(helpList);
         return;

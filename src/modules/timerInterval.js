@@ -11,6 +11,7 @@ module.exports = (bot) => {
     const voiceChannel = bot.channels.cache.get(area51);
     const generalChannel = bot.channels.cache.get(general);
     const testChannel = bot.channels.cache.get(test);
+    const countdownChannel = bot.channels.cache.get("892978561655394324");
     const hour = newTime.get("hour");
     const minute = newTime.get("minute");
 
@@ -29,6 +30,17 @@ module.exports = (bot) => {
         global.memeCount = 0;
         global.rankData = {};
         testChannel.send("Đã reset data cho ngày mới.");
+      }
+      if (minute === 0) {
+        const destinationTime = moment(1633118400000);
+        const days = destinationTime.diff(newTime, "days");
+        const hours =
+          days > 0
+            ? destinationTime.diff(newTime, "hours") - 24
+            : destinationTime.diff(newTime, "hours");
+        countdownChannel
+          .setName(`Countdown: ${days} ngày ${hours} giờ`)
+          .catch(console.error);
       }
     }
   }, 30000);
