@@ -36,13 +36,12 @@ module.exports = (bot) => {
         const days = destinationTime.diff(newTime, "days");
         const hours =
           days > 0
-            ? destinationTime.diff(newTime, "hours") - 24
-            : destinationTime.diff(newTime, "hours");
+            ? destinationTime.diff(newTime, "hours") - 30
+            : destinationTime.diff(newTime, "hours") - 6;
         countdownChannel
           .setName(`Countdown: ${days} ngày ${hours} giờ`)
           .catch(console.error);
       }
     }
-    console.log(destinationTime.diff(newTime, "hours"));
   }, 30000);
 };
