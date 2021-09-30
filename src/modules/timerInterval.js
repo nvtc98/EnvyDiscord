@@ -43,5 +43,6 @@ module.exports = (bot) => {
           .catch(console.error);
       }
     }
+    console.log(destinationTime.diff(newTime, "hours"));
   }, 30000);
 };
