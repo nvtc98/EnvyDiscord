@@ -32,14 +32,10 @@ module.exports = (bot) => {
         testChannel.send("Đã reset data cho ngày mới.");
       }
       if (minute === 0) {
-        const destinationTime = moment(1633118400000);
-        const days = destinationTime.diff(newTime, "days");
-        const hours =
-          days > 0
-            ? destinationTime.diff(newTime, "hours") - 30
-            : destinationTime.diff(newTime, "hours") - 6;
+        const destinationTime = moment(1633096800000);
+        const hours = destinationTime.diff(newTime, "hours");
         countdownChannel
-          .setName(`Countdown: ${days} ngày ${hours} giờ`)
+          .setName(`Countdown: ${hours} giờ`)
           .catch(console.error);
       }
     }
