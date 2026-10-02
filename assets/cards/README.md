@@ -1,19 +1,19 @@
 # Card art
 
-Thả tranh của từng thẻ vào thư mục này, tên file là **id thẻ** + đuôi `.png`, `.webp`, `.jpg` hoặc `.jpeg`.
-Thẻ nào chưa có file thì bot tự vẽ hình tạm theo hệ, nên có thể thêm dần từng tấm. Bot tự nhận file mới hoặc file bị thay (không cần restart).
+Drop each card's artwork in this folder. The file name is the **card id** plus `.png`, `.webp`, `.jpg` or `.jpeg`.
+Cards without a file get a generated placeholder, so you can add art one card at a time. The bot picks up new or replaced files automatically (no restart needed).
 
-## Quy cách tranh
-- Tỉ lệ **4:3 ngang**, đề xuất **1024×768** (lớn hơn cũng được, bot tự thu nhỏ để tiết kiệm RAM).
-- Đặt nhân vật ở **chính giữa** và chừa lề khoảng 10% mỗi bên: tranh được cắt vừa khung (cover) nên mép có thể bị cắt, nhất là trong cảnh đấu, nơi khung gần vuông hơn.
-- Dưới ~2 MB mỗi file. Không cần vẽ khung, tên hay chỉ số; bot tự vẽ phần đó.
-- Đừng dùng tranh có bản quyền của người khác (ví dụ Pokémon).
+## Art specs
+- **4:3 landscape**, recommended **1024×768** (larger is fine; the bot downscales on load to save RAM).
+- Keep the subject **centered** with roughly 10% margin on each side: the art is cropped to fit the frame ("cover"), so the edges can be cut off, especially in the battle scene where the frame is closer to square.
+- Under ~2 MB per file. Do not draw the frame, name or stats; the bot draws those.
+- Do not use copyrighted artwork you do not have the rights to (for example Pokémon).
 
-Xem thử kết quả mà không cần Discord: `npm run preview` (ảnh xuất ra thư mục `preview/`).
+Preview the result without Discord: `npm run preview` (images are written to `preview/`).
 
-## Danh sách thẻ
+## Card list
 
-| File | Tên thẻ | Hệ | Độ hiếm |
+| File | Card name | Type | Rarity |
 |---|---|---|---|
 | `tho-lua.png` | Ember Hare | fire | common |
 | `cao-than.png` | Cinder Fox | fire | common |

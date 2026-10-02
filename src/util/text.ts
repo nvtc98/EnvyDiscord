@@ -1,4 +1,4 @@
-/** Lowercase and strip Vietnamese diacritics so "Cáo Than" matches "cao than". */
+/** Lowercase and strip diacritics so "Café" matches "cafe" (also handles Vietnamese đ). */
 export function normalize(text: string): string {
   return text
     .normalize('NFD')

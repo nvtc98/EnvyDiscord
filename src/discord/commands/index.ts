@@ -3,6 +3,7 @@ import { battleCommand } from './battle';
 import { cardCommand } from './card';
 import { collectionCommand } from './collection';
 import { dailyCommand } from './daily';
+import { dmCommand } from './dm';
 import { mercifulCommand } from './merciful';
 import { profileCommand } from './profile';
 import { sayCommand } from './say';
@@ -17,6 +18,7 @@ export const commands: Command[] = [
   profileCommand,
   mercifulCommand,
   sayCommand,
+  dmCommand,
 ];
 
 export const commandMap = new Map(commands.map((c) => [c.data.name, c]));

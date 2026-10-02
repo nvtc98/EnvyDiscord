@@ -5,7 +5,7 @@ import { sayCommand } from '../src/discord/commands/say';
 describe('command registration', () => {
   it('registers every command for guild + user install in guilds, bot DM and private channels', () => {
     expect(commands.map((c) => c.data.name).sort()).toEqual(
-      ['battle', 'card', 'collection', 'daily', 'merciful', 'profile', 'say', 'team'],
+      ['battle', 'card', 'collection', 'daily', 'dm', 'merciful', 'profile', 'say', 'team'],
     );
     for (const command of commands) {
       const json = command.data.toJSON();

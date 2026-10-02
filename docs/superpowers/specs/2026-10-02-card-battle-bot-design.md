@@ -1,53 +1,56 @@
 # Card Battle Bot — Design
 
-## Mục tiêu
-Bot Discord chơi thẻ bài, dùng slash command + nút bấm, chạy được trong DM (User Install) và server.
-Chơi **PvE với AI**, **sưu tầm thẻ rồi đấu**. Quy mô nhỏ: <20 người chơi, <5 người cùng lúc, chạy nội bộ trên Synology NAS.
+## Goal
+A Discord bot for a trading-card game, driven by slash commands and buttons, usable in DMs (User Install) and in servers.
+**PvE against an AI**, **collect cards, then battle**. Small scale: fewer than 20 players, fewer than 5 at the same time, run privately on a Synology NAS.
 
-## Quyết định chính
-| Chủ đề | Quyết định | Lý do |
+## Key decisions
+| Topic | Decision | Reason |
 |---|---|---|
-| Kết nối Discord | `discord.js` qua Gateway | Chỉ kết nối ra ngoài, NAS không cần mở port |
-| Ngôn ngữ | TypeScript chạy bằng `tsx`, test bằng Vitest | Logic trận đấu cần test kỹ |
-| Lưu dữ liệu | 1 file JSON, ghi atomic (file tạm + rename), sau interface `PlayerRepo` | Quy mô nhỏ, dễ backup, không phụ thuộc thư viện native; đổi sang SQLite sau chỉ cần thay repo |
-| Trạng thái trận đấu | Trong RAM theo `userId`, không lưu đĩa | Mỗi lần bấm nút Discord cấp interaction mới nên không dính giới hạn 15 phút; restart bot chỉ mất trận đang đánh dở |
-| Triển khai | Chạy thẳng bằng Node (>= 20.6) trên Synology, khởi động bằng Task Scheduler; `data/` nằm cạnh project | Người dùng không dùng Docker; code không phụ thuộc Node 22 nên nâng cấp sau không cần sửa |
+| Discord connection | `discord.js` over the Gateway | Only outbound connections, so the NAS needs no open ports |
+| Language | TypeScript run with `tsx`, tested with Vitest | Battle logic needs thorough tests |
+| Storage | One JSON file, written atomically (temp file + rename), behind a `PlayerRepo` interface | Small scale, easy backup, no native dependency; switching to SQLite later only means replacing the repo |
+| Battle state | In memory, keyed by `userId`, never written to disk | Every button click gives a fresh interaction, so the 15-minute interaction limit does not apply; a restart only loses battles in progress |
+| Deployment | Run directly with Node (>= 20.6) on the Synology, started by Task Scheduler; `data/` sits next to the project | The owner does not use Docker; the code does not depend on Node 22, so upgrading later needs no changes |
 
-## Cấu trúc
+## Structure
 ```
-src/engine/    Logic trận đấu thuần (không import discord.js): lượt, damage, skill, AI
-src/game/      Luật tiến trình: gacha, thẻ trùng lên cấp, /daily, đội hình, đối thủ AI, thưởng
-src/data/      Định nghĩa thẻ
-src/db/        PlayerRepo + bản JSON
-src/discord/   Slash command, nút bấm, vẽ embed
+src/engine/    Pure battle logic (no discord.js): turns, damage, skills, AI
+src/game/      Progression rules: gacha, duplicate level-ups, /daily, teams, AI opponents, rewards
+src/data/      Card definitions
+src/db/        PlayerRepo + JSON implementation
+src/discord/   Slash commands, buttons, embeds
+src/render/    Image rendering (cards and battle scene)
 ```
 
-## Luật chơi
-**Thẻ:** hệ (Lửa/Nước/Cỏ), độ hiếm (Thường/Hiếm/Sử thi/Huyền thoại), HP/ATK/DEF/SPD, 3 skill
-(đánh thường không hồi chiêu, đòn mạnh có hồi chiêu, hỗ trợ hồi máu hoặc khiên).
-**Khắc hệ:** Lửa > Cỏ > Nước > Lửa. Khắc ×1.5, bị khắc ×0.5.
-**Damage:** `ATK × power × 100 / (100 + DEF) × hệ`, tối thiểu 1. Khiên hấp thụ trước khi mất HP.
-**Trận 3v3:** mỗi lượt chọn skill của thẻ đang đánh hoặc đổi thẻ. Đổi thẻ xảy ra trước, sau đó skill theo SPD
-(hòa thì người chơi trước). Thẻ gục thì thẻ kế tiếp tự ra sân. Hết thẻ là thua. Hồi chiêu N nghĩa là không dùng được trong N lượt kế tiếp.
-**Cấp thẻ:** nhận trùng thì +1 cấp (tối đa 5, mỗi cấp +10% chỉ số). Đã tối đa thì đổi thành 50 coin.
-**AI:** Dễ = skill ngẫu nhiên. Thường = chọn đòn có giá trị cao nhất theo heuristic (hạ gục > sát thương > hồi khi máu thấp > đổi thẻ khi bị khắc). Khó = nhìn trước 1 lượt (minimax).
+## Game rules
+**Cards:** type (Fire/Water/Grass), rarity (Common/Rare/Epic/Legendary), HP/ATK/DEF/SPD, and 3 skills
+(a basic attack with no cooldown, a strong attack with a cooldown, and a support skill that heals or shields).
+**Type advantage:** Fire > Grass > Water > Fire. Advantage ×1.5, disadvantage ×0.5.
+**Damage:** `ATK × power × 100 / (100 + DEF) × type multiplier`, minimum 1. A shield absorbs damage before HP is lost.
+**3v3 battle:** each turn you pick a skill for the active card or switch cards. Switches resolve first, then skills in SPD order
+(the player goes first on a tie). A fainted card is replaced automatically by the next one. A side with no cards left loses. A cooldown of N means the skill is unavailable for the next N turns.
+**Card levels:** a duplicate gives +1 level (max 5, +10% stats per level). A duplicate of a max-level card is converted to 50 coins.
+**AI:** Easy = random skill. Normal = picks the highest-value move by heuristic (knock-out > damage > heal when low > switch when at a type disadvantage). Hard = one-turn lookahead (minimax).
 
-## Lệnh
-Ngôn ngữ của bot (lệnh, tuỳ chọn, tin nhắn, tên thẻ/skill) là **tiếng Anh**; tài liệu viết tiếng Việt.
-`/daily` (3 thẻ khác nhau + 30 coin mỗi ngày theo múi giờ cấu hình), `/collection`, `/card <tên>`, `/team`, `/battle [difficulty]`, `/profile`.
-Mọi command đăng ký với `integration_types: [0,1]` và `contexts: [0,1,2]` để dùng được trong DM.
+## Commands
+The bot's language (commands, options, messages, card and skill names) is **English**; documentation is in English too.
+`/daily` (3 different cards + 30 coins per day, using the configured timezone), `/collection`, `/card <name>`, `/team`, `/battle [difficulty]`, `/profile`,
+plus `/say <content>`, `/merciful`, and the owner-only `/dm <message> [user] [user-id]`.
+Every command is registered with `integration_types: [0,1]` and `contexts: [0,1,2]` so it works in DMs.
+`/dm` checks that the caller is the application owner at runtime, so installing the app does not let anyone make the bot message strangers.
 
-## Hình ảnh
-Thẻ và trận đấu được vẽ bằng `@napi-rs/canvas` thành PNG, gắn vào tin nhắn dạng tệp đính kèm (hiển thị lớn hơn ảnh trong embed).
-- `src/render/`: `theme` (màu, biểu tượng hệ vẽ bằng path, không dùng emoji), `art` (nạp `assets/cards/<id>.(png|webp|jpg)`, theo dõi mtime, thu nhỏ khi nạp), `draw` (vẽ thẻ), `renderer` (API: `cards()` cho một hàng thẻ, `battle()` cho cả cảnh 3v3).
-- Thẻ chưa có tranh dùng hình tạm: gradient theo hệ + họa tiết ngẫu nhiên cố định theo id.
-- Font Inter đóng gói trong `assets/fonts/` vì máy chạy bot (NAS) thường không có font.
-- **Dự phòng:** renderer được nạp động trong `index.ts`; nếu nạp lỗi thì `ctx.images = null` và mọi lệnh dùng embed chữ. Lỗi vẽ lúc chạy cũng được bắt trong `tryRender` và quay về chữ.
-- Tên file ảnh có số lượt/trang để Discord không hiển thị ảnh cũ từ cache.
+## Images
+Cards and battles are drawn with `@napi-rs/canvas` into PNGs and sent as message attachments (Discord shows attachments larger than embed images).
+- `src/render/`: `theme` (colors, type icons drawn as vector paths, no emoji), `art` (loads `assets/cards/<id>.(png|webp|jpg)`, watches mtime, downscales on load), `draw` (draws cards), `renderer` (API: `cards()` for a row of cards, `battle()` for the whole 3v3 scene).
+- Cards without art use a placeholder: a type-colored gradient with a bokeh pattern that is stable per card id.
+- The Inter font is bundled in `assets/fonts/` because the host (a NAS) often has no usable fonts.
+- **Fallback:** the renderer is loaded dynamically in `index.ts`; if loading fails, `ctx.images = null` and every command uses text embeds. Render errors at runtime are caught in `tryRender` and also fall back to text.
+- Image file names include the turn or page number so Discord never shows a cached older image.
 
-## Ngoài phạm vi (lần này)
-PvP, cửa hàng/giao dịch, dùng coin, lưu trận đang đánh dở qua restart.
+## Out of scope (for now)
+PvP, a shop or trading, spending coins, and persisting battles in progress across restarts.
 
-## Kiểm thử
-Vitest cho engine, gacha/tiến trình, AI, repo JSON (kể cả file hỏng không bị ghi đè), và kiểm tra command có đủ `integration_types`/`contexts`.
-Script `npm run simulate` cho AI đấu AI để soi cân bằng. Script `npm run preview` xuất ảnh mẫu ra `preview/` để xem giao diện mà không cần Discord.
+## Testing
+Vitest covers the engine, gacha and progression, AI, the JSON repo (including that a corrupt file is never overwritten), the renderer, the `/dm` and `/say` commands, and that every command carries the required `integration_types`/`contexts`.
+`npm run simulate` plays AI against AI to check balance. `npm run preview` writes sample images to `preview/` so the look can be checked without Discord.
