@@ -1,0 +1,28 @@
+{
+  "name": "card-battle-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "start": "tsx --env-file=.env src/index.ts",
+    "deploy": "tsx --env-file=.env src/deploy-commands.ts",
+    "simulate": "tsx scripts/simulate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "preview": "tsx scripts/preview.ts"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.10",
+    "discord.js": "^14.27.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
