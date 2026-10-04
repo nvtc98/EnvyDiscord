@@ -1,10 +1,10 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } from 'discord.js';
-import { createFighter } from '../../engine/fighter';
-import type { Player } from '../../game/player';
-import { ownedCards } from '../../game/team';
+import { ownedCards } from '../../game/deck';
+import { MAX_TIER, type Player } from '../../game/player';
+import { EMBED_COLOR } from '../../render/theme';
 import { slash, type AppContext, type Command } from '../command';
 import { attach, tryRender } from '../images';
-import { ELEMENT_EMOJI, RARITY_LABEL, statsLine } from '../render';
+import { cardSummary, tierLabel } from '../render';
 
 // Three cards per page: that is what fits legibly in one row of the image.
 const PAGE_SIZE = 3;
@@ -13,22 +13,18 @@ async function view(player: Player, ctx: AppContext, requestedPage: number) {
   const items = ownedCards(player, ctx.cardIndex);
   const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const page = Math.min(Math.max(0, requestedPage), pages - 1);
+  const maxed = items.filter((o) => o.tier >= MAX_TIER).length;
 
   const embed = new EmbedBuilder()
-    .setColor(0x6366f1)
+    .setColor(EMBED_COLOR.neutral)
     .setTitle('🎴 Collection')
-    .setFooter({ text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards` });
+    .setFooter({ text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards · ${maxed} at max tier` });
   if (items.length === 0) embed.setDescription('No cards yet. Use `/daily` to get your first cards!');
+
   const slice = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const image =
-    slice.length > 0 ? await tryRender(ctx, (r) => r.cards(slice.map(({ def, level }) => ({ def, level })), { scale: 0.9 })) : null;
+  const image = slice.length > 0 ? await tryRender(ctx, (r) => r.cards(slice.map(({ def, tier }) => ({ def, tier, badge: `TIER ${tier}` })))) : null;
   if (!image) {
-    for (const { def, level } of slice) {
-      embed.addFields({
-        name: `${ELEMENT_EMOJI[def.element]} ${def.name} · Lv ${level}`,
-        value: `${RARITY_LABEL[def.rarity]}\n${statsLine(createFighter(def, level))}`,
-      });
-    }
+    for (const { def, tier } of slice) embed.addFields({ name: `${def.name} · ${tierLabel(tier)}`, value: cardSummary(def) });
   }
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

@@ -1,6 +1,9 @@
 import { DiscordAPIError, MessageFlags } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import { dmCommand } from '../src/discord/commands/dm';
+import { nullLogger } from '../src/log/logger';
+
+const ctx = { log: nullLogger } as never;
 
 const TARGET = '1555622989335232643';
 
@@ -26,14 +29,14 @@ const apiError = (code: number) =>
 describe('/dm', () => {
   it('sends the message verbatim, without pings, and confirms privately', async () => {
     const { interaction, reply, send } = setup();
-    await dmCommand.execute(interaction, {} as never);
+    await dmCommand.execute(interaction, ctx);
     expect(send).toHaveBeenCalledWith({ content: 'hello @everyone', allowedMentions: { parse: [] } });
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ flags: MessageFlags.Ephemeral, content: expect.stringContaining('bob') }));
   });
 
   it('refuses anyone who is not the bot owner and never contacts the target', async () => {
     const { interaction, reply, send, fetchUser } = setup({ caller: 'stranger' });
-    await dmCommand.execute(interaction, {} as never);
+    await dmCommand.execute(interaction, ctx);
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('Only the bot owner') }));
     expect(fetchUser).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
@@ -41,7 +44,7 @@ describe('/dm', () => {
 
   it.each([['abc'], ['123'], ['']])('rejects an invalid user id %j', async (bad) => {
     const { interaction, reply, send } = setup({ options: { 'user-id': bad } });
-    await dmCommand.execute(interaction, {} as never);
+    await dmCommand.execute(interaction, ctx);
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('valid numeric') }));
     expect(send).not.toHaveBeenCalled();
   });
@@ -51,7 +54,7 @@ describe('/dm', () => {
       throw apiError(50007);
     });
     const { interaction, reply } = setup({ send });
-    await dmCommand.execute(interaction, {} as never);
+    await dmCommand.execute(interaction, ctx);
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('share a server') }));
   });
 
@@ -60,6 +63,6 @@ describe('/dm', () => {
       throw new Error('network down');
     });
     const { interaction } = setup({ send });
-    await expect(dmCommand.execute(interaction, {} as never)).rejects.toThrow('network down');
+    await expect(dmCommand.execute(interaction, ctx)).rejects.toThrow('network down');
   });
 });

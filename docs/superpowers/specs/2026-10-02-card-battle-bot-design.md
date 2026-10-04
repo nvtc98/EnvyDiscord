@@ -1,7 +1,9 @@
 # Card Battle Bot — Design
 
+> **Update (2026-10-04):** the battle rules, card stats, `/team`, rarity and card levels in this document are superseded by [2026-10-04-lane-battle-design.md](2026-10-04-lane-battle-design.md). The rest (hosting, storage, logging, images, other commands) still applies.
+
 ## Goal
-A Discord bot for a trading-card game, driven by slash commands and buttons, usable in DMs (User Install) and in servers.
+A Discord bot for a dark, mysterious trading-card game, driven by slash commands and buttons, usable in DMs (User Install) and in servers.
 **PvE against an AI**, **collect cards, then battle**. Small scale: fewer than 20 players, fewer than 5 at the same time, run privately on a Synology NAS.
 
 ## Key decisions
@@ -21,6 +23,7 @@ src/data/      Card definitions
 src/db/        PlayerRepo + JSON implementation
 src/discord/   Slash commands, buttons, embeds
 src/render/    Image rendering (cards and battle scene)
+src/log/       JSON Lines logger, reply instrumentation, DM listener
 ```
 
 ## Game rules
@@ -36,7 +39,8 @@ src/render/    Image rendering (cards and battle scene)
 ## Commands
 The bot's language (commands, options, messages, card and skill names) is **English**; documentation is in English too.
 `/daily` (3 different cards + 30 coins per day, using the configured timezone), `/collection`, `/card <name>`, `/team`, `/battle [difficulty]`, `/profile`,
-plus `/say <content>`, `/merciful`, and the owner-only `/dm <message> [user] [user-id]`.
+plus `/say <content>`, `/say-later <content> <seconds>`, `/merciful`, and the owner-only `/dm <message> [user] [user-id]`.
+`/say-later` answers privately at once and posts the line with `followUp` after the delay. It is capped at 840 s because an interaction token lives 15 minutes, and at 3 waiting messages per user. Timers are in memory only.
 Every command is registered with `integration_types: [0,1]` and `contexts: [0,1,2]` so it works in DMs.
 `/dm` checks that the caller is the application owner at runtime, so installing the app does not let anyone make the bot message strangers.
 
@@ -48,9 +52,25 @@ Cards and battles are drawn with `@napi-rs/canvas` into PNGs and sent as message
 - **Fallback:** the renderer is loaded dynamically in `index.ts`; if loading fails, `ctx.images = null` and every command uses text embeds. Render errors at runtime are caught in `tryRender` and also fall back to text.
 - Image file names include the turn or page number so Discord never shows a cached older image.
 
+## Look and feel
+Dark, mysterious tone. Near-black panels, bone text, tarnished-gold frames and a serif display font (Cinzel) for names; Inter for numbers. The arena is lit cold on the player's side and ember-red on the enemy's, with a faint ritual circle behind "VS". Fallen cards are stamped FALLEN. Colors are centralised in `src/render/theme.ts` (`PALETTE`, `RARITY_STYLE`, `ELEMENT_STYLE`, `EMBED_COLOR`). Card art is separate and arrives later; until then placeholders use murky element gradients.
+
+## Logging
+Two append-only JSON Lines streams, one file per day (timezone from `BOT_TZ`): `game-*.jsonl` (gameplay events) and `messages-*.jsonl` (everything received or sent).
+- **Why JSONL:** one self-contained object per line is trivial to append safely, `grep`/`jq`, tail, or import later. How the logs get read is deliberately left open.
+- **Gameplay** events are logged explicitly by the commands that cause them.
+- **Outgoing replies** are captured centrally: `instrument()` wraps `reply`/`update`/`followUp`/`editReply` on every interaction, so no command has to remember to log what it says.
+- **Incoming commands/clicks** are logged in the interaction handler (`describeInteraction`); autocomplete is skipped as noise.
+- **DMs with the bot, both directions,** are logged from `messageCreate`. The client has the `DirectMessages` intent (not privileged) and `Partials.Channel` (DM channels are not cached at startup). This is also how replies to a message the bot sent on its own are received. DMs between two other people never reach the bot.
+- `/dm` is audited separately (`owner_dm`) because a refused DM produces no message event.
+- `LOG_CONTENT=false` keeps metadata but replaces text with a placeholder. Writes are queued and failures only warn, so logging cannot break the bot; shutdown flushes the queue.
+
+## Idea: the bot challenges players on its own
+The bot can start a conversation by DMing a user it shares a server with (the user must allow server DMs), attach Accept/Decline buttons, and handle the click like any other interaction. Their replies and clicks come back through the DM listener and the interaction handler. Needs an opt-in and a cooldown to avoid unsolicited-DM complaints. Not built yet.
+
 ## Out of scope (for now)
 PvP, a shop or trading, spending coins, and persisting battles in progress across restarts.
 
 ## Testing
-Vitest covers the engine, gacha and progression, AI, the JSON repo (including that a corrupt file is never overwritten), the renderer, the `/dm` and `/say` commands, and that every command carries the required `integration_types`/`contexts`.
+Vitest covers the engine, gacha and progression, AI, the JSON repo (including that a corrupt file is never overwritten), the renderer, the logger (rotation, ordering under load, content hiding, write failures), reply instrumentation, the DM listener, the `/dm`, `/say` and `/say-later` commands, and that every command carries the required `integration_types`/`contexts`.
 `npm run simulate` plays AI against AI to check balance. `npm run preview` writes sample images to `preview/` so the look can be checked without Discord.

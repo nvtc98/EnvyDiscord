@@ -2,7 +2,7 @@ import { MessageFlags } from 'discord.js';
 import { normalize } from '../../util/text';
 import { slash, type Command } from '../command';
 import { attach, tryRender } from '../images';
-import { ELEMENT_EMOJI, RARITY_LABEL, cardEmbed } from '../render';
+import { cardEmbed } from '../render';
 
 export const cardCommand: Command = {
   data: slash('card', 'View the details of a card').addStringOption((option) =>
@@ -14,7 +14,7 @@ export const cardCommand: Command = {
     const choices = ctx.cards
       .filter((c) => normalize(c.name).includes(query))
       .slice(0, 25)
-      .map((c) => ({ name: `${ELEMENT_EMOJI[c.element]} ${c.name} · ${RARITY_LABEL[c.rarity]}`, value: c.id }));
+      .map((c) => ({ name: `${c.name} · cost ${c.cost}, power ${c.power}`, value: c.id }));
     await interaction.respond(choices);
   },
 
@@ -26,14 +26,14 @@ export const cardCommand: Command = {
       await interaction.reply({ content: `Card "${input}" not found.`, flags: MessageFlags.Ephemeral });
       return;
     }
-    const level = ctx.repo.get(interaction.user.id).cards[def.id];
-    const note = level ? `You own this card: Lv ${level}` : "You don't own this card yet";
+    const tier = ctx.repo.get(interaction.user.id).cards[def.id];
+    const note = tier ? `You own this card: frame tier ${tier}` : "You don't own this card yet";
 
-    const image = await tryRender(ctx, (r) => r.cards([{ def, level: level ?? 1 }], { scale: 1.2 }));
+    const image = await tryRender(ctx, (r) => r.cards([{ def, tier: tier ?? 1 }], { scale: 2 }));
     if (image) {
       await interaction.reply({ content: `**${def.name}** · ${note}`, files: [attach(image, `${def.id}.png`)] });
       return;
     }
-    await interaction.reply({ embeds: [cardEmbed(def, level ?? 1, note)] });
+    await interaction.reply({ embeds: [cardEmbed(def, tier ?? 1, note)] });
   },
 };

@@ -35,7 +35,10 @@ export class JsonPlayerRepo implements PlayerRepo {
 
   get(id: string): Player {
     const existing = this.data.players[id];
-    return structuredClone(existing ?? createPlayer(id));
+    if (!existing) return createPlayer(id);
+    // Fill in fields that older save files do not have, and drop ones that no longer exist (`team`, from the 3v3 game).
+    const { team: _legacyTeam, ...rest } = structuredClone(existing) as Player & { team?: unknown };
+    return { ...createPlayer(id), ...rest };
   }
 
   save(player: Player): Promise<void> {

@@ -1,56 +1,86 @@
-export type Element = 'fire' | 'water' | 'grass';
-export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
-export type SkillKind = 'attack' | 'heal' | 'shield';
+/** Rules constants. See docs/superpowers/specs/2026-10-04-lane-battle-design.md. */
+export const LANES = 3;
+export const CELLS = 3;
+export const MAX_HP = 20;
+export const MAX_ENERGY = 9;
+export const MAX_ROUNDS = 30;
+export const DECK_SIZE = 12;
+/** Cards drawn before the first turn; every turn then starts with one more draw. */
+export const OPENING_HAND = { first: 2, second: 3 } as const;
 
-export interface Skill {
-  name: string;
-  kind: SkillKind;
-  /** attack: damage multiplier on ATK. heal/shield: fraction of max HP. */
-  power: number;
-  /** Turns the skill is unavailable after use. skills[0] must always be 0. */
-  cooldown: number;
-}
+/** Where a player sits. `bottom` is the human at the bottom of the board, `top` is the opponent. */
+export type Seat = 'bottom' | 'top';
+export type LaneIndex = 0 | 1 | 2;
+
+export type ActiveEffect =
+  | { kind: 'heal'; amount: number }
+  | { kind: 'damage'; amount: number }
+  | { kind: 'draw'; count: number }
+  | { kind: 'energy'; amount: number }
+  | { kind: 'buffLane'; amount: number };
+export type ContinuousEffect = { kind: 'laneDouble' } | { kind: 'anchor' };
+export type EndOfRoundEffect = { kind: 'heal'; amount: number };
+
+/** Active: once, when the card is played. Passive: while on the board, either always or at the end of each round. */
+export type Ability =
+  | { timing: 'active'; effect: ActiveEffect }
+  | { timing: 'continuous'; effect: ContinuousEffect }
+  | { timing: 'endOfRound'; effect: EndOfRoundEffect };
 
 export interface CardDef {
   id: string;
   name: string;
-  element: Element;
-  rarity: Rarity;
+  cost: number;
+  power: number;
+  ability?: Ability;
+  /** Rules text shown on the card. Defaults to a description generated from the ability. */
+  text?: string;
+}
+
+export interface CardInstance {
+  /** Unique within one game; identifies a card in hand or on the board. */
+  uid: number;
+  def: CardDef;
+  owner: Seat;
+  /** Permanent power changes from abilities. */
+  bonus: number;
+}
+
+export interface PlayerState {
   hp: number;
-  atk: number;
-  def: number;
-  spd: number;
-  skills: Skill[];
+  energy: number;
+  /** Turns this player has started, counting the current one. */
+  turns: number;
+  /** Remaining cards, next draw first. */
+  deck: CardDef[];
+  hand: CardInstance[];
 }
 
-export interface Fighter {
-  cardId: string;
-  name: string;
-  element: Element;
-  level: number;
-  maxHp: number;
-  hp: number;
-  atk: number;
-  def: number;
-  spd: number;
-  skills: Skill[];
-  /** Remaining unavailable turns per skill, same indexes as skills. */
-  cooldowns: number[];
-  shield: number;
+export type Cell = CardInstance | null;
+
+export interface GameState {
+  /** `lanes[lane][cell]`; cell 0 is the top edge, cell 2 the bottom edge. */
+  lanes: Cell[][];
+  players: Record<Seat, PlayerState>;
+  first: Seat;
+  active: Seat;
+  round: number;
+  winner: Seat | 'draw' | null;
+  nextUid: number;
 }
 
-export interface Side {
-  fighters: Fighter[];
-  active: number;
+export interface Play {
+  uid: number;
+  lane: LaneIndex;
 }
 
-export type SideId = 'player' | 'enemy';
+export type GameEvent =
+  | { type: 'drew'; seat: Seat; uid: number; card: CardDef }
+  | { type: 'turn_started'; seat: Seat; round: number; energy: number }
+  | { type: 'played'; seat: Seat; uid: number; card: CardDef; lane: LaneIndex; destroyed: { card: CardDef; owner: Seat } | null }
+  | { type: 'ability'; seat: Seat; card: CardDef; text: string }
+  | { type: 'round_resolved'; round: number; damage: Record<Seat, number>; hp: Record<Seat, number> }
+  | { type: 'game_over'; winner: Seat | 'draw'; reason: 'hp' | 'rounds' | 'forfeit' };
 
-export interface Battle {
-  player: Side;
-  enemy: Side;
-  turn: number;
-  winner: SideId | null;
-}
-
-export type Action = { type: 'skill'; index: number } | { type: 'switch'; index: number };
+export const opponentOf = (seat: Seat): Seat => (seat === 'bottom' ? 'top' : 'bottom');
+export const LANE_NAMES = ['Left', 'Middle', 'Right'] as const;

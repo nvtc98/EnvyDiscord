@@ -13,7 +13,8 @@
     "simulate": "tsx scripts/simulate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "preview": "tsx scripts/preview.ts"
+    "preview": "tsx scripts/preview.ts",
+    "frame:cutout": "tsx scripts/frame-cutout.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",

@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import type { PlayerRepo } from '../db/repository';
 import type { CardDef } from '../engine/types';
+import type { Logger } from '../log/logger';
 import type { ImageRenderer } from '../render/renderer';
 import type { Rng } from '../util/rng';
 
@@ -20,6 +21,7 @@ export interface AppContext {
   timezone: string;
   /** Null when image rendering is unavailable; commands then fall back to text embeds. */
   images: ImageRenderer | null;
+  log: Logger;
 }
 
 export interface Command {

@@ -20,7 +20,10 @@ export class ArtLibrary {
   private readonly cache = new Map<string, Entry>();
   private readonly warned = new Set<string>();
 
-  constructor(private readonly dir: string) {}
+  constructor(
+    private readonly dir: string,
+    private readonly maxWidth = MAX_WIDTH,
+  ) {}
 
   async get(cardId: string): Promise<Canvas | null> {
     for (const ext of EXTENSIONS) {
@@ -37,7 +40,7 @@ export class ArtLibrary {
 
       try {
         const image = await loadImage(path);
-        const scale = Math.min(1, MAX_WIDTH / image.width);
+        const scale = Math.min(1, this.maxWidth / image.width);
         const canvas = createCanvas(Math.round(image.width * scale), Math.round(image.height * scale));
         canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
         this.cache.set(cardId, { path, mtimeMs, canvas });

@@ -1,0 +1,12 @@
+{
+  "source": "Dextrous layout \"Blue\" (Poker card, 240 x 336). All numbers are Dextrous pixels; the bot scales them to the output size.",
+  "card": { "width": 240, "height": 336, "cornerRadius": 10 },
+  "art": { "x": 0, "y": 0, "width": 240, "height": 336 },
+  "frame": { "opacity": 1 },
+  "fields": {
+    "name": { "x": 6, "y": 228, "width": 228, "height": 24, "fontSize": 15, "weight": 700, "color": "#ffffff", "align": "center", "maxLines": 1 },
+    "description": { "x": 18, "y": 252, "width": 204, "height": 72, "fontSize": 15, "weight": 400, "color": "#ffffff", "align": "center", "lineHeight": 1.1, "maxLines": 5, "padding": 4 },
+    "cost": { "x": -6, "y": -6, "width": 42, "height": 42, "fontSize": 16, "weight": 700, "color": "#ffffff", "align": "center" },
+    "power": { "x": 204, "y": -6, "width": 42, "height": 42, "fontSize": 16, "weight": 700, "color": "#ffffff", "align": "center" }
+  }
+}

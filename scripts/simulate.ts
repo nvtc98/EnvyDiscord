@@ -1,21 +1,22 @@
-// Balance check: AI vs AI on random level-matched teams. Run with `npm run simulate`.
+// Balance check: AI vs AI with random 12-card decks. Run with `npm run simulate`.
 import { CARDS } from '../src/data/cards';
-import { chooseAction, type Difficulty } from '../src/engine/ai';
-import { createBattle, resolveTurn } from '../src/engine/battle';
-import { createFighter } from '../src/engine/fighter';
-import { shuffle, mulberry32 } from '../src/util/rng';
+import { playAiTurn, type Difficulty } from '../src/engine/ai';
+import { newGame } from '../src/engine/rules';
+import type { GameState, Seat } from '../src/engine/types';
+import { opponentDeck } from '../src/game/deck';
+import { mulberry32 } from '../src/util/rng';
 
-const GAMES = 400;
+const GAMES = 200;
 
-function play(a: Difficulty, b: Difficulty, level: number, seed: number) {
+function play(bottom: Difficulty, top: Difficulty, seed: number) {
   const rng = mulberry32(seed);
-  const team = () => shuffle(CARDS, rng).slice(0, 3).map((c) => createFighter(c, level));
-  let battle = createBattle(team(), team());
-  while (!battle.winner) {
-    battle = resolveTurn(battle, chooseAction(battle, 'player', a, rng), chooseAction(battle, 'enemy', b, rng)).battle;
-    if (battle.turn > 300) throw new Error(`Battle did not finish (seed ${seed})`);
+  const first: Seat = seed % 2 === 0 ? 'bottom' : 'top'; // alternate who goes first
+  let state: GameState = newGame({ bottom: opponentDeck(CARDS, rng), top: opponentDeck(CARDS, rng) }, first, rng).state;
+  while (!state.winner) {
+    const level = state.active === 'bottom' ? bottom : top;
+    state = playAiTurn(state, level, rng).state;
   }
-  return { winner: battle.winner, turns: battle.turn };
+  return { winner: state.winner, rounds: state.round, firstWon: state.winner === first };
 }
 
 const matchups: [Difficulty, Difficulty][] = [
@@ -27,14 +28,17 @@ const matchups: [Difficulty, Difficulty][] = [
   ['hard', 'hard'],
 ];
 
-console.log('player  vs enemy   | player win% | avg turns');
+console.log('first vs second seat  | first-seat win% | draws | avg rounds | goes-first wins%');
+console.log('(left level plays the bottom seat, right level the top seat; who moves first alternates)');
 for (const [a, b] of matchups) {
-  let wins = 0;
-  let turns = 0;
+  let wins = 0, draws = 0, rounds = 0, firstWins = 0;
   for (let seed = 1; seed <= GAMES; seed++) {
-    const result = play(a, b, 3, seed);
-    if (result.winner === 'player') wins++;
-    turns += result.turns;
+    const r = play(a, b, seed);
+    if (r.winner === 'bottom') wins++;
+    if (r.winner === 'draw') draws++;
+    if (r.firstWon) firstWins++;
+    rounds += r.rounds;
   }
-  console.log(`${a.padEnd(7)} vs ${b.padEnd(7)} | ${((wins / GAMES) * 100).toFixed(0).padStart(10)}% | ${(turns / GAMES).toFixed(1)}`);
+  const pct = (n: number) => ((n / GAMES) * 100).toFixed(0).padStart(3);
+  console.log(`${a.padEnd(7)} vs ${b.padEnd(7)} | ${pct(wins)}% (bottom wins) | ${pct(draws)}% | ${(rounds / GAMES).toFixed(1).padStart(6)} | ${pct(firstWins)}%`);
 }

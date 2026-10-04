@@ -1,7 +1,7 @@
 # Card Battle Bot
 
-A Discord bot for a PvE trading-card game: collect cards with `/daily`, build a team of three, and fight the AI in turn-based 3v3 battles (Pokémon-style). Cards and battles are rendered as images.
-Detailed design: [docs/superpowers/specs/2026-10-02-card-battle-bot-design.md](docs/superpowers/specs/2026-10-02-card-battle-bot-design.md).
+A Discord bot for a dark, mysterious PvE trading-card game: collect cards with `/daily`, build a 12-card deck, and fight the AI in a lane battle on a 3x3 board. Cards and battles are rendered as images. Everything the bot does and every message it sends or receives is logged to JSON Lines files.
+Design documents: the battle rules and cards are in [docs/superpowers/specs/2026-10-04-lane-battle-design.md](docs/superpowers/specs/2026-10-04-lane-battle-design.md); hosting, storage, logging and images are in [2026-10-02-card-battle-bot-design.md](docs/superpowers/specs/2026-10-02-card-battle-bot-design.md).
 
 ## Quick reference
 
@@ -22,6 +22,7 @@ Detailed design: [docs/superpowers/specs/2026-10-02-card-battle-bot-design.md](d
 | Tests / type check | `npm test` · `npm run typecheck` |
 | Render sample card and battle images without Discord | `npm run preview` (writes to `preview/`) |
 | AI vs AI games to check game balance | `npm run simulate` |
+| Remove the white background of a card frame exported from Dextrous | `npm run frame:cutout -- in.png out.png [layout.json]` |
 
 Stop the bot with `Ctrl+C`. After editing `.env`, stop and restart the bot (`tsx watch` does not watch `.env`).
 
@@ -48,6 +49,7 @@ To use the bot in DMs you **must** use global registration. Server commands and 
 - The bot cannot read messages in a DM between two people (a Discord limit for User Install apps), so a DM message counter is not possible. The bot only receives data when someone runs a command.
 - A **public** reply is visible to both people in a DM (it shows the bot's name and avatar plus a "used /command" line). An **ephemeral** (only-you) reply is invisible to the other person.
 - A bot can only DM users who share a server with it and allow DMs from server members; otherwise Discord rejects the message (error 50007).
+- Once the bot has a DM with someone, their replies reach the bot as ordinary messages (the bot has the `DirectMessages` intent, which is not privileged) and are logged. The bot never sees DMs between two other people.
 
 ## Commands
 
@@ -55,34 +57,92 @@ The whole bot interface (command names, options, messages, card and skill names)
 
 | Command | What it does | Visible to the other person in a DM? |
 |---|---|---|
-| `/daily` | Once a day, get 3 different cards + 30 coins (duplicates level a card up, max Lv 5) | Yes |
-| `/collection` | Browse your collection | No |
-| `/card <name>` | Show a card's details | Yes |
-| `/team` | Pick 3 cards for your team (if you don't, the bot uses your 3 strongest) | No |
-| `/battle [difficulty]` | 3v3 battle against the AI: easy / normal / hard | No |
+| `/daily` | Once a day, get 3 different random cards + 30 coins. A card you already own goes up one **frame tier** (cosmetic only, max 5); a card at max tier is never given again; with everything at max tier there is nothing left to receive | Yes |
+| `/collection` | Browse your collection, 3 cards per page | No |
+| `/card <name>` | Show a card's cost, power and ability | Yes |
+| `/deck` | Pick the 12 cards you take into battle. With fewer than 12 cards you own, battles fill the gaps with guest cards that are never added to your collection | No |
+| `/battle [difficulty]` | Lane battle against the AI: easy / normal / hard | No |
 | `/profile` | Coins, wins and losses | No |
 | `/say <content>` | The bot says exactly what you type (cannot ping @everyone or mentions) | Yes |
 | `/dm <message> [user] [user-id]` | **Bot owner only.** The bot sends a direct message to a user (works only if they share a server with the bot and allow DMs) | No (only you see the result) |
+| `/say-later <content> <seconds>` | The bot says a line in this chat after a delay of 5 to 840 seconds (14 minutes; Discord's 15-minute interaction limit). At most 3 waiting per user; lost if the bot restarts | Yes (the confirmation is only for you) |
 | `/merciful` | The bot replies: "Merciful be, all my eyes." | Yes |
 
-Type advantage: 🔥 Fire > 🌿 Grass > 💧 Water > 🔥 Fire (advantage ×1.5, disadvantage ×0.5).
+## How a battle works
+
+Full rules: [lane battle design](docs/superpowers/specs/2026-10-04-lane-battle-design.md). In short:
+
+- Each side has a **12-card deck**, **20 HP** and a hand. The first player starts with 2 cards, the second with 3; everyone draws 1 at the start of each of their turns.
+- **Energy** is `min(your turn number, 9)` and refills every turn. Play as many cards as you can pay for.
+- The board has **3 lanes (Left, Middle, Right) of 3 cells**. A card enters a lane from your edge (the bottom). If the cell is taken, that card is **pushed** one step toward the enemy, and so on down the lane. A gap absorbs the push; if there is no gap, the card at the far end is **destroyed**, whoever owns it. The enemy pushes from the top.
+- After both players have played, the round resolves: end-of-round passives, then **each player loses HP equal to the total power of the other's cards on the board**. Reach 0 HP and you lose. After round 30 the higher HP wins.
+- Cards have a **cost**, a **power** and at most one ability: *active* (once, when played) or *passive* (continuous, or at the end of each round).
+- In Discord: pick a card in the menu, press a lane (a 💥 means the push destroys an enemy card, ⚠️ one of yours), then **End turn**. The bot answers and the next round starts.
+
 
 ## Card images
 
-Cards and battles are drawn as **PNG images** (rarity frames, type icons, HP bars, shields, K.O. overlay):
+Cards and battles are drawn as **PNG images**:
 
 | Command | Image |
 |---|---|
-| `/card` | One full card with stats and its 3 skills |
-| `/daily` | The 3 cards you just got, with NEW / LV n / MAX badges |
+| `/card` | One full card (art, frame, cost, power, name and ability text) |
+| `/daily` | The 3 cards you just got, with NEW / TIER n badges |
 | `/collection` | 3 cards per page |
-| `/battle` | Both teams in one image, redrawn every turn (active card large, bench cards small) |
+| `/battle` | Both players' HP, the 3x3 board with the cards, your energy and your numbered hand; redrawn after every play |
 
-**Adding real art:** put a file at `assets/cards/<card id>.png` (png, webp and jpg all work). Cards without art get a generated placeholder based on their type. New or replaced files are picked up automatically, no restart needed. Art specs and the list of file names are in [assets/cards/README.md](assets/cards/README.md).
+**How a card is built (layers, bottom to top):**
+1. **Art**: `assets/cards/<card id>.png` (png, webp or jpg), cropped to fit the card. A card without art gets a generated placeholder.
+2. **Frame**: `assets/frames/tier-<n>.png`, a PNG with **transparency**, so the art shows through (the description box can be semi-transparent). A tier without its own file uses the nearest lower tier, so one `tier-1.png` is enough to start. With no frame file at all, the bot draws a built-in frame in the same style.
+3. **Text**: name, ability text, cost (top left) and power (top right), drawn by the bot using the positions in `assets/frames/layout.json`.
+
+New or replaced art and frame files are picked up automatically, no restart needed.
+
+**Card design tool:** frames are designed in [Dextrous](https://www.dextrous.com.au/decks). `layout.json` uses Dextrous pixels (the Poker card is 240 x 336, ratio 5:7), copied from Dextrous's layout export, so the text lands where it does in Dextrous. Export the frame at **750 x 1050** (or any 5:7 size of at least 480 x 672).
+
+**Dextrous exports a white background, not a transparent one.** Fix a frame with:
+
+```bash
+npm run frame:cutout -- Blue_frame.png assets/frames/tier-1.png Blue_layout.json
+```
+
+It makes the white transparent (with clean edges, no white halo) and restores boxes that Dextrous flattened onto the white, such as the description box at 48% opacity. The layout JSON is optional but needed for that last part. The original files for the current frame are kept in `assets/frames/source/`.
+
+Art specs and the list of file names: [assets/cards/README.md](assets/cards/README.md).
+
+**Board cards** are a compact landscape version of the same design (art, name banner, cost and power in the corners, an inner line in blue for your cards and red for the enemy's, a gold diamond for cards with an ability), because full portrait cards would be unreadable on a 3x3 board in a chat.
+
+**Look:** near-black surfaces, bone-colored text, a murky arena with cold light on your side and ember light on the enemy's. The palette lives in `src/render/theme.ts`.
 
 **Text fallback:** if the image library cannot run (for example on a NAS) or a single render fails, the bot falls back to text embeds and the game stays playable. On startup the terminal prints `Image rendering enabled`, or `Image rendering unavailable, falling back to text embeds: ...` with the reason.
 
-The **Inter** font (SIL OFL license) is bundled in `assets/fonts/`, so rendering does not depend on fonts installed on the host. When moving to a NAS, copy the whole `assets/` folder.
+Fonts (SIL OFL license) are bundled in `assets/fonts/`: **Inter** (HUD numbers), **Cinzel** (headings) and **Aleo** (card text, the typeface of the Dextrous design). When moving to a NAS, copy the whole `assets/` folder.
+
+## Logs
+
+The bot writes two append-only streams, one file per day (day boundaries follow `BOT_TZ`), in `logs/` (override with `LOG_DIR`; the folder is git-ignored). Every line is one JSON object with a `ts` (ISO time) and a `type`, which makes the files easy to `grep`, `jq` or load into any tool later.
+
+| File | Contains | Event types |
+|---|---|---|
+| `game-YYYY-MM-DD.jsonl` | Gameplay | `daily_claimed`, `deck_set`, `battle_started` (decks, who goes first, difficulty), `battle_event` (every card played, ability, round resolution and game over, as the engine reports them, so a battle can be replayed), `battle_ended` |
+| `messages-YYYY-MM-DD.jsonl` | What the bot receives and sends | `interaction` (a command or button received, with its options), `bot_response` (everything the bot replied: text, embed titles, attachment names, whether it was private), `dm_message` (messages in a DM with the bot, `direction: "in"` or `"out"`), `owner_dm` (each `/dm` attempt and whether Discord accepted it), `say_later_failed`, `error` |
+
+`interactionId` ties a command to the replies it caused. Replies to a message the bot sent on its own arrive as `dm_message` with `direction: "in"`.
+
+Message text is logged by default. Set `LOG_CONTENT=false` to keep who/when/what-kind but replace message text with `[hidden, N chars]`. Message logs contain private conversations, so treat the folder accordingly and tell the people who talk to the bot that it keeps logs. Logging never blocks or breaks the bot: a failed write only prints a warning.
+
+Examples (needs [jq](https://jqlang.github.io/jq/)):
+
+```bash
+# Every finished battle
+jq -c 'select(.type=="battle_ended")' logs/game-*.jsonl
+# Everything people wrote to the bot in DMs
+jq -r 'select(.type=="dm_message" and .direction=="in") | "\(.ts) \(.username): \(.content)"' logs/messages-*.jsonl
+# Which commands are used most
+jq -r 'select(.type=="interaction" and .kind=="command") | .name' logs/messages-*.jsonl | sort | uniq -c | sort -rn
+```
+
+Not logged: messages in servers (the bot does not read them) and DMs between two other people (Discord does not deliver them to the bot).
 
 ## Discord setup (one time)
 
@@ -129,10 +189,12 @@ Moving to Node 22 later needs no code changes.
 ## Development
 
 ```bash
-npm test            # Vitest: engine, gacha, AI, JSON repo, renderer, Discord payload limits
+npm test            # Vitest: engine rules, AI, collection and decks, JSON repo, renderer, frame cutout, Discord flows
 npm run typecheck
-npm run simulate    # AI vs AI games to check balance
+npm run simulate    # AI vs AI games to check balance (win rates by seat and difficulty, game length)
 ```
 
-Add a card: edit `src/data/cards.ts` (each card needs exactly 3 skills, and the first must be a basic attack with no cooldown). Never rename an existing card id, because ids are stored in players' save files.
+Add a card: edit `src/data/cards.ts` (a card has an id, a name, a cost, a power and optionally one ability; the rules text is generated from the ability unless you set `text`). Never rename an existing card id, because ids are stored in players' save files.
+Add an ability kind: add it to the types in `src/engine/types.ts`, give it a rules-text sentence in `src/engine/abilities.ts`, handle it in `src/engine/rules.ts`, and add tests in `tests/engine.test.ts`.
+Run `npm run preview` after changing anything under `src/render/` to see the result.
 Add a command: create a file in `src/discord/commands/`, add it to `src/discord/commands/index.ts`, then run `npm run deploy`.

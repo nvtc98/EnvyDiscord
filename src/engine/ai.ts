@@ -1,86 +1,101 @@
 import { pick, type Rng } from '../util/rng';
-import {
-  activeOf,
-  calcDamage,
-  elementMultiplier,
-  legalActions,
-  opponentOf,
-  resolveTurn,
-} from './battle';
-import type { Action, Battle, SideId } from './types';
+import { endTurn, legalPlays, playCard, totalPower, type Step } from './rules';
+import { opponentOf, type GameEvent, type GameState, type Play, type Seat } from './types';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
-export function chooseAction(battle: Battle, side: SideId, difficulty: Difficulty, rng: Rng): Action {
-  const actions = legalActions(battle, side);
-  if (actions.length === 0) throw new Error('No legal action available');
-  if (difficulty === 'easy') return pick(actions.filter((a) => a.type === 'skill'), rng);
-  if (difficulty === 'normal') {
-    // A little noise so it is not perfectly predictable.
-    if (rng() < 0.15) return pick(actions.filter((a) => a.type === 'skill'), rng);
-    return best(actions, (a) => heuristic(battle, side, a));
-  }
-  return best(actions, (a) => worstCase(battle, side, a));
+/**
+ * How good a position is for `me`. Board power counts triple because it keeps dealing damage every round;
+ * a board that can already kill (or that would kill us) dominates everything else.
+ */
+export function evaluate(state: GameState, me: Seat): number {
+  if (state.winner) return state.winner === me ? 1000 : state.winner === 'draw' ? 0 : -1000;
+  const foe = opponentOf(me);
+  const mine = totalPower(state, me);
+  const theirs = totalPower(state, foe);
+  let value = (mine - theirs) * 3 + (state.players[me].hp - state.players[foe].hp);
+  if (mine >= state.players[foe].hp) value += 200;
+  if (theirs >= state.players[me].hp) value -= 200;
+  return value;
 }
 
-function best(actions: Action[], score: (a: Action) => number): Action {
-  let top = actions[0];
-  let topScore = -Infinity;
-  for (const action of actions) {
-    const s = score(action);
-    if (s > topScore) {
-      top = action;
-      topScore = s;
+const costOf = (state: GameState, play: Play): number =>
+  state.players[state.active].hand.find((c) => c.uid === play.uid)?.def.cost ?? 0;
+
+/** Plans the active seat's whole turn (a list of plays) without ending it. */
+export function chooseTurn(state: GameState, difficulty: Difficulty, rng: Rng): Play[] {
+  if (difficulty === 'easy') return planEasy(state, rng);
+  if (difficulty === 'normal') return planGreedy(state);
+  return planBeam(state);
+}
+
+function planEasy(start: GameState, rng: Rng): Play[] {
+  const plan: Play[] = [];
+  let state = start;
+  while (state.winner === null) {
+    const options = legalPlays(state);
+    if (options.length === 0 || rng() < 0.25) break;
+    const play = pick(options, rng);
+    plan.push(play);
+    state = playCard(state, play.uid, play.lane).state;
+  }
+  return plan;
+}
+
+function planGreedy(start: GameState): Play[] {
+  const me = start.active;
+  const plan: Play[] = [];
+  let state = start;
+  while (state.winner === null) {
+    const base = evaluate(state, me);
+    let best: { play: Play; next: GameState; score: number } | null = null;
+    for (const play of legalPlays(state)) {
+      const next = playCard(state, play.uid, play.lane).state;
+      // A small bonus for spending energy, so the bot does not sit on unused mana.
+      const score = evaluate(next, me) - base + 0.25 * costOf(state, play);
+      if (!best || score > best.score) best = { play, next, score };
     }
+    if (!best || best.score <= 0) break;
+    plan.push(best.play);
+    state = best.next;
   }
-  return top;
+  return plan;
 }
 
-function heuristic(battle: Battle, side: SideId, action: Action): number {
-  const me = activeOf(battle, side);
-  const foe = activeOf(battle, opponentOf(side));
+/** Hard: keeps the 12 most promising partial turns at each step and returns the best whole turn it found. */
+function planBeam(start: GameState): Play[] {
+  const me = start.active;
+  const WIDTH = 12;
+  type Node = { state: GameState; plan: Play[]; value: number };
+  let frontier: Node[] = [{ state: start, plan: [], value: evaluate(start, me) }];
+  let best: Node = frontier[0];
 
-  if (action.type === 'switch') {
-    const candidate = battle[side].fighters[action.index];
-    const badMatchup = elementMultiplier(foe.element, me.element) > 1;
-    const goodMatchup = elementMultiplier(candidate.element, foe.element) > 1;
-    return badMatchup && goodMatchup ? 20 : -1;
+  for (let depth = 0; depth < 12 && frontier.length > 0; depth++) {
+    const next: Node[] = [];
+    for (const node of frontier) {
+      if (node.state.winner !== null) continue;
+      for (const play of legalPlays(node.state)) {
+        const state = playCard(node.state, play.uid, play.lane).state;
+        next.push({ state, plan: [...node.plan, play], value: evaluate(state, me) });
+      }
+    }
+    next.sort((a, b) => b.value - a.value);
+    frontier = next.slice(0, WIDTH);
+    for (const node of frontier) if (node.value > best.value) best = node;
   }
-
-  const skill = me.skills[action.index];
-  if (skill.kind === 'attack') {
-    const damage = calcDamage(me, skill, foe);
-    return damage >= foe.hp + foe.shield ? 1000 : damage;
-  }
-  if (skill.kind === 'heal') {
-    const missing = me.maxHp - me.hp;
-    return me.hp / me.maxHp < 0.4 ? Math.min(missing, me.maxHp * skill.power) * 1.5 : 0;
-  }
-  return me.shield === 0 ? me.maxHp * skill.power * 0.5 : 0;
+  return best.plan;
 }
 
-/** One-ply minimax: assume the opponent picks the reply that hurts us most. */
-function worstCase(battle: Battle, side: SideId, action: Action): number {
-  const replies = legalActions(battle, opponentOf(side));
-  let worst = Infinity;
-  for (const reply of replies) {
-    const result =
-      side === 'player'
-        ? resolveTurn(battle, action, reply).battle
-        : resolveTurn(battle, reply, action).battle;
-    worst = Math.min(worst, evaluate(result, side));
+/** Plays the active seat's turn with the AI and ends it. Returns every event that happened. */
+export function playAiTurn(start: GameState, difficulty: Difficulty, rng: Rng): Step {
+  const events: GameEvent[] = [];
+  let state = start;
+  for (const play of chooseTurn(state, difficulty, rng)) {
+    const step = playCard(state, play.uid, play.lane);
+    state = step.state;
+    events.push(...step.events);
+    if (state.winner) return { state, events };
   }
-  return worst;
-}
-
-function evaluate(battle: Battle, side: SideId): number {
-  if (battle.winner) return battle.winner === side ? 10 : -10;
-  return hpFraction(battle, side) - hpFraction(battle, opponentOf(side));
-}
-
-function hpFraction(battle: Battle, side: SideId): number {
-  const fighters = battle[side].fighters;
-  const hp = fighters.reduce((sum, f) => sum + f.hp + f.shield * 0.5, 0);
-  const max = fighters.reduce((sum, f) => sum + f.maxHp, 0);
-  return hp / max;
+  const ended = endTurn(state);
+  return { state: ended.state, events: [...events, ...ended.events] };
 }

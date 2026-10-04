@@ -1,5 +1,6 @@
 import { EmbedBuilder, MessageFlags } from 'discord.js';
 import { todayKey } from '../../game/gacha';
+import { EMBED_COLOR } from '../../render/theme';
 import { slash, type Command } from '../command';
 
 export const profileCommand: Command = {
@@ -12,7 +13,7 @@ export const profileCommand: Command = {
     const claimed = player.lastDaily === todayKey(new Date(), ctx.timezone);
 
     const embed = new EmbedBuilder()
-      .setColor(0x14b8a6)
+      .setColor(EMBED_COLOR.profile)
       .setTitle(`👤 ${interaction.user.displayName}`)
       .addFields(
         { name: '💰 Coins', value: String(player.coins), inline: true },

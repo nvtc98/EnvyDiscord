@@ -17,7 +17,7 @@ export const dmCommand: Command = {
     .addUserOption((option) => option.setName('user').setDescription('Who to message'))
     .addStringOption((option) => option.setName('user-id').setDescription('Or paste a user ID')),
 
-  async execute(interaction) {
+  async execute(interaction, ctx) {
     const reply = (content: string) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
 
     // Without this check anyone with the app installed could make the bot message strangers.
@@ -39,9 +39,17 @@ export const dmCommand: Command = {
         return;
       }
       // Repeat the text verbatim but never ping anyone through it.
-      await user.send({ content: interaction.options.getString('message', true), allowedMentions: { parse: [] } });
+      const content = interaction.options.getString('message', true);
+      await user.send({ content, allowedMentions: { parse: [] } });
+      ctx.log.message('owner_dm', { userId: interaction.user.id, targetId: userId, ok: true, content: ctx.log.text(content) });
       await reply(`✅ Sent to **${user.username}**.`);
     } catch (error) {
+      ctx.log.message('owner_dm', {
+        userId: interaction.user.id,
+        targetId: userId,
+        ok: false,
+        error: error instanceof DiscordAPIError ? `${error.code}: ${error.message}` : String(error),
+      });
       if (error instanceof DiscordAPIError && error.code === RESTJSONErrorCodes.CannotSendMessagesToThisUser) {
         await reply(
           "❌ Discord refused: that user has DMs closed, or doesn't share a server with the bot. " +
