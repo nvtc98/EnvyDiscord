@@ -1,0 +1,94 @@
+import type { CardDef } from "../engine/types";
+import type { Rng } from "../util/rng";
+
+export interface NameAttempt {
+  typed: string;
+  result: "exact" | "near" | "none";
+  suggestion?: string;
+}
+
+export interface StoryLine {
+  /** Who speaks. A line without a speaker is narration. */
+  speaker?: string;
+  text: string;
+}
+
+/** Where the player is in the story, and what they have told it. Saved with the player. */
+export interface StoryState {
+  /** The scene the player is in. */
+  node: string;
+  /** The player's name as a member of The Eyes, e.g. "Ocean Eyes". Null until given, or if they are not one of The Eyes. */
+  name: string | null;
+  isEye: boolean | null;
+  knowsTribe: boolean | null;
+  /** Every name the player typed, in order, with how it matched. */
+  nameAttempts: NameAttempt[];
+  /** A name the player typed that was not recognised, waiting for them to decide what to do. */
+  pendingName: { typed: string; suggestion: string | null } | null;
+  /** A line shown once at the top of the next scene view (a reaction to the last action). */
+  notice: StoryLine | null;
+  /** The twelve cards currently shown in the book, and how many times the player has had them redrawn. */
+  pack: { cards: string[]; rerolls: number } | null;
+  /** True once the player has taken their first twelve cards. /daily unlocks after this. */
+  starterClaimed: boolean;
+}
+
+export interface StoryChoice {
+  label: string;
+  style?: "primary" | "secondary" | "success" | "danger";
+  /** An emoji shown on the button, e.g. "⬅️". */
+  emoji?: string;
+}
+
+export interface MapLocation {
+  id: string;
+  name: string;
+  /** Position on the map image, 0 to 1 from the left and the top. */
+  x: number;
+  y: number;
+  /** The player stands here. */
+  here?: boolean;
+}
+
+export interface MapView {
+  locations: MapLocation[];
+  links: [string, string][];
+}
+
+/** What the player sees in one scene. The Discord layer turns it into a message. */
+export interface StoryView {
+  title: string;
+  lines: StoryLine[];
+  choices: StoryChoice[];
+  /** The scene asks the player to type something (opens a form). */
+  input?: {
+    buttonLabel: string;
+    modalTitle: string;
+    label: string;
+    placeholder: string;
+  };
+  map?: MapView;
+  pack?: { cards: CardDef[] };
+}
+
+export type StoryAction =
+  | { type: "choice"; index: number }
+  | { type: "text"; text: string };
+
+export interface StoryContext {
+  rng: Rng;
+  cards: readonly CardDef[];
+  cardIndex: ReadonlyMap<string, CardDef>;
+}
+
+export type StoryEvent =
+  | { type: "node"; node: string }
+  | {
+      type: "name_attempt";
+      typed: string;
+      result: NameAttempt["result"];
+      suggestion?: string;
+    }
+  | { type: "name_set"; name: string; how: "exact" | "suggestion" | "kept" }
+  | { type: "pack_shown"; cards: string[]; rerolls: number }
+  | { type: "pack_taken"; cards: string[]; rerolls: number };
