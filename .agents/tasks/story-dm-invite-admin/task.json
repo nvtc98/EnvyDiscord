@@ -1,0 +1,7 @@
+{
+  "task_id": "story-dm-invite-admin",
+  "task_description": "Move the Discord bot's story prologue from an in-place ephemeral embed to a multi-message DM conversation (plain text for conversation scenes, embeds kept for map and the book's card grid), with a precise stale-button safety model; add a command-layer ready-gate before the greeting and resume prompts that persist nothing on decline; add /invite (any user), other-player read-only /profile and /collection, and an owner-gated /admin summary; add a PlayerRepo enumeration method; update the story design doc.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
