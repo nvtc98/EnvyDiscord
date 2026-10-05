@@ -39,7 +39,7 @@ const storyContext = (ctx: AppContext): StoryContext => ({
 });
 
 /** Just enough of a Discord DM channel for sending scene messages. */
-interface DmChannel {
+export interface DmChannel {
   send(payload: StoryMessage): Promise<{ id: string }>;
 }
 
@@ -106,7 +106,7 @@ async function deliverScene(
 }
 
 /** The gate shown before the story: either the ready-gate (no progress) or a resume gate. */
-function gateMessage(
+export function gateMessage(
   line: string,
   yesLabel: string,
   yesId: string,
@@ -126,7 +126,7 @@ function gateMessage(
 }
 
 /** Opens the user's DM channel, mapping a closed-DM refusal to null (reusing the dm.ts error pattern). */
-async function resolveDm(user: User): Promise<DmChannel | null> {
+export async function resolveDm(user: User): Promise<DmChannel | null> {
   try {
     return (await user.createDM()) as unknown as DmChannel;
   } catch (error) {

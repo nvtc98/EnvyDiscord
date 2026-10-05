@@ -1,4 +1,5 @@
-import type { CardDef } from '../engine/types';
+import type { CardDef } from "../engine/types";
+import type { StoryState } from "../story/types";
 
 /** Highest frame tier. The tier only changes how a card's frame looks; it never changes a card's strength. */
 export const MAX_TIER = 5;
@@ -14,15 +15,37 @@ export interface Player {
   cards: Record<string, number>;
   /** cardIds chosen with /deck; empty or invalid means "build one automatically". */
   deck: string[];
+  /** Null until the player runs /story for the first time. */
+  story: StoryState | null;
 }
 
 export function createPlayer(id: string): Player {
-  return { id, coins: 0, wins: 0, losses: 0, lastDaily: null, cards: {}, deck: [] };
+  return {
+    id,
+    coins: 0,
+    wins: 0,
+    losses: 0,
+    lastDaily: null,
+    cards: {},
+    deck: [],
+    story: null,
+  };
+}
+
+/** True once a player has done anything: started the story, owns cards, battled, or earned coins. */
+export function hasPlayed(player: Player): boolean {
+  return (
+    player.story !== null ||
+    Object.keys(player.cards).length > 0 ||
+    player.wins > 0 ||
+    player.losses > 0 ||
+    player.coins > 0
+  );
 }
 
 export interface GrantResult {
   card: CardDef;
-  kind: 'new' | 'tier-up';
+  kind: "new" | "tier-up";
   tier: number;
 }
 
@@ -31,13 +54,16 @@ export function grantCard(player: Player, card: CardDef): GrantResult {
   const current = player.cards[card.id];
   if (current === undefined) {
     player.cards[card.id] = 1;
-    return { card, kind: 'new', tier: 1 };
+    return { card, kind: "new", tier: 1 };
   }
-  if (current >= MAX_TIER) throw new Error(`${card.id} is already at the maximum frame tier`);
+  if (current >= MAX_TIER)
+    throw new Error(`${card.id} is already at the maximum frame tier`);
   player.cards[card.id] = current + 1;
-  return { card, kind: 'tier-up', tier: current + 1 };
+  return { card, kind: "tier-up", tier: current + 1 };
 }
 
 /** Cards that can still be received: not owned yet, or owned below the maximum tier. */
-export const receivable = (player: Player, cards: readonly CardDef[]): CardDef[] =>
-  cards.filter((c) => (player.cards[c.id] ?? 0) < MAX_TIER);
+export const receivable = (
+  player: Player,
+  cards: readonly CardDef[],
+): CardDef[] => cards.filter((c) => (player.cards[c.id] ?? 0) < MAX_TIER);

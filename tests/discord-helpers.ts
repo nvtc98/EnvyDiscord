@@ -16,6 +16,9 @@ export class MemoryRepo implements PlayerRepo {
   async save(player: Player): Promise<void> {
     this.players.set(player.id, structuredClone(player));
   }
+  all(): Player[] {
+    return [...this.players.values()].map((p) => structuredClone(p));
+  }
   async flush(): Promise<void> {}
 }
 
@@ -110,19 +113,34 @@ export function slashInteraction(
     }
     return dm;
   });
+  // A fake user the slash command can resolve from a `user` option (plus the one invoking it).
+  const makeUser = (id: string) => ({
+    id,
+    username: `user${id}`,
+    displayName: `User ${id}`,
+    bot: false,
+    createDM,
+    displayAvatarURL: (_opts?: unknown) => `https://cdn.example/${id}.png`,
+  });
   return {
-    user: {
-      id: userId,
-      username: `user${userId}`,
-      displayName: `User ${userId}`,
-      createDM,
-    },
+    user: makeUser(userId),
     dm,
     options: {
       getString: (name: string) =>
         typeof options[name] === "string" ? (options[name] as string) : null,
       getBoolean: (name: string) =>
         typeof options[name] === "boolean" ? (options[name] as boolean) : null,
+      // A `user` option value is a user id string in these tests; required=true throws when absent.
+      getUser: (name: string, required?: boolean) => {
+        const value = options[name];
+        if (typeof value === "string") return makeUser(value);
+        if (required) throw new Error(`missing required user option: ${name}`);
+        return null;
+      },
+      getSubcommand: () =>
+        typeof options.subcommand === "string"
+          ? (options.subcommand as string)
+          : null,
     },
     client: {
       application: { fetch: async () => ({ owner: { id: ownerId } }) },
