@@ -54,6 +54,28 @@ export function sanitizeDisplay(input: string): string {
   return text || "someone";
 }
 
+/**
+ * Cleans a free-text name typed by someone who is NOT one of The Eyes: it keeps only safe characters
+ * (letters, digits, spaces, apostrophes, dots and hyphens — no markdown, mentions or links), collapses
+ * whitespace, caps the length and capitalizes each word and hyphenated part the same way `displayName`
+ * does. Unlike `displayName` it does NOT append "Eyes" (a stranger's name is their own), and unlike
+ * `cleanStem` it does NOT drop a trailing "Eyes". Returns an empty string when nothing usable remains,
+ * so the caller can keep asking.
+ */
+export function cleanFreeName(input: string): string {
+  const text = input
+    .replace(/[^\p{L}\p{N}\s'’.-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_STEM)
+    .trim();
+  if (!text) return "";
+  return text.replace(
+    /(^|[\s-])(\p{L})/gu,
+    (_, sep: string, ch: string) => sep + ch.toUpperCase(),
+  );
+}
+
 /** "ocean" becomes "Ocean Eyes". Each word and each hyphenated part starts with a capital; "alterra's" keeps its lowercase s. */
 export function displayName(stem: string): string {
   const titled = stem

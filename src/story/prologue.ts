@@ -1,6 +1,12 @@
 import { grantCard, type Player } from "../game/player";
 import { STARTER_SIZE, drawStarterPack } from "../game/starter";
-import { cleanStem, displayName, isStrangerStem, matchName } from "./names";
+import {
+  cleanFreeName,
+  cleanStem,
+  displayName,
+  isStrangerStem,
+  matchName,
+} from "./names";
 import type {
   StoryChoice,
   StoryContext,
@@ -127,7 +133,7 @@ export const NODES: Record<string, NodeDef> = {
     }),
     choose(p, index) {
       story(p).isEye = index === 0;
-      return index === 0 ? "ask_name" : "not_eye";
+      return index === 0 ? "ask_name" : "ask_name_free";
     },
   },
 
@@ -265,12 +271,45 @@ export const NODES: Record<string, NodeDef> = {
     choose: () => "tribe",
   },
 
-  not_eye: {
+  ask_name_free: {
     view: () => ({
       title: ROAD,
       lines: [
         stranger(
           "No matter. The old road is kind to any who keep walking. Tarry with me a while.",
+        ),
+        stranger(
+          "Still, I would know by what name to call thee. Speak it as thou wilt — thine own, whatever it be.",
+        ),
+      ],
+      choices: [],
+      input: {
+        buttonLabel: "Speak my name",
+        modalTitle: "Speak thy name",
+        label: "Thy name (whatever thou art called)",
+        placeholder: "Phantom",
+      },
+    }),
+    submit(p, text, _ctx, events) {
+      const s = story(p);
+      const name = cleanFreeName(text);
+      if (!name) {
+        s.notice = stranger("Speak something. A name cannot be empty.");
+        return "ask_name_free";
+      }
+      s.name = name;
+      s.pendingName = null;
+      events.push({ type: "name_set", name, how: "free" });
+      return "name_free_ack";
+    },
+  },
+
+  name_free_ack: {
+    view: (p) => ({
+      title: ROAD,
+      lines: [
+        stranger(
+          `${who(p)}. A fine name, and one I have not met upon this road. 'Tis thine alone, and that is no small thing.`,
         ),
       ],
       choices: go("Onward"),

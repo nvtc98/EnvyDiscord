@@ -149,15 +149,17 @@ describe("/story", () => {
   it("continues where the player left off via the resume gate", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not"); // moves to not_eye
+    await click(ctx, dm, "Nay, I am not"); // moves to the free-name form (ask_name_free)
     // A second /story offers the resume gate.
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
     expect(labels(second.gate)).toEqual([GATE.resumeYes, GATE.resumeNo]);
     await pressGate(ctx, second.dm, GATE.resumeYes);
     const resumed = live(second.dm);
-    expect(content(resumed)).toMatch(/No matter/);
-    expect(labels(resumed)).toEqual(["Onward"]);
+    expect(second.dm.sent.some((p) => content(p)?.match(/No matter/))).toBe(
+      true,
+    );
+    expect(labels(resumed)).toEqual(["Speak my name"]);
   });
 
   it("asks for a name in a form that explains Eyes is added, and welcomes a name from the list", async () => {
@@ -273,8 +275,8 @@ describe("/story", () => {
     );
     const greetingMsgId = ctx.repo.get("u").story!.liveMessageId!;
     // advance via a different choice first so the greeting message is no longer live
-    await click(ctx, dm, "Nay, I am not"); // -> not_eye
-    expect(ctx.repo.get("u").story!.node).toBe("not_eye");
+    await click(ctx, dm, "Nay, I am not"); // -> ask_name_free
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     // now press the stale greeting button
     const stale = dmButtonInteraction(
       "u",
@@ -285,7 +287,7 @@ describe("/story", () => {
     await storyCommand.component!(stale as never, ctx);
     expect(stale.update).toHaveBeenCalledWith({ components: [] });
     expect(ctx.repo.get("u").story).toMatchObject({
-      node: "not_eye",
+      node: "ask_name_free",
       isEye: false,
     });
   });
@@ -300,12 +302,12 @@ describe("/story", () => {
     const liveId = ctx.repo.get("u").story!.liveMessageId!;
     const first = dmButtonInteraction("u", button.custom_id, liveId, dm);
     await storyCommand.component!(first as never, ctx);
-    expect(ctx.repo.get("u").story!.node).toBe("not_eye");
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     const beforeSecond = dm.sent.length;
     // second click on the same (now stale) message
     const second = dmButtonInteraction("u", button.custom_id, liveId, dm);
     await storyCommand.component!(second as never, ctx);
-    expect(ctx.repo.get("u").story!.node).toBe("not_eye");
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     expect(dm.sent.length).toBe(beforeSecond); // nothing new sent
   });
 
@@ -313,6 +315,14 @@ describe("/story", () => {
     const ctx = makeCtx(4);
     const { dm } = await begin(ctx);
     await click(ctx, dm, "Nay, I am not");
+    // the non-Eyes branch now asks a name a different way: a free form, no card match, no "Eyes" appended
+    const { payload: ack } = await submitName(ctx, dm, "Nomad");
+    expect(content(ack)).toMatch(/Nomad/);
+    expect(ctx.repo.get("u").story).toMatchObject({
+      isEye: false,
+      name: "Nomad",
+      node: "name_free_ack",
+    });
     let p = (await click(ctx, dm, "Onward")).payload;
     expect(content(p)).toMatch(/Do you know where they live\?/);
     expect(dm.sent.some((m) => content(m)?.includes("Bò Tuôi"))).toBe(true);
@@ -428,6 +438,7 @@ describe("/story", () => {
     );
     const { dm } = await begin(ctx);
     await click(ctx, dm, "Nay, I am not");
+    await submitName(ctx, dm, "Nomad"); // the non-Eyes free-name step
     for (const label of ["Onward", "Nay, I do not", "Onward", "Onward"])
       await click(ctx, dm, label);
     let p = (await click(ctx, dm, "Look upon the map")).payload;
@@ -485,13 +496,15 @@ describe("/story gate persistence", () => {
   it("a player with progress sees the resume gate and resume lands at the saved node", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not"); // not_eye
+    await click(ctx, dm, "Nay, I am not"); // ask_name_free
     const node = ctx.repo.get("u").story!.node;
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
     await pressGate(ctx, second.dm, GATE.resumeYes);
     expect(ctx.repo.get("u").story!.node).toBe(node);
-    expect(content(live(second.dm))).toMatch(/No matter/);
+    expect(second.dm.sent.some((p) => content(p)?.match(/No matter/))).toBe(
+      true,
+    );
   });
 
   it("declining a resume leaves saved progress unchanged", async () => {
@@ -514,7 +527,7 @@ describe("/story restart", () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
     await click(ctx, dm, "Nay, I am not");
-    expect(ctx.repo.get("u").story!.node).toBe("not_eye");
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     const player = ctx.repo.get("u");
     player.cards["abyss-eyes"] = { variants: ["metal"], active: "metal" };
     player.coins = 50;
@@ -525,7 +538,7 @@ describe("/story restart", () => {
     expect(lastPayload(refused.reply as any).content).toMatch(
       /Only the bot owner/,
     );
-    expect(ctx.repo.get("u").story!.node).toBe("not_eye");
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
 
     // owner restart wipes progress; the gate shown is then the ready-gate again
     const restart = await openGate(ctx, "u", { restart: true });

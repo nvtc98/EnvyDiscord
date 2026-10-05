@@ -300,12 +300,50 @@ describe("story: the prologue", () => {
     }
   });
 
-  it("saying no to The Eyes skips the name and changes nothing else", () => {
-    const { player } = play([1]);
+  it('accepts "Phantom" in the Eyes branch (not blocked) and normalizes it to "Phantom Eyes"', () => {
+    for (const typed of ["Phantom", "phantom", "Phantom Eyes"]) {
+      const c = ctx();
+      const player = createPlayer("p");
+      ensureStory(player, c);
+      applyAction(player, "greeting", { type: "choice", index: 0 }, c);
+      applyAction(player, "ask_name", { type: "text", text: typed }, c);
+      expect(player.story!.name, typed).toBe("Phantom Eyes");
+      expect(player.story!.node, typed).toBe("name_exact");
+    }
+  });
+
+  it("the non-Eyes reaction differs from the Eyes-branch recognition line", () => {
+    const free = play([1, "nomad"]); // non-Eyes free name
+    const eyes = play([0, "abyss"]); // Eyes exact name
+    const freeLine = currentView(free.player, ctx()).lines[0].text;
+    const eyesLine = currentView(eyes.player, ctx()).lines[0].text;
+    expect(free.player.story!.node).toBe("name_free_ack");
+    expect(eyes.player.story!.node).toBe("name_exact");
+    expect(freeLine).not.toBe(eyesLine);
+    expect(freeLine).not.toMatch(/old records/);
+    expect(eyesLine).toMatch(/old records/);
+  });
+
+  it("saying no to The Eyes still asks a name, but in a free form that is not matched or given Eyes", () => {
+    const { player } = play([1, "abyss"]); // "abyss" would match a card if this path matched — it must not
     expect(player.story).toMatchObject({
       isEye: false,
-      name: null,
-      node: "not_eye",
+      name: "Abyss", // no "Eyes" appended, no card-list match
+      node: "name_free_ack",
+      nameAttempts: [], // the free path records no match attempts
+    });
+    // the free reaction differs from the Eyes branch's recognition line
+    const reaction = currentView(player, ctx()).lines[0].text;
+    expect(reaction).not.toMatch(/old records/);
+    expect(reaction).toMatch(/Abyss/);
+  });
+
+  it("the free name is sanitized but keeps a trailing Eyes and never matches the card list", () => {
+    const { player } = play([1, "**Ocean** <@123> Eyes"]);
+    expect(player.story).toMatchObject({
+      isEye: false,
+      name: "Ocean 123 Eyes", // sanitized, capitalized, no 'Eyes' stripped, no match
+      node: "name_free_ack",
     });
   });
 
@@ -318,21 +356,21 @@ describe("story: the prologue", () => {
         .join(" "),
     ).toMatch(/you are one of The Eyes/);
 
-    const stranger = play([1, 0, 1]); // not an eye, continue, "no"
+    const stranger = play([1, "nomad", 0, 1]); // not an eye, name, continue, "no"
     expect(stranger.player.story!.node).toBe("tribe_unknown_stranger");
     expect(currentView(stranger.player, ctx()).lines[0].text).toMatch(
       /search together/,
     );
 
-    const knows = play([1, 0, 0]);
+    const knows = play([1, "nomad", 0, 0]);
     expect(knows.player.story!.node).toBe("tribe_known");
     expect(knows.player.story!.knowsTribe).toBe(true);
   });
 
   it("every path reaches the curse and the Informant, and the tribe name is spelled with its Vietnamese letters", () => {
     for (const steps of [
-      [1, 0, 1, 0],
-      [1, 0, 0, 0],
+      [1, "nomad", 0, 1, 0],
+      [1, "nomad", 0, 0, 0],
     ]) {
       const { player } = play(steps);
       expect(player.story!.node).toBe("curse");
@@ -346,7 +384,7 @@ describe("story: the prologue", () => {
   });
 
   it("the map offers at most four places, shows three locations and refuses to go to the tribe yet", () => {
-    const { player } = play([1, 0, 1, 0, 0, 0]); // ... curse -> informant -> map
+    const { player } = play([1, "nomad", 0, 1, 0, 0, 0]); // ... curse -> informant -> map
     expect(player.story!.node).toBe("map");
     const view = currentView(player, ctx());
     expect(view.choices.length).toBeLessThanOrEqual(4);
@@ -374,7 +412,7 @@ describe("story: the prologue", () => {
 
   describe("the book", () => {
     // not an Eye ... map -> wisdom; "Just open the book" (index 1) -> book
-    const toBook = (seed = 1) => play([1, 0, 1, 0, 0, 0, 0, 1], seed);
+    const toBook = (seed = 1) => play([1, "nomad", 0, 1, 0, 0, 0, 0, 1], seed);
     const idsOf = (p: Player) => p.story!.pack!.cards;
 
     it("opens with twelve different cards in the 2-2-8 mix, and nothing is granted until the player takes them", () => {

@@ -95,6 +95,10 @@ export type StoryEvent =
       result: NameAttempt["result"];
       suggestion?: string;
     }
-  | { type: "name_set"; name: string; how: "exact" | "suggestion" | "kept" }
+  | {
+      type: "name_set";
+      name: string;
+      how: "exact" | "suggestion" | "kept" | "free";
+    }
   | { type: "pack_shown"; cards: string[]; rerolls: number }
   | { type: "pack_taken"; cards: string[]; rerolls: number };
