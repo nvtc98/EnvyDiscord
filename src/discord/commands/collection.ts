@@ -6,11 +6,11 @@ import {
   MessageFlags,
 } from "discord.js";
 import { ownedCards } from "../../game/deck";
-import { hasPlayed, MAX_TIER, type Player } from "../../game/player";
+import { hasPlayed, type Player } from "../../game/player";
 import { EMBED_COLOR } from "../../render/theme";
 import { slash, type AppContext, type Command } from "../command";
 import { attach, tryRender } from "../images";
-import { cardSummary, tierLabel } from "../render";
+import { cardSummary, variantLabel } from "../render";
 
 // Three cards per page: that is what fits legibly in one row of the image.
 const PAGE_SIZE = 3;
@@ -24,13 +24,16 @@ async function view(
   const items = ownedCards(player, ctx.cardIndex);
   const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const page = Math.min(Math.max(0, requestedPage), pages - 1);
-  const maxed = items.filter((o) => o.tier >= MAX_TIER).length;
+  const variantsOwned = Object.values(player.cards).reduce(
+    (sum, c) => sum + c.variants.length,
+    0,
+  );
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR.neutral)
     .setTitle("🎴 Collection")
     .setFooter({
-      text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards · ${maxed} at max tier`,
+      text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards · ${variantsOwned} variants`,
     });
   if (items.length === 0)
     embed.setDescription("No cards yet. Use `/daily` to get your first cards!");
@@ -40,18 +43,18 @@ async function view(
     slice.length > 0
       ? await tryRender(ctx, (r) =>
           r.cards(
-            slice.map(({ def, tier }) => ({
+            slice.map(({ def, active }) => ({
               def,
-              tier,
-              badge: `TIER ${tier}`,
+              variant: active,
+              badge: variantLabel(active),
             })),
           ),
         )
       : null;
   if (!image) {
-    for (const { def, tier } of slice)
+    for (const { def, active } of slice)
       embed.addFields({
-        name: `${def.name} · ${tierLabel(tier)}`,
+        name: `${def.name} · ${variantLabel(active)}`,
         value: cardSummary(def),
       });
   }

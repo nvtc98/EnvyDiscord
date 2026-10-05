@@ -423,7 +423,7 @@ describe("story: the prologue", () => {
       expect(first.join()).not.toBe(idsOf(player).join());
     });
 
-    it("taking the cards grants exactly those twelve at tier 1, makes them the deck and unlocks /daily", () => {
+    it("taking the cards grants exactly those twelve as metal, makes them the deck and unlocks /daily", () => {
       const c = ctx();
       const { player } = toBook();
       const shown = [...idsOf(player)];
@@ -435,7 +435,14 @@ describe("story: the prologue", () => {
       );
       expect(result).toMatchObject({ ok: true });
       expect(Object.keys(player.cards).sort()).toEqual([...shown].sort());
-      expect(Object.values(player.cards).every((t) => t === 1)).toBe(true);
+      expect(
+        Object.values(player.cards).every(
+          (c) =>
+            c.active === "metal" &&
+            c.variants.length === 1 &&
+            c.variants[0] === "metal",
+        ),
+      ).toBe(true);
       expect(player.deck).toEqual(shown);
       expect(player.story).toMatchObject({
         starterClaimed: true,

@@ -1,20 +1,28 @@
-import { DECK_SIZE, type CardDef } from '../engine/types';
-import { shuffle, type Rng } from '../util/rng';
-import type { Player } from './player';
+import { DECK_SIZE, type CardDef } from "../engine/types";
+import type { VariantId } from "../data/variants";
+import { shuffle, type Rng } from "../util/rng";
+import type { Player } from "./player";
 
 export interface OwnedCard {
   def: CardDef;
-  tier: number;
+  /** The variant currently displayed for this card. */
+  active: VariantId;
 }
 
 /** The player's cards, cheapest first, then by name. */
-export function ownedCards(player: Player, index: ReadonlyMap<string, CardDef>): OwnedCard[] {
+export function ownedCards(
+  player: Player,
+  index: ReadonlyMap<string, CardDef>,
+): OwnedCard[] {
   return Object.entries(player.cards)
-    .flatMap(([id, tier]) => {
+    .flatMap(([id, owned]) => {
       const def = index.get(id);
-      return def ? [{ def, tier }] : [];
+      return def ? [{ def, active: owned.active }] : [];
     })
-    .sort((a, b) => a.def.cost - b.def.cost || a.def.name.localeCompare(b.def.name, 'en'));
+    .sort(
+      (a, b) =>
+        a.def.cost - b.def.cost || a.def.name.localeCompare(b.def.name, "en"),
+    );
 }
 
 export interface ResolvedDeck {
@@ -25,10 +33,15 @@ export interface ResolvedDeck {
 
 /**
  * The deck to battle with: the saved deck if it is complete and still owned; otherwise the saved cards that are
- * still valid, topped up with other owned cards (highest frame tier first), and finally with random guest cards
- * the player does not own. Guests are never added to the collection.
+ * still valid, topped up with other owned cards (cheapest first), and finally with random guest cards the
+ * player does not own. Guests are never added to the collection.
  */
-export function resolveDeck(player: Player, all: readonly CardDef[], index: ReadonlyMap<string, CardDef>, rng: Rng): ResolvedDeck {
+export function resolveDeck(
+  player: Player,
+  all: readonly CardDef[],
+  index: ReadonlyMap<string, CardDef>,
+  rng: Rng,
+): ResolvedDeck {
   const owned = ownedCards(player, index);
   const ownedIds = new Set(owned.map((o) => o.def.id));
 
@@ -45,9 +58,13 @@ export function resolveDeck(player: Player, all: readonly CardDef[], index: Read
     const def = index.get(id);
     if (def && ownedIds.has(id)) take(def);
   }
-  for (const o of [...owned].sort((a, b) => b.tier - a.tier || a.def.cost - b.def.cost)) take(o.def);
+  // `owned` is already cheapest-first; variants are equal rank, so cost order is all that matters.
+  for (const o of owned) take(o.def);
 
-  const guests = shuffle(all.filter((c) => !ownedIds.has(c.id)), rng).slice(0, DECK_SIZE - chosen.length);
+  const guests = shuffle(
+    all.filter((c) => !ownedIds.has(c.id)),
+    rng,
+  ).slice(0, DECK_SIZE - chosen.length);
   return { cards: [...chosen, ...guests], guests };
 }
 

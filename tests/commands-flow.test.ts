@@ -4,8 +4,9 @@ import { collectionCommand } from "../src/discord/commands/collection";
 import { dailyCommand } from "../src/discord/commands/daily";
 import { deckCommand } from "../src/discord/commands/deck";
 import { cardCommand } from "../src/discord/commands/card";
+import { shopCommand } from "../src/discord/commands/shop";
+import { SHOP_VARIANT_PRICE } from "../src/game/shop";
 import { DECK_SIZE } from "../src/engine/types";
-import { MAX_TIER } from "../src/game/player";
 import { CARD_INDEX } from "../src/data/cards";
 import {
   buttonInteraction,
@@ -13,6 +14,7 @@ import {
   lastPayload,
   makeCtx,
   ownEverything,
+  ownEveryVariant,
   rows,
   selectInteraction,
   slashInteraction,
@@ -45,9 +47,9 @@ describe("/daily", () => {
     expect(lastPayload(second.reply).content).toMatch(/already claimed/);
   });
 
-  it("says the collection is complete once every card is at max tier, and gives nothing", async () => {
+  it("says the collection is complete once every card owns every variant, and gives nothing", async () => {
     const ctx = makeCtx(2);
-    ownEverything(ctx, "u", MAX_TIER);
+    ownEveryVariant(ctx, "u");
     unlockDaily(ctx, "u");
     const call = slashInteraction("u");
     await dailyCommand.execute(call as never, ctx);
@@ -59,7 +61,7 @@ describe("/daily", () => {
 describe("/collection", () => {
   it("shows three cards per page with working page buttons, and the counts in the footer", async () => {
     const ctx = makeCtx(2);
-    ownEverything(ctx, "u", 2);
+    ownEverything(ctx, "u", "blue");
     const call = slashInteraction("u");
     await collectionCommand.execute(call as never, ctx);
     let payload = lastPayload(call.reply);
@@ -89,7 +91,7 @@ describe("/collection", () => {
 
   it("shows another player's cards read-only and threads the target through paging", async () => {
     const ctx = makeCtx(2);
-    ownEverything(ctx, "friend", 1);
+    ownEverything(ctx, "friend", "metal");
     const call = slashInteraction("viewer", { user: "friend" });
     await collectionCommand.execute(call as never, ctx);
     let payload = lastPayload(call.reply);
@@ -145,7 +147,8 @@ describe("/deck", () => {
   it("rejects a selection with the wrong size or cards the player does not own", async () => {
     const ctx = makeCtx();
     const player = ctx.repo.get("u");
-    for (const c of CARDS.slice(0, 12)) player.cards[c.id] = 1;
+    for (const c of CARDS.slice(0, 12))
+      player.cards[c.id] = { variants: ["metal"], active: "metal" };
     await ctx.repo.save(player);
     const tooFew = selectInteraction(
       "u",
@@ -190,7 +193,11 @@ describe("/profile", () => {
     const { profileCommand } = await import("../src/discord/commands/profile");
     const ctx = makeCtx();
     const player = ctx.repo.get("u");
-    player.cards = { "abyss-eyes": 1, "tho-lua": 4, "long-gone-card": 2 };
+    player.cards = {
+      "abyss-eyes": { variants: ["metal"], active: "metal" },
+      "tho-lua": { variants: ["metal", "blue"], active: "blue" },
+      "long-gone-card": { variants: ["metal"], active: "metal" },
+    };
     await ctx.repo.save(player);
     const call = slashInteraction("u");
     await profileCommand.execute(call as never, ctx);
@@ -204,7 +211,7 @@ describe("/profile", () => {
     const { profileCommand } = await import("../src/discord/commands/profile");
     const ctx = makeCtx();
     const friend = ctx.repo.get("friend");
-    friend.cards = { "abyss-eyes": 1 };
+    friend.cards = { "abyss-eyes": { variants: ["metal"], active: "metal" } };
     friend.wins = 2;
     await ctx.repo.save(friend);
     const call = slashInteraction("viewer", { user: "friend" });
@@ -221,5 +228,86 @@ describe("/profile", () => {
     const call = slashInteraction("viewer", { user: "stranger" });
     await profileCommand.execute(call as never, ctx);
     expect(lastPayload(call.reply).content).toMatch(/hasn't started/);
+  });
+});
+
+describe("/shop variant", () => {
+  const abyss = CARD_INDEX.get("abyss-eyes")!;
+
+  /** A player who owns abyss-eyes (metal) with the given coins. */
+  function seedOwner(ctx: ReturnType<typeof makeCtx>, coins: number) {
+    const player = ctx.repo.get("u");
+    player.coins = coins;
+    player.cards[abyss.id] = { variants: ["metal"], active: "metal" };
+    void ctx.repo.save(player);
+  }
+
+  it("buys a purchasable variant for an owned card, deducts the flat price and keeps it", async () => {
+    const ctx = makeCtx();
+    seedOwner(ctx, 500);
+    const call = slashInteraction("u", {
+      subcommand: "variant",
+      card: abyss.id,
+      variant: "blue",
+    });
+    await shopCommand.execute(call as never, ctx);
+    expect(embedOf(lastPayload(call.reply)).description).toMatch(/Blue/);
+    const saved = ctx.repo.get("u");
+    expect(saved.cards[abyss.id].variants).toContain("blue");
+    expect(saved.coins).toBe(500 - SHOP_VARIANT_PRICE);
+  });
+
+  it("refuses when the player already owns the variant", async () => {
+    const ctx = makeCtx();
+    seedOwner(ctx, 500);
+    const call = slashInteraction("u", {
+      subcommand: "variant",
+      card: abyss.id,
+      variant: "metal",
+    });
+    await shopCommand.execute(call as never, ctx);
+    expect(lastPayload(call.reply).content).toMatch(/already own/);
+    expect(ctx.repo.get("u").coins).toBe(500); // unchanged
+  });
+
+  it("refuses when the player does not own the card", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = 500;
+    void ctx.repo.save(player);
+    const call = slashInteraction("u", {
+      subcommand: "variant",
+      card: abyss.id,
+      variant: "blue",
+    });
+    await shopCommand.execute(call as never, ctx);
+    expect(lastPayload(call.reply).content).toMatch(/don't own/);
+  });
+
+  it("refuses when the player cannot afford the variant", async () => {
+    const ctx = makeCtx();
+    seedOwner(ctx, SHOP_VARIANT_PRICE - 1);
+    const call = slashInteraction("u", {
+      subcommand: "variant",
+      card: abyss.id,
+      variant: "blue",
+    });
+    await shopCommand.execute(call as never, ctx);
+    expect(lastPayload(call.reply).content).toMatch(/need/);
+    expect(ctx.repo.get("u").cards[abyss.id].variants).toEqual(["metal"]);
+  });
+
+  it("only offers purchasable variants in the command's choices", () => {
+    const json = shopCommand.data.toJSON() as any;
+    const variantSub = json.options.find((o: any) => o.name === "variant");
+    const variantOpt = variantSub.options.find(
+      (o: any) => o.name === "variant",
+    );
+    expect(variantOpt.choices.map((c: any) => c.value)).toEqual([
+      "metal",
+      "blue",
+      "purple",
+      "red",
+    ]);
   });
 });

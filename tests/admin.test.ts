@@ -27,8 +27,8 @@ async function seedPlayer(
     starterClaimed: true,
     liveMessageId: null,
   };
-  player.cards[CARDS[0].id] = 1;
-  player.cards[CARDS[1].id] = 2;
+  player.cards[CARDS[0].id] = { variants: ["metal"], active: "metal" };
+  player.cards[CARDS[1].id] = { variants: ["metal", "blue"], active: "blue" };
   await ctx.repo.save(player);
 }
 
@@ -38,7 +38,9 @@ describe("/admin summary", () => {
     const call = slashInteraction("stranger", {}, "owner");
     await adminCommand.execute(call as never, ctx);
     expect(lastPayload(call.reply).content).toMatch(/Only the bot owner/);
-    expect(ctx.log.entries.find((e) => e.type === "admin_summary")).toBeUndefined();
+    expect(
+      ctx.log.entries.find((e) => e.type === "admin_summary"),
+    ).toBeUndefined();
   });
 
   it("lists every seeded player with their node and card count", async () => {
@@ -53,7 +55,9 @@ describe("/admin summary", () => {
     expect(embed.description).toContain("greeting");
     expect(embed.description).toContain("owns 2 cards");
     expect(embed.footer.text).toContain("2 players");
-    expect(ctx.log.entries.find((e) => e.type === "admin_summary")?.data).toMatchObject({ by: "owner" });
+    expect(
+      ctx.log.entries.find((e) => e.type === "admin_summary")?.data,
+    ).toMatchObject({ by: "owner" });
   });
 
   it("shows one player's story details", async () => {
@@ -65,8 +69,12 @@ describe("/admin summary", () => {
     const fields = embed.fields as { name: string; value: string }[];
     expect(fields.find((f) => f.name === "Scene")?.value).toBe("greeting");
     expect(fields.find((f) => f.name === "Name")?.value).toBe("Ocean Eyes");
-    expect(fields.find((f) => f.name === "Name attempts")?.value).toContain("ocean");
-    expect(ctx.log.entries.find((e) => e.type === "admin_summary")?.data).toMatchObject({ by: "owner", target: "alice" });
+    expect(fields.find((f) => f.name === "Name attempts")?.value).toContain(
+      "ocean",
+    );
+    expect(
+      ctx.log.entries.find((e) => e.type === "admin_summary")?.data,
+    ).toMatchObject({ by: "owner", target: "alice" });
   });
 
   it("says a fresh user hasn't started the story", async () => {

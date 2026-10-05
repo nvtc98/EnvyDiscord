@@ -512,7 +512,7 @@ describe("/story restart", () => {
     await click(ctx, dm, "No, I am not");
     expect(ctx.repo.get("u").story!.node).toBe("not_eye");
     const player = ctx.repo.get("u");
-    player.cards["abyss-eyes"] = 3;
+    player.cards["abyss-eyes"] = { variants: ["metal"], active: "metal" };
     player.coins = 50;
     await ctx.repo.save(player);
 

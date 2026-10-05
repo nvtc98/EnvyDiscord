@@ -1,8 +1,25 @@
 import type { CardDef } from "../engine/types";
 import type { StoryState } from "../story/types";
+import {
+  DEFAULT_VARIANT,
+  nextUnownedVariant,
+  type VariantId,
+} from "../data/variants";
 
-/** Highest frame tier. The tier only changes how a card's frame looks; it never changes a card's strength. */
-export const MAX_TIER = 5;
+/**
+ * Coins refunded when a duplicate arrives but the player already owns every variant of that card. Placeholder
+ * value, tuned later. Defined here (not in shop.ts) so player.ts can use it without a circular import; shop.ts
+ * re-exports it next to its own price constants.
+ */
+export const DUPLICATE_REBATE = 25;
+
+/** One owned card: the set of variants the player owns (always at least `metal`) and the one shown right now. */
+export interface OwnedCard {
+  /** Owned variant ids, kept in registry order; always contains `metal`. */
+  variants: VariantId[];
+  /** The variant currently displayed; always one of `variants`. */
+  active: VariantId;
+}
 
 export interface Player {
   id: string;
@@ -11,8 +28,8 @@ export interface Player {
   losses: number;
   /** Last claimed /daily as YYYY-MM-DD in the configured timezone. */
   lastDaily: string | null;
-  /** cardId -> frame tier (1 to MAX_TIER). */
-  cards: Record<string, number>;
+  /** cardId -> owned variants and the active one. */
+  cards: Record<string, OwnedCard>;
   /** cardIds chosen with /deck; empty or invalid means "build one automatically". */
   deck: string[];
   /** Null until the player runs /story for the first time. */
@@ -43,27 +60,70 @@ export function hasPlayed(player: Player): boolean {
   );
 }
 
+/** The variants a player owns for a card, in registry order (empty when the card is unowned). */
+export function cardVariants(player: Player, cardId: string): VariantId[] {
+  return player.cards[cardId]?.variants ?? [];
+}
+
+/** The active variant of an owned card, or undefined when the card is unowned. */
+export function activeVariant(
+  player: Player,
+  cardId: string,
+): VariantId | undefined {
+  return player.cards[cardId]?.active;
+}
+
+/**
+ * Switches which owned variant of a card is displayed. Returns true when it changed; false when the card is
+ * unowned or the player does not own that variant (the active variant is left untouched).
+ */
+export function switchVariant(
+  player: Player,
+  cardId: string,
+  variantId: VariantId,
+): boolean {
+  const owned = player.cards[cardId];
+  if (!owned || !owned.variants.includes(variantId)) return false;
+  owned.active = variantId;
+  return true;
+}
+
 export interface GrantResult {
   card: CardDef;
-  kind: "new" | "tier-up";
-  tier: number;
+  kind: "new" | "variant-unlocked" | "duplicate-refunded";
+  /** The variant granted ('new' and 'variant-unlocked'); absent when the grant was refunded. */
+  variant?: VariantId;
+  /** Coins refunded ('duplicate-refunded' only). */
+  refund?: number;
 }
 
-/** Gives a card: a new one starts at tier 1, one the player already owns goes up a tier. */
+/**
+ * Gives a card:
+ * - a brand new card starts at `metal`;
+ * - a duplicate unlocks the next not-yet-owned variant in registry order;
+ * - a duplicate of a card whose variants are all owned refunds a small amount of coins.
+ */
 export function grantCard(player: Player, card: CardDef): GrantResult {
-  const current = player.cards[card.id];
-  if (current === undefined) {
-    player.cards[card.id] = 1;
-    return { card, kind: "new", tier: 1 };
+  const owned = player.cards[card.id];
+  if (owned === undefined) {
+    player.cards[card.id] = {
+      variants: [DEFAULT_VARIANT],
+      active: DEFAULT_VARIANT,
+    };
+    return { card, kind: "new", variant: DEFAULT_VARIANT };
   }
-  if (current >= MAX_TIER)
-    throw new Error(`${card.id} is already at the maximum frame tier`);
-  player.cards[card.id] = current + 1;
-  return { card, kind: "tier-up", tier: current + 1 };
+  const next = nextUnownedVariant(owned.variants);
+  if (next !== null) {
+    owned.variants.push(next);
+    return { card, kind: "variant-unlocked", variant: next };
+  }
+  player.coins += DUPLICATE_REBATE;
+  return { card, kind: "duplicate-refunded", refund: DUPLICATE_REBATE };
 }
 
-/** Cards that can still be received: not owned yet, or owned below the maximum tier. */
+/** Cards that can still be received: unowned, or owned but still missing at least one variant. */
 export const receivable = (
   player: Player,
   cards: readonly CardDef[],
-): CardDef[] => cards.filter((c) => (player.cards[c.id] ?? 0) < MAX_TIER);
+): CardDef[] =>
+  cards.filter((c) => nextUnownedVariant(cardVariants(player, c.id)) !== null);
