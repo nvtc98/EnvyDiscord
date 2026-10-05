@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dailyCommand } from "../src/discord/commands/daily";
-import { storyCommand } from "../src/discord/commands/story";
+import { setStorySleep, storyCommand } from "../src/discord/commands/story";
 import { createImageRenderer } from "../src/render/renderer";
 import { GATE } from "../src/story/prologue";
 import {
@@ -101,6 +101,18 @@ async function submitName(ctx: Ctx, dm: Dm, textValue: string, userId = "u") {
   await storyCommand.modal!(submit as never, ctx);
   return { modal: modal.toJSON(), payload: live(dm), submit };
 }
+
+// Every test runs with a recording no-op sleep so delivery never waits on a real timer.
+const sleptMs: number[] = [];
+beforeEach(() => {
+  sleptMs.length = 0;
+  setStorySleep(async (ms: number) => {
+    sleptMs.push(ms);
+  });
+});
+afterEach(() => {
+  setStorySleep();
+});
 
 describe("/story gate and DM delivery", () => {
   it("sends an ephemeral pointer and asks the ready-gate in the DM for a new player", async () => {
@@ -468,6 +480,60 @@ describe("/story", () => {
       /could not reach thee/,
     );
     expect(ctx.repo.get("u").story).toBeNull();
+  });
+});
+
+describe("/story typing + paced delivery", () => {
+  it("precedes each plain-scene line with a typing beat and paces with a mocked sleep", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    // The greeting (2 lines) was delivered after the gate; isolate just those two sends.
+    const sceneMsgs = dm.sent.slice(1);
+    expect(sceneMsgs).toHaveLength(2);
+    // deliverScene paces one typing beat + one sleep per greeting line (the gate send is unpaced).
+    expect(dm.sendTyping).toHaveBeenCalledTimes(sceneMsgs.length);
+    // Ordering: every paced greeting send is immediately preceded by a typing marker. The event log
+    // begins with the gate send (unpaced); everything after it is typing/send pairs.
+    const greetingEvents = dm.events.slice(1); // drop the gate send
+    for (let i = 0; i < greetingEvents.length; i++) {
+      if (greetingEvents[i] !== "typing")
+        expect(greetingEvents[i - 1]).toBe("typing");
+    }
+    // Two greeting lines => two typing beats and two recorded sleeps.
+    expect(dm.typingCount).toBe(2);
+    expect(sleptMs).toHaveLength(2);
+    // Buttons only on the last greeting message; liveMessageId points at it.
+    expect(buttons(sceneMsgs[0])).toHaveLength(0);
+    expect(buttons(sceneMsgs[1])).toHaveLength(2);
+    // liveMessageId points at the id returned by the LAST send (the button-bearing greeting line).
+    const lastSendId = (await dm.send.mock.results.at(-1)!.value).id;
+    expect(ctx.repo.get("u").story!.liveMessageId).toBe(lastSendId);
+  });
+
+  it("clamps the paced sleep between the floor and ceiling constants", async () => {
+    const ctx = makeCtx();
+    await begin(ctx);
+    // Every recorded delay stays within the tunable floor/ceiling (TYPING_MIN_MS/TYPING_MAX_MS).
+    for (const ms of sleptMs) {
+      expect(ms).toBeGreaterThanOrEqual(800);
+      expect(ms).toBeLessThanOrEqual(4000);
+    }
+  });
+
+  it("a rich (map) scene does exactly one typing beat before its single send", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    await click(ctx, dm, "Nay, I am not");
+    await submitName(ctx, dm, "Nomad");
+    for (const label of ["Onward", "Nay, I do not", "Onward", "Onward"])
+      await click(ctx, dm, label);
+    const typingBefore = dm.typingCount;
+    const sentBefore = dm.sent.length;
+    const p = (await click(ctx, dm, "Look upon the map")).payload;
+    expect(embedOf(p).title).toBe("The Crossroads"); // the rich map scene
+    // The rich scene added exactly one typing beat and one send.
+    expect(dm.typingCount - typingBefore).toBe(1);
+    expect(dm.sent.length - sentBefore).toBe(1);
   });
 });
 

@@ -27,15 +27,34 @@ export class MemoryRepo implements PlayerRepo {
   async flush(): Promise<void> {}
 }
 
-/** A fake DM channel: `send` records the payload and returns a unique message id. */
+/**
+ * A fake DM channel: `send` records the payload and returns a unique message id. `sendTyping` records
+ * each typing beat (push "typing" onto `events` and bump `typingCount`) so tests can assert ordering
+ * against sends; `events` interleaves "typing" markers with the sent payloads in call order.
+ */
 export function dmChannel() {
   const sent: any[] = [];
+  const events: any[] = [];
+  let typingCount = 0;
   let next = 1;
   const send = vi.fn(async (payload: unknown) => {
     sent.push(payload);
+    events.push(payload);
     return { id: `dm-${next++}` };
   });
-  return { send, sent };
+  const sendTyping = vi.fn(async () => {
+    typingCount++;
+    events.push("typing");
+  });
+  return {
+    send,
+    sendTyping,
+    sent,
+    events,
+    get typingCount() {
+      return typingCount;
+    },
+  };
 }
 
 /** A button press on a DM message. `messageId` is the id of the message the button lived on. */

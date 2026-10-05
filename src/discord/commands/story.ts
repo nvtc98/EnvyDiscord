@@ -38,9 +38,38 @@ const storyContext = (ctx: AppContext): StoryContext => ({
   cardIndex: ctx.cardIndex,
 });
 
-/** Just enough of a Discord DM channel for sending scene messages. */
+/** Just enough of a Discord DM channel for sending scene messages and showing the typing indicator. */
 export interface DmChannel {
   send(payload: StoryMessage): Promise<{ id: string }>;
+  sendTyping(): Promise<void>;
+}
+
+/** Tunable pacing for the story's "typing one line at a time" effect. */
+const TYPING_MS_PER_CHAR = 30;
+const TYPING_MIN_MS = 800;
+const TYPING_MAX_MS = 4000;
+
+/** How long to show the typing indicator before a message, proportional to its length (clamped). */
+function typingDelay(text: string): number {
+  return Math.min(
+    Math.max(text.length * TYPING_MS_PER_CHAR, TYPING_MIN_MS),
+    TYPING_MAX_MS,
+  );
+}
+
+/** How long to wait, behind a seam so tests can inject a recording no-op instead of a real timer. */
+export type Sleep = (ms: number) => Promise<void>;
+const defaultSleep: Sleep = (ms) => new Promise<void>((r) => setTimeout(r, ms));
+let sleep: Sleep = defaultSleep;
+
+/** Test seam: replace the pacing sleep (e.g. with a recording no-op). Call with no args to reset. */
+export function setStorySleep(replacement: Sleep = defaultSleep): void {
+  sleep = replacement;
+}
+
+/** The text a plain message carries, used to size its typing delay. */
+function messageText(msg: StoryMessage): string {
+  return "content" in msg ? msg.content : "";
 }
 
 function logEvents(
@@ -95,9 +124,16 @@ async function deliverScene(
   if (isPlainConversation(screen.view)) {
     const msgs = renderPlain(screen);
     let last = { id: "" };
-    for (const msg of msgs) last = await dm.send(msg);
+    // Pace each line: show typing, wait proportional to its length, then send. Buttons ride the last.
+    for (const msg of msgs) {
+      await dm.sendTyping();
+      await sleep(typingDelay(messageText(msg)));
+      last = await dm.send(msg);
+    }
     liveId = last.id;
   } else {
+    // A rich (map/book) scene is a single embed: one short typing beat, then the one send.
+    await dm.sendTyping();
     const sent = await dm.send(renderRich(screen));
     liveId = sent.id;
   }
