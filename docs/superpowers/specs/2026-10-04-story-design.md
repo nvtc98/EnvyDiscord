@@ -4,20 +4,23 @@ The game is a story-driven single-player game played through one command, `/stor
 
 ## Goals
 
-- One entry point: `/story` starts the story for a new player and resumes it for everyone else.
-- Three kinds of scene: conversation and choices, a simple map, and a card duel.
+- One entry point: `/story` starts the story for a new player and resumes it for everyone else. The story is played in the player's direct messages with the bot, not in the server.
+- Three kinds of scene: conversation and choices, a simple map, and a card duel. Conversation scenes are sent as plain DM text, one message per line, so the stranger reads like a real person typing; the map and the book's card grid keep their embed box.
 - The player can leave at any moment and continue later from the same scene.
 - Scenes are data plus small functions, so adding the next chapter means adding scenes, not changing the engine.
 - Everything the player sees is in English, except a few special Vietnamese names such as `Bò Tuôi`.
 
 ## Command changes
 
-| Command                                     | Change                                                                                                                                                                                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/story [restart]`                          | New. `restart` is owner-only and erases the owner's progress (story, collection, deck, coins, results) so the story can be replayed while testing.                                                                 |
-| `/battle`                                   | Practice battles stay available to the **bot owner only**, so the lane battle can be tested before the story reaches its first duel. Players are told to use `/story`. Remove it once duels are part of the story. |
-| `/daily`                                    | Locked until the player takes their first 12 cards in the story.                                                                                                                                                   |
-| `/deck`, `/collection`, `/card`, `/profile` | Unchanged.                                                                                                                                                                                                         |
+| Command                                 | Change                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/story [restart]`                      | New. The story runs in the player's DMs; in a server `/story` opens the DM and replies with a short ephemeral pointer. A ready-gate (new player) or resume prompt (has progress) is shown before any scene. `restart` is owner-only and erases the owner's progress (story, collection, deck, coins, results) so the story can be replayed while testing. |
+| `/invite <user>`                        | New. Any player may use it. DMs the invitee with the same ready-gate (never-played) or an invite-resume prompt (has progress), then replies to the inviter ephemerally. Reuses the story gate — it does not duplicate the flow.                                                                                                                           |
+| `/battle`                               | Practice battles stay available to the **bot owner only**, so the lane battle can be tested before the story reaches its first duel. Players are told to use `/story`. Remove it once duels are part of the story.                                                                                                                                        |
+| `/daily`                                | Locked until the player takes their first 12 cards in the story.                                                                                                                                                                                                                                                                                          |
+| `/profile [user]`, `/collection [user]` | Gained an optional `user` option to view another player's data read-only; a never-played target reports "That player hasn't started yet." Self-view is unchanged.                                                                                                                                                                                         |
+| `/admin summary [user]`                 | New. Owner-only (gated via `isOwner`). With no user, lists every known player (identity, scene, card count) with paging. With a user, shows that player's story progress and the details they entered.                                                                                                                                                    |
+| `/deck`, `/card`                        | Unchanged — no other-player viewing.                                                                                                                                                                                                                                                                                                                      |
 
 ## Structure
 
@@ -27,8 +30,11 @@ src/story/names.ts      cleaning typed names, adding "Eyes", matching against th
 src/story/prologue.ts   the scenes of the prologue: text, choices, what each choice does
 src/story/engine.ts     start/resume, current view, apply a button press or a submitted form
 src/game/starter.ts     the first-12-cards rule
-src/discord/story-view.ts            a StoryView as a Discord message
-src/discord/commands/story.ts        /story, its buttons and its form
+src/discord/story-view.ts            a StoryView as Discord messages (renderPlain for conversation, renderRich for map/book)
+src/discord/commands/story.ts        /story, DM delivery, the ready/resume gate, its buttons and its form
+src/discord/commands/invite.ts       /invite — DMs the invitee the shared gate
+src/discord/commands/admin.ts        /admin summary — owner-only player inspection
+src/db/repository.ts                 PlayerRepo, including all() for enumeration
 src/render/                          map and book images
 ```
 
@@ -42,11 +48,33 @@ A view has a title, lines (a speaker and text; no speaker means narration), choi
 
 ### State
 
-`StoryState` is saved in `players.json` as `player.story`: the current scene, the player's name, whether they said they are one of The Eyes, whether they know the tribe's location, every name they typed (with how it matched), a pending name while they decide, a one-off notice line, the cards currently in the book with how many times it was redrawn, and whether the first twelve cards were taken.
+`StoryState` is saved in `players.json` as `player.story`: the current scene, the player's name, whether they said they are one of The Eyes, whether they know the tribe's location, every name they typed (with how it matched), a pending name while they decide, a one-off notice line, the cards currently in the book with how many times it was redrawn, whether the first twelve cards were taken, and `liveMessageId` — the id of the DM message that currently carries the scene's live buttons (null in a server reply or before the first DM send).
 
 ### Messages and stale buttons
 
-The story message is private (ephemeral) and is edited in place at every step. Button ids carry the scene they belong to (`story:<scene>:c:<n>`). Pressing a button from an old message does nothing except show where the player really is, so a double click or an old window cannot skip or repeat a step. The same holds for a submitted form.
+The story runs in the player's DM as ordinary messages, not an ephemeral in-place edit. A conversation scene is delivered as several messages — one per line — and only the last one carries the scene's buttons; the map and the book's card grid are a single embed message. In a server, `/story` opens the DM, drives the story there, and replies to the slash command with a short ephemeral pointer to the DMs; if the player's DMs are closed it replies ephemerally with an error. Ephemeral replies now exist only for these pointers, acknowledgements and owner-gated errors.
+
+Because a scene is several messages, stale buttons are guarded by `StoryState.liveMessageId` rather than by editing one message. Advancing a scene strips the buttons off the pressed message, sends the next scene as fresh messages, and points `liveMessageId` at the new last message. A button press is stale — it only strips its own components and never advances or repeats — when its message id is not the current `liveMessageId`, or when the scene id in its custom id (`story:<scene>:c:<n>`) no longer matches the saved scene. Those two checks together mean a double click, an old message, or a stale window cannot skip or repeat a step. A submitted form is guarded the same way, resyncing to the current scene when stale.
+
+### The ready-gate and resume prompts
+
+Before any scene, `/story` and `/invite` show a short gate so the player opts in. The gate is a command-layer pre-scene, not a `NODES` scene, so declining persists nothing: the engine never starts and `player.story` stays null for a never-played player. A player with no progress sees the ready-gate ("Of course" / "Not right now"); a player with progress sees a resume prompt ("Yes, let's continue" / "Not right now"), worded for `/story` or, from `/invite`, naming the inviter. The gate buttons are `story:gate:begin`, `story:gate:resume` and `story:gate:decline`; they route to the story command, which re-derives begin-vs-resume from the live `player.story` at press time (so a race cannot start twice or resume nothing). Declining shows a friendly line and leaves saved progress untouched — a new player stays unsaved and the next `/story` asks again. The exact strings live in the `GATE` object in `prologue.ts`, kept in the stranger's direct second-person voice.
+
+### /invite
+
+`/invite <user>` lets any player (not just the owner) ask the bot to reach out to someone. It rejects bots and self-invites (self is pointed at `/story`), opens the target's DM, loads that player, and sends the shared gate — the ready-gate for a never-played target or the invite-resume prompt (naming the sanitized inviter) for one with progress. The inviter gets an ephemeral confirmation, or an error when the target's DMs are closed; neither reply pings. The gate buttons are the same `story:gate:*` ids, so `/invite` reuses the story command's gate handler and never duplicates the flow. Each attempt logs a `story_invite` event with the inviter, target and whether the DM succeeded.
+
+### Viewing another player
+
+`/profile` and `/collection` take an optional `user` option to view someone else read-only; `/deck` and `/card` are unchanged. Viewing another player loads their record and shows it under their name and avatar without ever mutating it. `/collection`'s paging buttons carry the target id (`collection:<page>:<targetId>`) so paging keeps viewing the same person, while a self-view keeps the plain `collection:<page>` id and stays backward compatible. A target that is indistinguishable from a fresh player (no story, no cards, no results, no coins — checked by `hasPlayed`) reports "That player hasn't started yet." Both views stay ephemeral.
+
+### /admin summary
+
+`/admin summary` is owner-only, gated by `isOwner` (the tester is the app owner, so no id is hard-coded). With no user it lists every known player — identity, current scene or "not started", and how many owned cards still exist in the card list — in an embed with `◀`/`▶` paging (`admin:<page>`), capped and chunked to stay inside Discord's limits; the paging handler re-checks `isOwner`. With a user it shows that player's story in detail: scene, name entered, whether they claimed to be one of The Eyes, whether they know the tribe, pack and starter status, the recorded name attempts, and a card count — or "hasn't started the story" when there is no progress. It never exposes `/deck`- or `/card`-level detail, and each use logs an `admin_summary` event. The player list comes from `PlayerRepo.all()`.
+
+### PlayerRepo.all()
+
+`PlayerRepo` gained `all(): Player[]`, returning every known player as copies in an unspecified order, for admin and inspection use. The JSON repo maps its stored ids through `get()` so the normalization is identical to a single lookup; the in-memory test repo clones each stored player.
 
 ### Names
 
@@ -85,4 +113,4 @@ The card list is `src/data/eyes-names.json` (229 names: 195 common, 19 rare, 15 
 
 ## Testing
 
-Story engine: name cleaning and matching (exact, near, none, ties, short names), the starter-pack mix over 100 seeds, every branch of the prologue (Eye or not, knows the tribe or not), name attempts recorded in order, the map and the "not yet" detour, redrawing the book many times, taking the cards, stale and invalid actions, saving and loading state, and a check that every scene fits Discord's limits. Discord flow: `/story` beginning and resuming, the form and its settings, sanitising of hostile names, old buttons and old forms, the whole journey through the book, `/daily` locked and then unlocked, images attached and replaced, and the owner-only restart.
+Story engine: name cleaning and matching (exact, near, none, ties, short names), the starter-pack mix over 100 seeds, every branch of the prologue (Eye or not, knows the tribe or not), name attempts recorded in order, the map and the "not yet" detour, redrawing the book many times, taking the cards, stale and invalid actions, saving and loading state, and a check that every scene fits Discord's limits. Discord flow: the DM model (a conversation scene sending one message per line with buttons on the last, the map and book as embeds, a server `/story` opening a DM and replying with an ephemeral pointer, closed DMs reporting an error), the ready-gate and resume prompts (declining a new player persists nothing and re-asks; resuming lands at the saved scene; declining a resume leaves progress untouched), `/story` beginning and resuming, the form and its settings, sanitising of hostile names, stale and non-live buttons and old forms that never advance or repeat, the whole journey through the book, `/daily` locked and then unlocked, images attached and replaced, and the owner-only restart. Also `/invite` (the shared gate reaching the invitee, closed-DM and bot/self rejections), other-player read-only `/profile` and `/collection` with the "hasn't started" message, and owner-only `/admin summary` listing all players and inspecting one.

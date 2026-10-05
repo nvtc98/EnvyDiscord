@@ -1,0 +1,23 @@
+{
+  "id": "FEAT-003",
+  "type": "docs",
+  "description": "Update the story design doc to match the new behavior and run the full verification sweep. Depends on FEAT-001 and FEAT-002 being implemented so the doc describes the real, shipped behavior.",
+  "status": "completed",
+  "steps": [
+    "Read .agents/tasks/story-dm-plan.md (step 13) and context.json FIRST.",
+    "docs/superpowers/specs/2026-10-04-story-design.md: revise the 'Three kinds of scene' line and the '### Messages and stale buttons' section. Conversation scenes now render as plain DM text messages (no embed/box), one message per line; map and the book's card grid keep the embed. The story runs in the player's DM (not an ephemeral in-place edit). Stale-button safety now uses StoryState.liveMessageId: only the latest message carries live buttons; an old/non-live button or a double-click strips its own components and never advances or repeats.",
+    "docs/superpowers/specs/2026-10-04-story-design.md: add sections for the command-layer ready-gate and resume prompts (declining persists nothing; the gate is NOT a NODES scene), /invite (any user; DMs the invitee; reuses the gate), other-player read-only /profile and /collection (/deck and /card unchanged), /admin summary (owner-gated via isOwner), and the PlayerRepo.all() enumeration method. Keep statements accurate and in the existing doc style.",
+    "Run the full typecheck and test suite; confirm no NEW failures beyond the documented baseline (the shop list is fixed by FEAT-002; at most the pre-existing /profile avatar mock may remain unless trivially fixed)."
+  ],
+  "acceptance_criteria": [
+    "The design doc no longer claims the story message is ephemeral/edited-in-place or that all three scene kinds use the same embed; it documents the DM plain-text model, liveMessageId, the gates, /invite, other-player viewing, /admin summary, and PlayerRepo.all().",
+    "`node ./node_modules/typescript/bin/tsc --noEmit` is clean.",
+    "`node ./node_modules/vitest/vitest.mjs run` shows no new failures versus the documented baseline."
+  ],
+  "verification": [
+    "node ./node_modules/typescript/bin/tsc --noEmit",
+    "node ./node_modules/vitest/vitest.mjs run"
+  ],
+  "blocked_reason": null,
+  "findings": "DONE. docs/superpowers/specs/2026-10-04-story-design.md updated to match shipped FEAT-001/FEAT-002 behavior; tsc clean; full suite 199 passed, 0 failed (both documented baseline failures — commands.test.ts shop list and /profile avatar mock — are already fixed, no regressions).\n\nDOC CHANGES:\n- Goals: story is played in DMs; conversation scenes are plain DM text (one message per line) while map and the book card grid keep the embed.\n- Command table: /story now DM-based with ready/resume gate + ephemeral server pointer; added /invite <user>, /profile [user] + /collection [user] (read-only, 'hasn't started' message), /admin summary [user] (owner-only via isOwner); /deck and /card explicitly unchanged.\n- Structure: added renderPlain/renderRich note, invite.ts, admin.ts, repository.ts all().\n- State: documented StoryState.liveMessageId.\n- Replaced the old 'Messages and stale buttons' (ephemeral/edited-in-place) with the DM multi-message model + liveMessageId stale-button rule (stale when message id != liveMessageId OR scene id != saved node; strips its own components, never advances/repeats).\n- New sections: ready-gate/resume prompts (command-layer pre-scene, decline persists nothing, GATE strings, story:gate:* ids re-derive begin-vs-resume); /invite (shared gate, bot/self rejection, closed-DM error, story_invite log); viewing another player (/profile + /collection read-only, collection:<page>:<targetId> paging, hasPlayed guard); /admin summary (isOwner, admin:<page> paging, per-player detail fields, admin_summary log); PlayerRepo.all().\n- Testing paragraph extended to cover the DM model, gates, stale buttons, /invite, other-player viewing, and /admin summary."
+}
