@@ -18,6 +18,32 @@ export const STRANGER = "Stranger";
 export const TRIBE = "Bò Tuôi";
 export const PLACE_WISDOM = "The Eyes Of Wisdom";
 
+/**
+ * The ready/resume gate shown BEFORE the real story scenes. It lives at the command layer (not in
+ * NODES) so declining persists nothing — the engine never starts and `player.story` stays null.
+ * Kept in the single stranger's direct second-person voice; no speaker label is shown.
+ */
+export const GATE = {
+  /** No-progress greeting shown before the real `greeting` scene (both /story and /invite). */
+  readyLine:
+    "Hello there, stranger. Might I trouble you for a moment of your time?",
+  readyYes: "Of course",
+  readyNo: "Not right now",
+  /** Shown after declining the ready-gate; nothing is saved. */
+  declineLine:
+    "No trouble at all. When you have a moment, just say /story and I'll be here.",
+  /** /story resume (progress exists). */
+  resumeLine: "There you are again. Shall we pick up where we left off?",
+  resumeYes: "Yes, let's continue",
+  resumeNo: "Not right now",
+  /** /invite resume (progress exists); `inviter` is already a sanitized display name. */
+  inviteResumeLine: (inviter: string): string =>
+    `${inviter} reminded me about you. Shall we continue where we left off?`,
+  /** Shown after declining a resume; saved progress is untouched. */
+  resumeDeclineLine:
+    "Of course. Whenever you're ready, say /story and we'll continue.",
+} as const;
+
 export interface NodeDef {
   view(player: Player, ctx: StoryContext): StoryView;
   /** A button was pressed. Updates the player and returns the id of the next scene (the same id stays here). */

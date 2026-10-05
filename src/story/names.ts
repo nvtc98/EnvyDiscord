@@ -37,6 +37,23 @@ export function cleanStem(input: string): string {
 export const isStrangerStem = (stem: string): boolean =>
   normalize(stemOf(stem)) === "stranger";
 
+/**
+ * Cleans a free-text DISPLAY name (an inviter's Discord display name) for safe insertion into story
+ * text: it uses the same character filter as `cleanStem` (letters, digits, spaces, apostrophes, dots
+ * and hyphens only — no markdown, mentions or links), collapses whitespace, trims and caps the length.
+ * Unlike `cleanStem` it does NOT drop a trailing "Eyes" (this is a display name, not a name stem, so
+ * "Ocean Eyes" must survive intact) and falls back to "someone" when nothing usable remains.
+ */
+export function sanitizeDisplay(input: string): string {
+  const text = input
+    .replace(/[^\p{L}\p{N}\s'’.-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40)
+    .trim();
+  return text || "someone";
+}
+
 /** "ocean" becomes "Ocean Eyes". Each word and each hyphenated part starts with a capital; "alterra's" keeps its lowercase s. */
 export function displayName(stem: string): string {
   const titled = stem

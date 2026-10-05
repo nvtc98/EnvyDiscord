@@ -1,11 +1,12 @@
-import { vi } from 'vitest';
-import { CARDS, CARD_INDEX } from '../src/data/cards';
-import type { PlayerRepo } from '../src/db/repository';
-import type { AppContext } from '../src/discord/command';
-import { createPlayer, type Player } from '../src/game/player';
-import { nullLogger, type Logger } from '../src/log/logger';
-import type { ImageRenderer } from '../src/render/renderer';
-import { mulberry32 } from '../src/util/rng';
+import { DiscordAPIError, RESTJSONErrorCodes } from "discord.js";
+import { vi } from "vitest";
+import { CARDS, CARD_INDEX } from "../src/data/cards";
+import type { PlayerRepo } from "../src/db/repository";
+import type { AppContext } from "../src/discord/command";
+import { createPlayer, type Player } from "../src/game/player";
+import { nullLogger, type Logger } from "../src/log/logger";
+import type { ImageRenderer } from "../src/render/renderer";
+import { mulberry32 } from "../src/util/rng";
 
 export class MemoryRepo implements PlayerRepo {
   players = new Map<string, Player>();
@@ -18,8 +19,33 @@ export class MemoryRepo implements PlayerRepo {
   async flush(): Promise<void> {}
 }
 
+/** A fake DM channel: `send` records the payload and returns a unique message id. */
+export function dmChannel() {
+  const sent: any[] = [];
+  let next = 1;
+  const send = vi.fn(async (payload: unknown) => {
+    sent.push(payload);
+    return { id: `dm-${next++}` };
+  });
+  return { send, sent };
+}
+
+/** A button press on a DM message. `messageId` is the id of the message the button lived on. */
+export function dmButtonInteraction(
+  userId: string,
+  customId: string,
+  messageId: string,
+  channel?: ReturnType<typeof dmChannel>,
+) {
+  return {
+    ...buttonInteraction(userId, customId),
+    message: { id: messageId },
+    channel,
+  };
+}
+
 export interface LogEntry {
-  stream: 'game' | 'messages';
+  stream: "game" | "messages";
   type: string;
   data: Record<string, unknown>;
 }
@@ -28,14 +54,27 @@ export function spyLogger(): Logger & { entries: LogEntry[] } {
   const entries: LogEntry[] = [];
   return {
     ...nullLogger,
-    game: (type, data = {}) => void entries.push({ stream: 'game', type, data }),
-    message: (type, data = {}) => void entries.push({ stream: 'messages', type, data }),
+    game: (type, data = {}) =>
+      void entries.push({ stream: "game", type, data }),
+    message: (type, data = {}) =>
+      void entries.push({ stream: "messages", type, data }),
     entries,
   };
 }
 
-export function makeCtx(seed = 1, images: ImageRenderer | null = null): AppContext & { repo: MemoryRepo; log: ReturnType<typeof spyLogger> } {
-  return { repo: new MemoryRepo(), cards: CARDS, cardIndex: CARD_INDEX, rng: mulberry32(seed), timezone: 'UTC', images, log: spyLogger() };
+export function makeCtx(
+  seed = 1,
+  images: ImageRenderer | null = null,
+): AppContext & { repo: MemoryRepo; log: ReturnType<typeof spyLogger> } {
+  return {
+    repo: new MemoryRepo(),
+    cards: CARDS,
+    cardIndex: CARD_INDEX,
+    rng: mulberry32(seed),
+    timezone: "UTC",
+    images,
+    log: spyLogger(),
+  };
 }
 
 /** Gives a player every card at the given tier. */
@@ -45,11 +84,49 @@ export function ownEverything(ctx: AppContext, userId: string, tier = 1): void {
   void ctx.repo.save(player);
 }
 
-export function slashInteraction(userId: string, options: Record<string, string | null> = {}) {
+/** A fake slash interaction. `ownerId` is the account the fake Discord application belongs to (the caller by default). */
+export function slashInteraction(
+  userId: string,
+  options: Record<string, string | boolean | null> = {},
+  ownerId: string = userId,
+  opts: { dm?: ReturnType<typeof dmChannel> | null } = {},
+) {
   const reply = vi.fn(async (_payload: unknown) => undefined);
+  // `dm` is the channel user.createDM() resolves to; pass dm: null to simulate closed DMs.
+  const dm = opts.dm === undefined ? dmChannel() : opts.dm;
+  const createDM = vi.fn(async () => {
+    if (!dm) {
+      throw new DiscordAPIError(
+        {
+          code: RESTJSONErrorCodes.CannotSendMessagesToThisUser,
+          message: "Cannot send messages to this user",
+        } as never,
+        RESTJSONErrorCodes.CannotSendMessagesToThisUser,
+        403,
+        "POST",
+        "",
+        {},
+      );
+    }
+    return dm;
+  });
   return {
-    user: { id: userId, username: `user${userId}`, displayName: `User ${userId}` },
-    options: { getString: (name: string) => options[name] ?? null },
+    user: {
+      id: userId,
+      username: `user${userId}`,
+      displayName: `User ${userId}`,
+      createDM,
+    },
+    dm,
+    options: {
+      getString: (name: string) =>
+        typeof options[name] === "string" ? (options[name] as string) : null,
+      getBoolean: (name: string) =>
+        typeof options[name] === "boolean" ? (options[name] as boolean) : null,
+    },
+    client: {
+      application: { fetch: async () => ({ owner: { id: ownerId } }) },
+    },
     reply,
   };
 }
@@ -65,8 +142,60 @@ export function buttonInteraction(userId: string, customId: string) {
   };
 }
 
-export function selectInteraction(userId: string, customId: string, values: string[]) {
-  return { ...buttonInteraction(userId, customId), isButton: () => false, isStringSelectMenu: () => true, values };
+/** The player has taken their first cards, so /daily is open. */
+export function unlockDaily(ctx: AppContext, userId: string): void {
+  const player = ctx.repo.get(userId);
+  player.story = {
+    node: "prologue_end",
+    name: null,
+    isEye: null,
+    knowsTribe: null,
+    nameAttempts: [],
+    pendingName: null,
+    notice: null,
+    pack: null,
+    starterClaimed: true,
+    liveMessageId: null,
+  };
+  void ctx.repo.save(player);
+}
+
+/** A button press that opens a form. */
+export function buttonWithModal(userId: string, customId: string) {
+  return {
+    ...buttonInteraction(userId, customId),
+    showModal: vi.fn(async (_modal: unknown) => undefined),
+  };
+}
+
+/** A submitted form. `fromMessage` is true when the form was opened from a message's button, as the story does. */
+export function modalInteraction(
+  userId: string,
+  customId: string,
+  text: string,
+  fromMessage = true,
+) {
+  return {
+    user: { id: userId, username: `user${userId}` },
+    customId,
+    fields: { getTextInputValue: (_id: string) => text },
+    isFromMessage: () => fromMessage,
+    update: vi.fn(async (_payload: unknown) => undefined),
+    reply: vi.fn(async (_payload: unknown) => undefined),
+  };
+}
+
+export function selectInteraction(
+  userId: string,
+  customId: string,
+  values: string[],
+) {
+  return {
+    ...buttonInteraction(userId, customId),
+    isButton: () => false,
+    isStringSelectMenu: () => true,
+    values,
+  };
 }
 
 type Json = Record<string, any>;
@@ -76,8 +205,11 @@ export function rows(payload: { components?: { toJSON(): Json }[] }): Json[] {
   return (payload.components ?? []).map((r) => r.toJSON());
 }
 
-export const embedOf = (payload: { embeds?: { toJSON(): Json }[] }): Json => payload.embeds![0].toJSON();
+export const embedOf = (payload: { embeds?: { toJSON(): Json }[] }): Json =>
+  payload.embeds![0].toJSON();
 
 /** The payload passed to the first call of a mock. */
-export const firstPayload = (fn: ReturnType<typeof vi.fn>): any => fn.mock.calls[0][0];
-export const lastPayload = (fn: ReturnType<typeof vi.fn>): any => fn.mock.calls.at(-1)![0];
+export const firstPayload = (fn: ReturnType<typeof vi.fn>): any =>
+  fn.mock.calls[0][0];
+export const lastPayload = (fn: ReturnType<typeof vi.fn>): any =>
+  fn.mock.calls.at(-1)![0];

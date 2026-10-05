@@ -31,6 +31,12 @@ export interface StoryState {
   pack: { cards: string[]; rerolls: number } | null;
   /** True once the player has taken their first twelve cards. /daily unlocks after this. */
   starterClaimed: boolean;
+  /**
+   * The id of the DM message that currently carries this scene's live buttons. A button pressed on
+   * any other message is stale and must not advance the story. Null in a server/ephemeral render or
+   * before the first DM send.
+   */
+  liveMessageId: string | null;
 }
 
 export interface StoryChoice {

@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -22,6 +23,29 @@ export interface StoryScreen {
   footer?: string;
 }
 
+/** One Discord message payload for a scene: a plain conversation line, or a rich (embed) scene. */
+export type StoryMessage =
+  | {
+      content: string;
+      components?: ActionRowBuilder<ButtonBuilder>[];
+      files?: AttachmentBuilder[];
+      allowedMentions: { parse: [] };
+    }
+  | {
+      embeds: EmbedBuilder[];
+      components?: ActionRowBuilder<ButtonBuilder>[];
+      files?: AttachmentBuilder[];
+      allowedMentions: { parse: [] };
+    };
+
+/**
+ * A conversation scene renders as plain text (one message per line); a scene with a map or a card
+ * pack keeps the embed box so those features show in full.
+ */
+export function isPlainConversation(view: StoryView): boolean {
+  return !view.map && !view.pack;
+}
+
 const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {
   primary: ButtonStyle.Primary,
   secondary: ButtonStyle.Secondary,
@@ -29,7 +53,7 @@ const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {
   danger: ButtonStyle.Danger,
 };
 
-function formatLine(line: StoryLine): string {
+function formatPlain(line: StoryLine): string {
   // A single stranger speaks throughout the prologue, so his name is never printed:
   // a spoken line (with a speaker) renders as plain text, a gesture/narration line stays italic.
   return line.speaker ? line.text : `*${line.text}*`;
@@ -52,23 +76,11 @@ function packText(cards: CardDef[]): string {
     .join("\n");
 }
 
-export function renderStory(screen: StoryScreen) {
+/** The action row for a scene's buttons (input button first, then choices). Null when there are none. */
+function buttonRow(
+  screen: StoryScreen,
+): ActionRowBuilder<ButtonBuilder> | null {
   const { view, nodeId } = screen;
-  const embed = new EmbedBuilder()
-    .setColor(EMBED_COLOR.story)
-    .setTitle(view.title)
-    .setDescription(view.lines.map(formatLine).join("\n\n").slice(0, 3800));
-  if (screen.footer) embed.setFooter({ text: screen.footer });
-
-  if (!screen.image) {
-    if (view.map) embed.addFields({ name: "Map", value: mapText(view.map) });
-    if (view.pack)
-      embed.addFields({
-        name: "The cards",
-        value: packText(view.pack.cards).slice(0, 1000),
-      });
-  }
-
   const row = new ActionRowBuilder<ButtonBuilder>();
   if (view.input) {
     row.addComponents(
@@ -86,11 +98,50 @@ export function renderStory(screen: StoryScreen) {
     if (choice.emoji) button.setEmoji(choice.emoji);
     row.addComponents(button);
   });
+  return row.components.length > 0 ? row : null;
+}
+
+/**
+ * A plain conversation scene: one text message per line, with the scene's buttons on the LAST
+ * message only (the "typing one line at a time" effect). Never carries an image.
+ */
+export function renderPlain(screen: StoryScreen): StoryMessage[] {
+  const { view } = screen;
+  const row = buttonRow(screen);
+  const lines = view.lines.length > 0 ? view.lines : [{ text: "\u200b" }];
+  return lines.map((line, i) => {
+    const last = i === lines.length - 1;
+    const content = view.lines.length > 0 ? formatPlain(line) : "\u200b";
+    return {
+      content,
+      components: last && row ? [row] : [],
+      allowedMentions: { parse: [] },
+    } satisfies StoryMessage;
+  });
+}
+
+export function renderRich(screen: StoryScreen): StoryMessage {
+  const { view, nodeId } = screen;
+  const embed = new EmbedBuilder()
+    .setColor(EMBED_COLOR.story)
+    .setTitle(view.title)
+    .setDescription(view.lines.map(formatPlain).join("\n\n").slice(0, 3800));
+  if (screen.footer) embed.setFooter({ text: screen.footer });
+
+  if (!screen.image) {
+    if (view.map) embed.addFields({ name: "Map", value: mapText(view.map) });
+    if (view.pack)
+      embed.addFields({
+        name: "The cards",
+        value: packText(view.pack.cards).slice(0, 1000),
+      });
+  }
+
+  const row = buttonRow(screen);
 
   return {
-    content: "",
     embeds: [embed],
-    components: row.components.length > 0 ? [row] : [],
+    components: row ? [row] : [],
     files: screen.image
       ? [
           attach(
@@ -99,5 +150,6 @@ export function renderStory(screen: StoryScreen) {
           ),
         ]
       : [],
+    allowedMentions: { parse: [] },
   };
 }
