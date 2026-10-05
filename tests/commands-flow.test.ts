@@ -5,7 +5,7 @@ import { dailyCommand } from "../src/discord/commands/daily";
 import { deckCommand } from "../src/discord/commands/deck";
 import { cardCommand } from "../src/discord/commands/card";
 import { shopCommand } from "../src/discord/commands/shop";
-import { SHOP_VARIANT_PRICE } from "../src/game/shop";
+import { SHOP_CARD_PRICE, SHOP_VARIANT_PRICE } from "../src/game/shop";
 import { DECK_SIZE } from "../src/engine/types";
 import { CARD_INDEX } from "../src/data/cards";
 import {
@@ -111,7 +111,9 @@ describe("/collection", () => {
     const ctx = makeCtx();
     const call = slashInteraction("viewer", { user: "stranger" });
     await collectionCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/not yet set foot upon the road/);
+    expect(lastPayload(call.reply).content).toMatch(
+      /not yet set foot upon the road/,
+    );
   });
 });
 
@@ -227,11 +229,13 @@ describe("/profile", () => {
     const ctx = makeCtx();
     const call = slashInteraction("viewer", { user: "stranger" });
     await profileCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/not yet set foot upon the road/);
+    expect(lastPayload(call.reply).content).toMatch(
+      /not yet set foot upon the road/,
+    );
   });
 });
 
-describe("/shop variant", () => {
+describe("/shop", () => {
   const abyss = CARD_INDEX.get("abyss-eyes")!;
 
   /** A player who owns abyss-eyes (metal) with the given coins. */
@@ -242,31 +246,118 @@ describe("/shop variant", () => {
     void ctx.repo.save(player);
   }
 
-  it("buys a purchasable variant for an owned card, deducts the flat price and keeps it", async () => {
+  it("shows the coin balance and two in-voice buttons (no subcommand)", async () => {
+    const json = shopCommand.data.toJSON() as any;
+    expect(json.options ?? []).toEqual([]); // no subcommands/options left
+
+    const ctx = makeCtx();
+    seedOwner(ctx, 250);
+    const call = slashInteraction("u");
+    await shopCommand.execute(call as never, ctx);
+    const payload = lastPayload(call.reply);
+    expect(payload.content).toMatch(/250 coins/);
+    const buttons = rows(payload)[0].components;
+    expect(buttons.map((b: any) => b.custom_id)).toEqual([
+      "shop:summon",
+      "shop:variant",
+    ]);
+    // The card button is mystical, not "Buy a card".
+    expect(buttons[0].label).toMatch(/Summon/);
+    expect(buttons[0].label).not.toMatch(/Buy/i);
+  });
+
+  it("summons a card via the button, deducting coins and saving it", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = 500;
+    void ctx.repo.save(player);
+    const before = Object.keys(ctx.repo.get("u").cards).length;
+
+    const press = buttonInteraction("u", "shop:summon");
+    await shopCommand.component!(press as never, ctx);
+    expect(embedOf(lastPayload(press.reply)).title).toMatch(/claimed/);
+    const saved = ctx.repo.get("u");
+    expect(Object.keys(saved.cards).length).toBe(before + 1);
+    expect(saved.coins).toBe(500 - SHOP_CARD_PRICE);
+    expect(ctx.log.entries.find((e) => e.type === "shop_card")).toBeDefined();
+  });
+
+  it("refuses to summon when the player cannot afford a card", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = SHOP_CARD_PRICE - 1;
+    void ctx.repo.save(player);
+    const press = buttonInteraction("u", "shop:summon");
+    await shopCommand.component!(press as never, ctx);
+    expect(lastPayload(press.reply).content).toMatch(/need/);
+    expect(ctx.repo.get("u").coins).toBe(SHOP_CARD_PRICE - 1);
+  });
+
+  it("buys a variant through the two-step select flow, deducting the flat price", async () => {
     const ctx = makeCtx();
     seedOwner(ctx, 500);
-    const call = slashInteraction("u", {
-      subcommand: "variant",
-      card: abyss.id,
-      variant: "blue",
-    });
-    await shopCommand.execute(call as never, ctx);
-    expect(embedOf(lastPayload(call.reply)).description).toMatch(/Blue/);
+
+    const openPick = buttonInteraction("u", "shop:variant");
+    await shopCommand.component!(openPick as never, ctx);
+    const cardMenu = rows(lastPayload(openPick.reply))[0].components[0];
+    expect(cardMenu.custom_id).toBe("shop:pickcard");
+    expect(cardMenu.options.map((o: any) => o.value)).toContain(abyss.id);
+
+    const pickCard = selectInteraction("u", "shop:pickcard", [abyss.id]);
+    await shopCommand.component!(pickCard as never, ctx);
+    const variantMenu = rows(lastPayload(pickCard.update))[0].components[0];
+    expect(variantMenu.custom_id).toBe(`shop:pickvariant:${abyss.id}`);
+
+    const pickVariant = selectInteraction("u", `shop:pickvariant:${abyss.id}`, [
+      "blue",
+    ]);
+    await shopCommand.component!(pickVariant as never, ctx);
+    expect(embedOf(lastPayload(pickVariant.update)).description).toMatch(
+      /Blue/,
+    );
     const saved = ctx.repo.get("u");
     expect(saved.cards[abyss.id].variants).toContain("blue");
     expect(saved.coins).toBe(500 - SHOP_VARIANT_PRICE);
+    expect(
+      ctx.log.entries.find((e) => e.type === "shop_variant"),
+    ).toBeDefined();
   });
 
-  it("refuses when the player already owns the variant", async () => {
+  it("the variant select offers only purchasable variants the player does not yet own", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = 500;
+    player.cards[abyss.id] = { variants: ["metal", "blue"], active: "metal" };
+    void ctx.repo.save(player);
+
+    const pickCard = selectInteraction("u", "shop:pickcard", [abyss.id]);
+    await shopCommand.component!(pickCard as never, ctx);
+    const variantMenu = rows(lastPayload(pickCard.update))[0].components[0];
+    // metal + blue are owned, so only purple + red remain.
+    expect(variantMenu.options.map((o: any) => o.value)).toEqual([
+      "purple",
+      "red",
+    ]);
+  });
+
+  it("tells the player no card awaits a hue when none is eligible", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = 500; // owns no cards
+    void ctx.repo.save(player);
+    const open = buttonInteraction("u", "shop:variant");
+    await shopCommand.component!(open as never, ctx);
+    expect(lastPayload(open.reply).content).toMatch(/No card of thine/);
+  });
+
+  it("refuses when the player already owns the chosen variant", async () => {
     const ctx = makeCtx();
     seedOwner(ctx, 500);
-    const call = slashInteraction("u", {
-      subcommand: "variant",
-      card: abyss.id,
-      variant: "metal",
-    });
-    await shopCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/already own/);
+    const pick = selectInteraction("u", `shop:pickvariant:${abyss.id}`, [
+      "metal",
+    ]);
+    await shopCommand.component!(pick as never, ctx);
+    expect(lastPayload(pick.update).content).toMatch(/already own/);
     expect(ctx.repo.get("u").coins).toBe(500); // unchanged
   });
 
@@ -275,39 +366,21 @@ describe("/shop variant", () => {
     const player = ctx.repo.get("u");
     player.coins = 500;
     void ctx.repo.save(player);
-    const call = slashInteraction("u", {
-      subcommand: "variant",
-      card: abyss.id,
-      variant: "blue",
-    });
-    await shopCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/not yet thine/);
+    const pick = selectInteraction("u", `shop:pickvariant:${abyss.id}`, [
+      "blue",
+    ]);
+    await shopCommand.component!(pick as never, ctx);
+    expect(lastPayload(pick.update).content).toMatch(/not yet thine/);
   });
 
   it("refuses when the player cannot afford the variant", async () => {
     const ctx = makeCtx();
     seedOwner(ctx, SHOP_VARIANT_PRICE - 1);
-    const call = slashInteraction("u", {
-      subcommand: "variant",
-      card: abyss.id,
-      variant: "blue",
-    });
-    await shopCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/need/);
-    expect(ctx.repo.get("u").cards[abyss.id].variants).toEqual(["metal"]);
-  });
-
-  it("only offers purchasable variants in the command's choices", () => {
-    const json = shopCommand.data.toJSON() as any;
-    const variantSub = json.options.find((o: any) => o.name === "variant");
-    const variantOpt = variantSub.options.find(
-      (o: any) => o.name === "variant",
-    );
-    expect(variantOpt.choices.map((c: any) => c.value)).toEqual([
-      "metal",
+    const pick = selectInteraction("u", `shop:pickvariant:${abyss.id}`, [
       "blue",
-      "purple",
-      "red",
     ]);
+    await shopCommand.component!(pick as never, ctx);
+    expect(lastPayload(pick.update).content).toMatch(/need/);
+    expect(ctx.repo.get("u").cards[abyss.id].variants).toEqual(["metal"]);
   });
 });
