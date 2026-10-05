@@ -114,6 +114,10 @@ export function slashInteraction(
   opts: { dm?: ReturnType<typeof dmChannel> | null } = {},
 ) {
   const reply = vi.fn(async (_payload: unknown) => undefined);
+  // Commands may defer first and then editReply (needed when work exceeds Discord's 3s window).
+  // editReply shares the `reply` spy so assertions on the bot's response work whichever path a command takes.
+  const deferReply = vi.fn(async (_payload?: unknown) => undefined);
+  const editReply = reply;
   // `dm` is the channel user.createDM() resolves to; pass dm: null to simulate closed DMs.
   const dm = opts.dm === undefined ? dmChannel() : opts.dm;
   const createDM = vi.fn(async () => {
@@ -165,6 +169,8 @@ export function slashInteraction(
       application: { fetch: async () => ({ owner: { id: ownerId } }) },
     },
     reply,
+    deferReply,
+    editReply,
   };
 }
 

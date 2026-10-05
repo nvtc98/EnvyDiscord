@@ -174,8 +174,11 @@ export const storyCommand: Command = {
 
   async execute(interaction, ctx) {
     const user = interaction.user;
-    const reply = (content: string) =>
-      interaction.reply({ content, flags: MessageFlags.Ephemeral });
+    // Defer immediately: opening the DM channel and sending the gate are network calls that can
+    // exceed Discord's 3-second window for the first response. Deferring reserves the token (15 min)
+    // so the final editReply below never fails with 10062 Unknown interaction.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const reply = (content: string) => interaction.editReply({ content });
 
     if (interaction.options.getBoolean("restart")) {
       if (!(await isOwner(interaction.client, user.id))) {

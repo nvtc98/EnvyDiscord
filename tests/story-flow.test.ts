@@ -106,7 +106,9 @@ describe("/story gate and DM delivery", () => {
   it("sends an ephemeral pointer and asks the ready-gate in the DM for a new player", async () => {
     const ctx = makeCtx();
     const { call, dm, gate } = await openGate(ctx);
-    expect(lastPayload(call.reply as any).flags).toBeDefined();
+    // The command defers ephemerally first (so slow DM work can't blow the 3s interaction window),
+    // then edits in the pointer; the ephemeral flag lives on the defer.
+    expect(lastPayload(call.deferReply as any).flags).toBeDefined();
     expect(lastPayload(call.reply as any).content).toMatch(/DM/);
     expect(content(gate)).toBe(GATE.readyLine);
     expect(labels(gate)).toEqual([GATE.readyYes, GATE.readyNo]);
