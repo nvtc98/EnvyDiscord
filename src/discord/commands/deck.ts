@@ -32,8 +32,9 @@ export const deckCommand: Command = {
           default: current.has(def.id),
         })),
       );
+    const shown = Math.min(owned.length, 25);
     await interaction.reply({
-      content: `Choose your ${DECK_SIZE}-card deck:`,
+      content: `Choose your ${DECK_SIZE}-card deck:${owned.length > shown ? ` (showing your ${shown} cheapest of ${owned.length} cards; browsing the rest is coming)` : ''}`,
       components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)],
       flags: MessageFlags.Ephemeral,
     });

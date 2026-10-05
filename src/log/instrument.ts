@@ -59,5 +59,9 @@ export function describeInteraction(interaction: Interaction, log: Logger): Reco
   if (interaction.isMessageComponent()) {
     return { ...base, kind: 'component', customId: interaction.customId };
   }
+  if (interaction.isModalSubmit()) {
+    const fields = [...(interaction.fields?.fields?.values() ?? [])].map((f) => (log.logContent && 'value' in f ? { name: f.customId, value: f.value } : { name: f.customId }));
+    return { ...base, kind: 'modal', customId: interaction.customId, fields };
+  }
   return null; // autocomplete keystrokes would only be noise
 }

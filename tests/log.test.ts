@@ -144,13 +144,23 @@ describe('instrument', () => {
   it('describeInteraction records command options, or only their names when content is hidden', () => {
     const command = {
       id: 'i', user: { id: 'u', username: 'bob' }, guildId: null, channelId: 'c', context: 1, commandName: 'say',
-      isChatInputCommand: () => true, isMessageComponent: () => false,
+      isChatInputCommand: () => true, isMessageComponent: () => false, isModalSubmit: () => false,
       options: { data: [{ name: 'content', value: 'hello' }] },
     };
     expect(describeInteraction(command as never, nullLogger)).toMatchObject({ kind: 'command', name: 'say', username: 'bob', options: [{ name: 'content', value: 'hello' }] });
     expect(describeInteraction(command as never, new JsonlLogger('x', 'UTC', false))).toMatchObject({ options: [{ name: 'content' }] });
-    const autocomplete = { ...command, isChatInputCommand: () => false, isMessageComponent: () => false };
+    const autocomplete = { ...command, isChatInputCommand: () => false, isMessageComponent: () => false, isModalSubmit: () => false };
     expect(describeInteraction(autocomplete as never, nullLogger)).toBeNull();
+  });
+
+  it('describeInteraction records a submitted form with its values, or just the field names when content is hidden', () => {
+    const modal = {
+      id: 'i', user: { id: 'u', username: 'bob' }, guildId: null, channelId: 'c', context: 1, customId: 'story:ask_name:text',
+      isChatInputCommand: () => false, isMessageComponent: () => false, isModalSubmit: () => true,
+      fields: { fields: new Map([['text', { customId: 'text', value: 'Ocean' }]]) },
+    };
+    expect(describeInteraction(modal as never, nullLogger)).toMatchObject({ kind: 'modal', customId: 'story:ask_name:text', fields: [{ name: 'text', value: 'Ocean' }] });
+    expect(describeInteraction(modal as never, new JsonlLogger('x', 'UTC', false))).toMatchObject({ fields: [{ name: 'text' }] });
   });
 });
 

@@ -1,13 +1,6 @@
-import { DiscordAPIError, MessageFlags, RESTJSONErrorCodes, Team, type Client } from 'discord.js';
+import { DiscordAPIError, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import { slash, type Command } from '../command';
-
-/** The application's owner (or every member of the owning team). Only they may use /dm. */
-async function isOwner(client: Client<true>, userId: string): Promise<boolean> {
-  const app = await client.application.fetch();
-  const owner = app.owner;
-  if (!owner) return false;
-  return owner instanceof Team ? owner.members.has(userId) : owner.id === userId;
-}
+import { isOwner } from '../owner';
 
 export const dmCommand: Command = {
   data: slash('dm', 'Owner only: send a direct message to a user as the bot')

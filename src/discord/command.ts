@@ -5,6 +5,7 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
   type MessageComponentInteraction,
+  type ModalSubmitInteraction,
   type RESTPostAPIApplicationCommandsJSONBody,
 } from 'discord.js';
 import type { PlayerRepo } from '../db/repository';
@@ -30,6 +31,8 @@ export interface Command {
   autocomplete?(interaction: AutocompleteInteraction, ctx: AppContext): Promise<void>;
   /** Buttons / select menus whose customId starts with `<command name>:`. */
   component?(interaction: MessageComponentInteraction, ctx: AppContext): Promise<void>;
+  /** Forms (modals) whose customId starts with `<command name>:`. */
+  modal?(interaction: ModalSubmitInteraction, ctx: AppContext): Promise<void>;
 }
 
 /** Slash command usable in servers, in DMs with the bot, and in any DM/group DM (User Install). */

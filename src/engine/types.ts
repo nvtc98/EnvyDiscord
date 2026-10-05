@@ -27,9 +27,13 @@ export type Ability =
   | { timing: 'continuous'; effect: ContinuousEffect }
   | { timing: 'endOfRound'; effect: EndOfRoundEffect };
 
+export type Rarity = 'common' | 'rare' | 'epic';
+
 export interface CardDef {
   id: string;
   name: string;
+  /** Used by the story's starter pack. Ordinary packs ignore it. */
+  rarity?: Rarity;
   cost: number;
   power: number;
   ability?: Ability;

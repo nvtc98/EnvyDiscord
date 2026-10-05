@@ -65,6 +65,8 @@ Shared across variants: card 240 × 336, 10 px corner, 5 px outer outline; built
 
 ## Frame files
 
+The variant frames are **generated**: `npm run frames:variants` (`scripts/make-variant-frames.ts`, `src/render/variant-frames.ts`, `src/render/recolor.ts`) takes the Blue frame in `assets/frames/source/` (the Dextrous export with its white background removed) and recolours the title banner and the description panel with each variant's registry colours. Every banner pixel's position on the Blue gradient line is mapped to the same position on the target gradient (shape, anti-aliasing and alpha are kept); the description pixels take `descFill`'s colour and have their alpha rescaled to its opacity. The outline and the cost/power badges are shared, so they are identical in every file. A test (`tests/recolor.test.ts`) fails when a shipped file no longer matches the registry or when its banner and panel colours differ from the registry's, so changing a colour or adding a variant means running the command and committing the files. A variant whose design differs from a recolour can be exported from Dextrous and saved over its file by hand, but the next run of the command will overwrite it.
+
 Frames are `assets/frames/variant-<id>.png` (transparent PNG/WebP). `FrameLibrary.forVariant(id)` loads the
 file for that variant; a missing file falls back to `variant-metal.png`, then to any other variant file in
 registry order, then to the built-in drawn frame (`null`) — mirroring the old nearest-tier fallback.

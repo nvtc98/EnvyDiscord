@@ -24,6 +24,7 @@ Design documents: the story is in [docs/superpowers/specs/2026-10-04-story-desig
 | Render sample card and battle images without Discord               | `npm run preview` (writes to `preview/`)               |
 | AI vs AI games to check game balance                               | `npm run simulate`                                     |
 | Remove the white background of a card frame exported from Dextrous | `npm run frame:cutout -- in.png out.png [layout.json]` |
+| Regenerate the colour variant frames from the Blue frame | `npm run frames:variants [-- --sheet preview/variants.png]` |
 
 Stop the bot with `Ctrl+C`. After editing `.env`, stop and restart the bot (`tsx watch` does not watch `.env`).
 

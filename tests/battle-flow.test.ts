@@ -42,6 +42,15 @@ async function startWithPlayableCard(userId = 'u1') {
 }
 
 describe('/battle', () => {
+  it('is for the bot owner only while the story is being built', async () => {
+    const ctx = makeCtx(3);
+    const stranger = slashInteraction('stranger', {}, 'someone-else');
+    await battleCommand.execute(stranger as never, ctx);
+    expect(lastPayload(stranger.reply).content).toMatch(/\/story/);
+    expect(lastPayload(stranger.reply).components).toBeUndefined();
+    expect(ctx.log.entries.find((e) => e.type === 'battle_started')).toBeUndefined();
+  });
+
   it('starts a private battle with a hand, three control rows and a log', async () => {
     const ctx = makeCtx(3);
     const { payload } = await start(ctx);

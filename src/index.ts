@@ -52,6 +52,9 @@ async function handle(interaction: Interaction): Promise<void> {
   } else if (interaction.isMessageComponent()) {
     const [name] = interaction.customId.split(':');
     await commandMap.get(name)?.component?.(interaction, ctx);
+  } else if (interaction.isModalSubmit()) {
+    const [name] = interaction.customId.split(':');
+    await commandMap.get(name)?.modal?.(interaction, ctx);
   }
 }
 
