@@ -25,23 +25,23 @@ export const PLACE_WISDOM = "The Eyes Of Wisdom";
  */
 export const GATE = {
   /** No-progress greeting shown before the real `greeting` scene (both /story and /invite). */
-  readyLine:
-    "Hello there, stranger. Might I trouble you for a moment of your time?",
-  readyYes: "Of course",
-  readyNo: "Not right now",
+  readyLine: "Hark, traveler. Might I beg a moment of thy time?",
+  readyYes: "Aye, gladly",
+  readyNo: "Not at this hour",
   /** Shown after declining the ready-gate; nothing is saved. */
   declineLine:
-    "No trouble at all. When you have a moment, just say /story and I'll be here.",
+    "No matter at all. When the hour suits thee, speak /story and here I shall wait.",
   /** /story resume (progress exists). */
-  resumeLine: "There you are again. Shall we pick up where we left off?",
-  resumeYes: "Yes, let's continue",
-  resumeNo: "Not right now",
+  resumeLine:
+    "There thou art again. Shall we take up the road where we left it?",
+  resumeYes: "Aye, let us go on",
+  resumeNo: "Not at this hour",
   /** /invite resume (progress exists); `inviter` is already a sanitized display name. */
   inviteResumeLine: (inviter: string): string =>
-    `${inviter} reminded me about you. Shall we continue where we left off?`,
+    `${inviter} bade me remember thee. Shall we go on from where we left the road?`,
   /** Shown after declining a resume; saved progress is untouched. */
   resumeDeclineLine:
-    "Of course. Whenever you're ready, say /story and we'll continue.",
+    "As thou wilt. Whenever thou art ready, speak /story and we shall go on.",
 } as const;
 
 export interface NodeDef {
@@ -75,18 +75,19 @@ const go = (
 
 const story = (p: Player) => p.story!;
 const who = (p: Player) => story(p).name ?? "traveler";
+// NOTE: "traveler" is kept as the fallback form of address, in keeping with the archaic voice.
 
 const ROAD = "The Road";
 const CROSSROADS = "The Crossroads";
 
 const REROLL_LINES: StoryLine[] = [
-  stranger("Wrong way. I will close it, and you will try again."),
+  stranger("Wrong way. I shall close it, and thou shalt try once more."),
   stranger(
-    "Hold it by the spine this time. There — the pages fall open somewhere else.",
+    "Hold it by the spine this time. There — the pages fall open elsewhere.",
   ),
-  stranger("Close it. Breathe. Open it again. See? A different twelve."),
+  stranger("Close it. Breathe. Open it anew. Seest thou? A different twelve."),
   stranger(
-    "It is shy, this book. Give it a moment, and it shows you new pages.",
+    "'Tis a shy book, this. Grant it a moment, and new pages it shows thee.",
   ),
 ];
 
@@ -115,13 +116,13 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          "Hear that wind? It has been dragging dead leaves down this road since morning. Few people come this way now — but I have been waiting for one who would.",
+          "Dost thou hear that wind? Since dawn it has dragged dead leaves down the old road. Few folk pass this way now — yet I have tarried here for one who would.",
         ),
-        stranger("Tell me: are you one of The Eyes?"),
+        stranger("Tell me, then: are you one of The Eyes?"),
       ],
       choices: [
-        { label: "Yes, I am one of The Eyes", style: "primary" },
-        { label: "No, I am not", style: "secondary" },
+        { label: "Aye, I am one of The Eyes", style: "primary" },
+        { label: "Nay, I am not", style: "secondary" },
       ],
     }),
     choose(p, index) {
@@ -134,30 +135,32 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: ROAD,
       lines: [
-        stranger("I thought as much. There is a look about you I know."),
         stranger(
-          "Every one of The Eyes carries a name that ends the same way. Tell me yours, and I will remember it.",
+          "I thought as much. There is a look about thee I know of old.",
+        ),
+        stranger(
+          "Every one of The Eyes bears a name that ends the same way. Speak thine to me, and I shall remember it.",
         ),
       ],
       choices: [],
       input: {
-        buttonLabel: "Say my name",
-        modalTitle: "Say your name",
-        label: "Your name (Eyes is added for you)",
-        placeholder: "Ocean",
+        buttonLabel: "Speak my name",
+        modalTitle: "Speak thy name",
+        label: "Thy name (Eyes is added for thee)",
+        placeholder: "Phantom",
       },
     }),
     submit(p, text, ctx, events) {
       const s = story(p);
       const stem = cleanStem(text);
       if (!stem) {
-        s.notice = stranger("Say something. A name cannot be empty.");
+        s.notice = stranger("Speak something. A name cannot be empty.");
         return "ask_name";
       }
       // "Stranger Eyes" is reserved — it belongs to someone else. Reject it hard; never keepable.
       if (isStrangerStem(stem)) {
         s.notice = stranger(
-          "No. That name is already spoken for — it belongs to someone you have not met. Choose another.",
+          "Nay. That name is already spoken for — it belongs to one thou hast not yet met. Choose another.",
         );
         return "ask_name";
       }
@@ -193,10 +196,10 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `${story(p).name}. Yes... I know that name. It is written in the old records. I should have known you at once.`,
+          `${story(p).name}. Yes... I know that name. 'Tis written in the old records. I should have known thee at once.`,
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "tribe",
   },
@@ -212,20 +215,20 @@ export const NODES: Record<string, NodeDef> = {
       lines.push(
         stranger(
           pending.suggestion
-            ? `Could your name be ${pending.suggestion}?`
-            : "Nor anything close to it.",
+            ? `Could thy name be ${pending.suggestion}?`
+            : "Nor aught close to it.",
         ),
       );
-      lines.push(stranger("Are you certain of your name?"));
+      lines.push(stranger("Art thou certain of thy name?"));
       const choices: StoryChoice[] = [];
       if (pending.suggestion)
         choices.push({
-          label: `Yes, I am ${pending.suggestion}`,
+          label: `Aye, I am ${pending.suggestion}`,
           style: "primary",
         });
-      choices.push({ label: "I will say it again", style: "secondary" });
+      choices.push({ label: "I shall speak it again", style: "secondary" });
       choices.push({
-        label: `Yes, I am ${pending.typed}`,
+        label: `Aye, I am ${pending.typed}`,
         style: pending.suggestion ? "secondary" : "primary",
       });
       return { title: ROAD, lines, choices };
@@ -239,7 +242,7 @@ export const NODES: Record<string, NodeDef> = {
       const picked = options[index];
       if (picked === "again") {
         s.pendingName = null;
-        s.notice = stranger("Say it again, then.");
+        s.notice = stranger("Speak it again, then.");
         return "ask_name";
       }
       s.name = picked === "suggestion" ? pending.suggestion! : pending.typed;
@@ -254,10 +257,10 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `Very well, ${story(p).name}. A name is only what its bearer makes of it.`,
+          `Very well, ${story(p).name}. A name is but what its bearer makes of it.`,
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "tribe",
   },
@@ -267,10 +270,10 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          "No matter. The road is kind to anyone who keeps walking. Stay with me a while.",
+          "No matter. The old road is kind to any who keep walking. Tarry with me a while.",
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "tribe",
   },
@@ -280,12 +283,12 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `I am searching for a tribe: the ${TRIBE}. Do you know where they live?`,
+          `I am in search of a tribe: the ${TRIBE}. Do you know where they live?`,
         ),
       ],
       choices: [
-        { label: "Yes, I know where they are", style: "primary" },
-        { label: "No, I do not", style: "secondary" },
+        { label: "Aye, I know where they dwell", style: "primary" },
+        { label: "Nay, I do not", style: "secondary" },
       ],
     }),
     choose(p, index) {
@@ -301,10 +304,10 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          "Then you are worth more to me than most travelers. Keep that knowledge close — I will need it before the end.",
+          "Then thou art worth more to me than most who wander. Keep that knowledge close — I shall have need of it before the end.",
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "curse",
   },
@@ -313,8 +316,10 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: ROAD,
       lines: [
-        stranger("Oh? But you are one of The Eyes. Surely you know the way."),
-        stranger("Point me in the right direction. Even a guess will do."),
+        stranger(
+          "Oh? But you are one of The Eyes. Surely thou knowest the way.",
+        ),
+        stranger("Point me the right road. Even a guess shall serve."),
       ],
       choices: go("Point the way"),
     }),
@@ -326,10 +331,10 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          "Then we search together, you and I. Two pairs of eyes see further than one.",
+          "Then we search together, thou and I. Two pairs of eyes see further than one.",
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "curse",
   },
@@ -338,21 +343,21 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: ROAD,
       lines: [
-        narration("He pulls his hood lower against the colder wind."),
+        narration("He draws his hood lower against the colder wind."),
         stranger(
-          `I must warn you, though. The ${TRIBE} — Bò Tuôi — carry a strange curse. No outsider can walk up to them in the ordinary way. The road bends, and the path forgets you.`,
+          `Yet I must warn thee. The ${TRIBE} — Bò Tuôi — bear a strange curse. No outsider may walk up to them in the common way. The road bends, and the path forgets thee.`,
         ),
         stranger(
-          "But you have me. I can bring us in safely — I know the way through.",
+          "But thou hast me. I can bring us in safely — I know the way through.",
         ),
         stranger(
-          "My price is a duel: beat me at cards, and I will bring us in safely. To challenge me, though, you need a deck of The Eyes of your own.",
+          "My price is a duel: best me at cards, and I shall bring us in safely. Yet to challenge me, thou must bear a deck of The Eyes of thine own.",
         ),
         stranger(
-          `That deck lies in ${PLACE_WISDOM}, a place within the lands of The Eyes. Come there with me, and I will show you how to claim it.`,
+          `That deck lies in ${PLACE_WISDOM}, a place within the lands of The Eyes. Come thither with me, and I shall show thee how to claim it.`,
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "informant",
   },
@@ -362,13 +367,13 @@ export const NODES: Record<string, NodeDef> = {
       title: CROSSROADS,
       lines: [
         narration(
-          "He steps off the road where it splits three ways, and waits for you to catch up.",
+          "He steps off the road where it splits three ways, and waits for thee to catch up.",
         ),
         stranger(
-          `This is the crossroads. From here, take me to ${PLACE_WISDOM}, and I will show you what waits inside.`,
+          `This is the crossroads. From here, take me to ${PLACE_WISDOM}, and I shall show thee what waits within.`,
         ),
       ],
-      choices: go("Look at the map"),
+      choices: go("Look upon the map"),
     }),
     choose: () => "map",
   },
@@ -376,7 +381,7 @@ export const NODES: Record<string, NodeDef> = {
   map: {
     view: () => ({
       title: CROSSROADS,
-      lines: [stranger("So — where shall we go?")],
+      lines: [stranger("So — whither shall we go?")],
       choices: [
         { label: PLACE_WISDOM, style: "primary", emoji: "⬅️" },
         { label: TRIBE, style: "primary", emoji: "➡️" },
@@ -401,7 +406,7 @@ export const NODES: Record<string, NodeDef> = {
       title: CROSSROADS,
       lines: [
         stranger(
-          `${TRIBE}? Not yet. Without the deck the gate stays shut — and so do I. The book first.`,
+          `${TRIBE}? Not yet. Without the deck the gate stays shut — and so do I. The book comes first.`,
         ),
       ],
       choices: go("Back to the map", "secondary"),
@@ -414,14 +419,14 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         stranger(
-          "Mind your step. Painted eyes cover every wall in here, and every one of them is watching you. Keep close to me.",
+          "Mind thy step. Painted eyes cover every wall in here, and every one of them watches thee. Keep close to me.",
         ),
         stranger(
-          "There, on the stand — there is a book. Open it the right way and it gives up the deck. I will tell you how.",
+          "There, upon the stand — there is a book. Open it aright and it yields up the deck. I shall tell thee how.",
         ),
       ],
       choices: [
-        { label: "How do you know all this?", style: "primary" },
+        { label: "How dost thou know all this?", style: "primary" },
         { label: "Just open the book", style: "secondary" },
       ],
     }),
@@ -432,15 +437,15 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: PLACE_WISDOM,
       lines: [
-        stranger("How do I know the way, and who you are?"),
+        stranger("How do I know the way, and who thou art?"),
         narration(
-          "A slow, knowing smile crosses his face, and he does not answer the rest.",
+          "A slow, knowing smile crosses his face, and he answers not the rest.",
         ),
         stranger(
-          "Let us say I keep an eye on things. For now, just call me Stranger Eyes. The book is waiting.",
+          "Let us say I keep an eye on things. For now, do but call me Stranger Eyes. The book is waiting.",
         ),
       ],
-      choices: go("Open the book"),
+      choices: go("Open the tome"),
     }),
     choose: () => "book",
   },
@@ -452,14 +457,14 @@ export const NODES: Record<string, NodeDef> = {
         .map((id) => ctx.cardIndex.get(id))
         .filter((c) => c !== undefined);
       const lines: StoryLine[] = [
-        stranger(`Twelve pages, twelve cards. Do they suit you, ${who(p)}?`),
+        stranger(`Twelve pages, twelve cards. Do they suit thee, ${who(p)}?`),
       ];
       return {
         title: PLACE_WISDOM,
         lines,
         choices: [
           { label: "Take these cards", style: "success" },
-          { label: "Close the book and open it again", style: "secondary" },
+          { label: "Close the tome and open it anew", style: "secondary" },
         ],
         pack: { cards },
       };
@@ -486,13 +491,13 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         narration(
-          `The ${STARTER_SIZE} cards leave the pages and settle into your hands. The book closes on its own.`,
+          `The ${STARTER_SIZE} cards leave the pages and settle into your hands. The book closes of its own accord.`,
         ),
         stranger(
-          "These will do. Remember what I asked of you, and I will remember what you took.",
+          "These shall serve. Remember what I asked of thee, and I shall remember what thou tookest.",
         ),
       ],
-      choices: go("Continue"),
+      choices: go("Onward"),
     }),
     choose: () => "prologue_end",
   },
@@ -502,9 +507,9 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         stranger(
-          `Come. The road to the ${TRIBE} is long, and the curse will not wait. We leave at dawn.`,
+          `Come. The road to the ${TRIBE} is long, and the curse will not wait. We set forth at dawn.`,
         ),
-        narration("The story continues soon."),
+        narration("The tale continues anon."),
       ],
       choices: [],
     }),

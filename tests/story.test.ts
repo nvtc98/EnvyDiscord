@@ -205,16 +205,16 @@ describe("story: the prologue", () => {
     });
     applyAction(player, "confirm_name", { type: "choice", index: 0 }, c); // I will say it again
     expect(player.story!.node).toBe("ask_name");
-    expect(currentView(player, c).lines[0].text).toBe("Say it again, then.");
+    expect(currentView(player, c).lines[0].text).toBe("Speak it again, then.");
     applyAction(player, "ask_name", { type: "text", text: "abiss" }, c); // near Abyss
     expect(player.story!.pendingName).toEqual({
       typed: "Abiss Eyes",
       suggestion: "Abyss Eyes",
     });
     expect(currentView(player, c).choices.map((x) => x.label)).toEqual([
-      "Yes, I am Abyss Eyes",
-      "I will say it again",
-      "Yes, I am Abiss Eyes",
+      "Aye, I am Abyss Eyes",
+      "I shall speak it again",
+      "Aye, I am Abiss Eyes",
     ]);
     applyAction(player, "confirm_name", { type: "choice", index: 2 }, c); // keep what I typed
     expect(player.story!.name).toBe("Abiss Eyes");
@@ -388,7 +388,7 @@ describe("story: the prologue", () => {
       expect(view.pack!.cards).toHaveLength(12);
       expect(view.choices.map((c) => c.label)).toEqual([
         "Take these cards",
-        "Close the book and open it again",
+        "Close the tome and open it anew",
       ]);
     });
 

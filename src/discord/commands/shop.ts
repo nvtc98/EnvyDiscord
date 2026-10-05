@@ -17,29 +17,29 @@ import { attach, tryRender } from "../images";
 import { cardSummary, variantLabel } from "../render";
 
 export const shopCommand: Command = {
-  data: slash("shop", "Spend coins to get cards")
+  data: slash("shop", "Spend thy coins upon cards")
     .addSubcommand((sub) =>
       sub
         .setName("card")
-        .setDescription(`Buy a random card for ${SHOP_CARD_PRICE} coins`),
+        .setDescription(`Summon a card unknown for ${SHOP_CARD_PRICE} coins`),
     )
     .addSubcommand((sub) =>
       sub
         .setName("variant")
         .setDescription(
-          `Buy a colour variant for a card you own (${SHOP_VARIANT_PRICE} coins)`,
+          `Claim a colour variant for a card thou ownest (${SHOP_VARIANT_PRICE} coins)`,
         )
         .addStringOption(
           new SlashCommandStringOption()
             .setName("card")
-            .setDescription("Which card to buy a variant for")
+            .setDescription("For which card to claim a variant")
             .setRequired(true)
             .setAutocomplete(true),
         )
         .addStringOption((opt) => {
           opt
             .setName("variant")
-            .setDescription("Which variant to buy")
+            .setDescription("Which variant to claim")
             .setRequired(true);
           for (const v of purchasableVariants())
             opt.addChoices({ name: v.name, value: v.id });
@@ -56,8 +56,8 @@ export const shopCommand: Command = {
       if (!result.ok) {
         const msg =
           result.reason === "insufficient-coins"
-            ? `❌ You need **${SHOP_CARD_PRICE} coins** to buy a card. You have **${player.coins}**.`
-            : "🏆 Your collection is complete — nothing left to buy!";
+            ? `❌ Thou needest **${SHOP_CARD_PRICE} coins** to summon a card. Thy purse holds **${player.coins}**.`
+            : "🏆 Thy collection is complete — naught remains to be bought.";
         await interaction.reply({
           content: msg,
           flags: MessageFlags.Ephemeral,
@@ -81,14 +81,14 @@ export const shopCommand: Command = {
         grant.kind === "new"
           ? `🆕 **${grant.card.name}** · ${cardSummary(grant.card)}`
           : grant.kind === "variant-unlocked"
-            ? `🎨 **${grant.card.name}** unlocked the **${variantLabel(grant.variant!)}** variant`
-            : `💰 **${grant.card.name}** was a duplicate · refunded **${grant.refund}** coins`;
+            ? `🎨 **${grant.card.name}** hath revealed its **${variantLabel(grant.variant!)}** variant`
+            : `💰 **${grant.card.name}** came twice over · **${grant.refund}** coins returned to thy purse`;
       const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR.daily)
-        .setTitle("🛒 Card purchased")
+        .setTitle("🛒 A card claimed")
         .setDescription(description)
         .setFooter({
-          text: `-${result.coinsSpent} coins · Remaining: ${player.coins} coins`,
+          text: `-${result.coinsSpent} coins · Thy purse holds: ${player.coins} coins`,
         });
 
       const image = await tryRender(ctx, (r) =>
@@ -121,7 +121,7 @@ export const shopCommand: Command = {
       );
       if (!card) {
         await interaction.reply({
-          content: `❌ Card not found: **${cardName}**`,
+          content: `❌ No such card is known to me: **${cardName}**`,
           flags: MessageFlags.Ephemeral,
         });
         return;
@@ -130,13 +130,13 @@ export const shopCommand: Command = {
       const result = buyVariant(player, card, variantId);
       if (!result.ok) {
         const msg: Record<string, string> = {
-          "insufficient-coins": `❌ You need **${SHOP_VARIANT_PRICE} coins** to buy a variant. You have **${player.coins}**.`,
-          "not-owned": `❌ You don't own **${card.name}** yet. Buy it first with \`/shop card\`.`,
-          "already-owned": `✨ You already own the **${variantLabel(variantId)}** variant of **${card.name}**.`,
-          "not-purchasable": `❌ The **${variantLabel(variantId)}** variant can't be bought in the shop.`,
+          "insufficient-coins": `❌ Thou needest **${SHOP_VARIANT_PRICE} coins** to claim a variant. Thy purse holds **${player.coins}**.`,
+          "not-owned": `❌ **${card.name}** is not yet thine. Claim it first with \`/shop card\`.`,
+          "already-owned": `✨ Thou dost already own the **${variantLabel(variantId)}** variant of **${card.name}**.`,
+          "not-purchasable": `❌ The **${variantLabel(variantId)}** variant cannot be claimed in the shop.`,
         };
         await interaction.reply({
-          content: msg[result.reason] ?? "❌ Cannot buy that variant.",
+          content: msg[result.reason] ?? "❌ That variant cannot be claimed.",
           flags: MessageFlags.Ephemeral,
         });
         return;
@@ -153,12 +153,12 @@ export const shopCommand: Command = {
 
       const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR.victory)
-        .setTitle("✨ Variant purchased")
+        .setTitle("✨ A variant claimed")
         .setDescription(
-          `🎨 **${card.name}** gained the **${variantLabel(result.variant)}** variant`,
+          `🎨 **${card.name}** hath gained the **${variantLabel(result.variant)}** variant`,
         )
         .setFooter({
-          text: `-${result.coinsSpent} coins · Remaining: ${player.coins} coins`,
+          text: `-${result.coinsSpent} coins · Thy purse holds: ${player.coins} coins`,
         });
 
       const image = await tryRender(ctx, (r) =>

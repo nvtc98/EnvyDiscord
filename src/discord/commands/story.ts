@@ -140,8 +140,8 @@ export async function resolveDm(user: User): Promise<DmChannel | null> {
 }
 
 const CLOSED_DM =
-  "❌ I couldn't message you. Open your DMs (Privacy Settings → allow DMs from server members) and try again.";
-const DM_POINTER = "📬 Check your DMs — we'll talk there.";
+  "❌ I could not reach thee. Open thy private messages (Privacy Settings → allow DMs from server members) and try again.";
+const DM_POINTER = "📬 Look to thy private messages — we shall speak there.";
 
 function nameModal(nodeId: string, view: StoryView): ModalBuilder {
   const input = view.input!;
@@ -165,11 +165,11 @@ function nameModal(nodeId: string, view: StoryView): ModalBuilder {
 export const storyCommand: Command = {
   data: slash(
     "story",
-    "Begin the story, or continue where you left off",
+    "Begin the tale, or take up the road where thou left it",
   ).addBooleanOption((option) =>
     option
       .setName("restart")
-      .setDescription("Owner only: erase all your progress and begin again"),
+      .setDescription("Owner only: erase all thy progress and begin anew"),
   ),
 
   async execute(interaction, ctx) {
@@ -182,7 +182,7 @@ export const storyCommand: Command = {
 
     if (interaction.options.getBoolean("restart")) {
       if (!(await isOwner(interaction.client, user.id))) {
-        await reply("Only the bot owner can restart the story.");
+        await reply("Only the bot owner may begin the tale anew.");
         return;
       }
       await ctx.repo.save(createPlayer(user.id));
@@ -231,7 +231,7 @@ export const storyCommand: Command = {
     const player = ctx.repo.get(user.id);
     if (!player.story) {
       await interaction.update({
-        content: "Use `/story` to begin.",
+        content: "Speak `/story` to begin.",
         embeds: [],
         components: [],
         attachments: [],
@@ -288,7 +288,7 @@ export const storyCommand: Command = {
         await deliverScene(ctx, user, player, dmFrom(interaction));
       else
         await interaction.reply({
-          content: "Use `/story` to begin.",
+          content: "Speak `/story` to begin.",
           flags: MessageFlags.Ephemeral,
         });
       return;

@@ -31,12 +31,14 @@ async function view(
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR.neutral)
-    .setTitle("🎴 Collection")
+    .setTitle("🎴 Thy collection")
     .setFooter({
       text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards · ${variantsOwned} variants`,
     });
   if (items.length === 0)
-    embed.setDescription("No cards yet. Use `/daily` to get your first cards!");
+    embed.setDescription(
+      "No cards yet. Speak `/daily` to gather thy first cards.",
+    );
 
   const slice = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const image =
@@ -82,10 +84,11 @@ async function view(
 }
 
 export const collectionCommand: Command = {
-  data: slash("collection", "View your card collection").addUserOption((o) =>
-    o
-      .setName("user")
-      .setDescription("View another player's collection (read-only)"),
+  data: slash("collection", "Behold the cards in thy keeping").addUserOption(
+    (o) =>
+      o
+        .setName("user")
+        .setDescription("Behold another's collection (for the eyes only)"),
   ),
 
   async execute(interaction, ctx) {
@@ -95,7 +98,7 @@ export const collectionCommand: Command = {
 
     if (viewingOther && !hasPlayed(player)) {
       await interaction.reply({
-        content: "That player hasn't started yet.",
+        content: "That soul hath not yet set foot upon the road.",
         flags: MessageFlags.Ephemeral,
       });
       return;

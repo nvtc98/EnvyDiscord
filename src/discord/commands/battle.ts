@@ -113,23 +113,26 @@ const pushLog = (session: Session, lines: string[]) => {
 };
 
 export const battleCommand: Command = {
-  data: slash("battle", "Fight the AI in a lane battle").addStringOption(
-    (option) =>
-      option
-        .setName("difficulty")
-        .setDescription("AI difficulty (default: normal)")
-        .addChoices(
-          { name: "Easy", value: "easy" },
-          { name: "Normal", value: "normal" },
-          { name: "Hard", value: "hard" },
-        ),
+  data: slash(
+    "battle",
+    "Do battle against the foe across three lanes",
+  ).addStringOption((option) =>
+    option
+      .setName("difficulty")
+      .setDescription("The measure of the foe (default: normal)")
+      .addChoices(
+        { name: "Easy", value: "easy" },
+        { name: "Normal", value: "normal" },
+        { name: "Hard", value: "hard" },
+      ),
   ),
 
   async execute(interaction, ctx) {
     // Practice battles are for the owner while the story is being built; players reach battles through /story.
     if (!(await isOwner(interaction.client, interaction.user.id))) {
       await interaction.reply({
-        content: "Battles are part of the story now. Use `/story` to continue.",
+        content:
+          "Battles are woven into the tale now. Speak `/story` to go on.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -160,10 +163,10 @@ export const battleCommand: Command = {
       touched: now,
     };
     const opening = [
-      first === "bottom" ? "You go first." : "The enemy goes first.",
+      first === "bottom" ? "Thou goest first." : "The enemy goes first.",
       ...(deck.guests.length > 0
         ? [
-            `${deck.guests.length} guest card${deck.guests.length === 1 ? "" : "s"} fill your deck for this battle. They are not added to your collection.`,
+            `${deck.guests.length} guest card${deck.guests.length === 1 ? "" : "s"} fill thy deck for this battle. They are not added to thy collection.`,
           ]
         : []),
     ];
@@ -197,7 +200,7 @@ export const battleCommand: Command = {
     if (!session || session.id !== battleId) {
       await interaction.update({
         content:
-          "⌛ This battle has ended or expired. Use `/battle` to play again.",
+          "⌛ This battle hath ended or passed away. Speak `/battle` to fight anew.",
         embeds: [],
         components: [],
         attachments: [],
@@ -229,7 +232,7 @@ export const battleCommand: Command = {
       const lane = Number(arg) as LaneIndex;
       const uid = session.selectedUid;
       if (uid === null || !canPlay(session.state, uid, lane).ok) {
-        await reject("You can't play that card there right now.");
+        await reject("Thou canst not play that card there at this moment.");
         return;
       }
       const step = playCard(session.state, uid, lane);
@@ -239,7 +242,7 @@ export const battleCommand: Command = {
       pushLog(session, describeEvents(events, "bottom"));
     } else if (kind === "end") {
       if (session.state.active !== "bottom" || session.state.winner) {
-        await reject("It isn't your turn.");
+        await reject("'Tis not thy turn.");
         return;
       }
       ctx.log.game("battle_event", {
@@ -258,7 +261,7 @@ export const battleCommand: Command = {
       const step = forfeit(session.state, "bottom");
       session.state = step.state;
       events = step.events;
-      pushLog(session, ["You forfeited."]);
+      pushLog(session, ["Thou hast yielded."]);
     } else {
       return;
     }
@@ -295,10 +298,10 @@ export const battleCommand: Command = {
     });
     const summary =
       outcome === "won"
-        ? `You won! **+${coins} coins**`
+        ? `Victory is thine! **+${coins} coins**`
         : outcome === "draw"
           ? `A draw. **+${coins} coins**`
-          : `You lost. **+${coins} coins** as consolation.`;
+          : `Thou art bested. **+${coins} coins** for thy trouble.`;
     await interaction.update({
       ...renderBattleEnd(await withImage(ctx, session), summary),
       attachments: [],

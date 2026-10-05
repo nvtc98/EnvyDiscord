@@ -5,8 +5,10 @@ import { EMBED_COLOR } from "../../render/theme";
 import { slash, type Command } from "../command";
 
 export const profileCommand: Command = {
-  data: slash("profile", "View your stats").addUserOption((o) =>
-    o.setName("user").setDescription("View another player's stats (read-only)"),
+  data: slash("profile", "Behold thy standing").addUserOption((o) =>
+    o
+      .setName("user")
+      .setDescription("Behold another's standing (for the eyes only)"),
   ),
 
   async execute(interaction, ctx) {
@@ -16,7 +18,7 @@ export const profileCommand: Command = {
 
     if (viewingOther && !hasPlayed(player)) {
       await interaction.reply({
-        content: "That player hasn't started yet.",
+        content: "That soul hath not yet set foot upon the road.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -31,7 +33,7 @@ export const profileCommand: Command = {
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR.profile)
-      .setTitle(`👤 ${target.displayName}`)
+      .setTitle(`👤 The record of ${target.displayName}`)
       .setThumbnail(avatarUrl)
       .addFields(
         { name: "💰 Coins", value: String(player.coins), inline: true },
@@ -46,8 +48,8 @@ export const profileCommand: Command = {
           inline: true,
         },
         {
-          name: "🎁 Daily pack today",
-          value: claimed ? "Claimed" : "Not claimed",
+          name: "🎁 Daily pack this day",
+          value: claimed ? "Claimed" : "Not yet claimed",
           inline: true,
         },
       );

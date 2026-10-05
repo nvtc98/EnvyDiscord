@@ -5,12 +5,15 @@ import { slash, type Command } from "../command";
 import { gateMessage, resolveDm } from "./story";
 
 const CLOSED_DM =
-  "❌ I couldn't message that person — their DMs are closed, or we don't share a server.";
+  "❌ I could not reach that soul — their private messages are closed, or we share no server.";
 
 export const inviteCommand: Command = {
   // Anyone may invite someone to meet the stranger — this is NOT owner-gated.
-  data: slash("invite", "Invite someone to meet the stranger").addUserOption(
-    (o) => o.setName("user").setDescription("Who to invite").setRequired(true),
+  data: slash(
+    "invite",
+    "Bid another soul come meet the stranger",
+  ).addUserOption((o) =>
+    o.setName("user").setDescription("Whom to bid come").setRequired(true),
   ),
 
   async execute(interaction, ctx) {
@@ -24,11 +27,11 @@ export const inviteCommand: Command = {
 
     const target = interaction.options.getUser("user", true);
     if (target.bot) {
-      await reply("Bots can't be invited to the story.");
+      await reply("A mere automaton cannot be bidden into the tale.");
       return;
     }
     if (target.id === inviter.id) {
-      await reply("You can start the story yourself with `/story`.");
+      await reply("Thou mayst begin the tale thyself with `/story`.");
       return;
     }
 
@@ -67,6 +70,6 @@ export const inviteCommand: Command = {
       targetId: target.id,
       ok: true,
     });
-    await reply(`📬 I've reached out to <@${target.id}>.`);
+    await reply(`📬 I have sent word to <@${target.id}>.`);
   },
 };

@@ -15,19 +15,19 @@ function describeGrant(grant: GrantResult): string {
   if (grant.kind === "new")
     return `🆕 **${grant.card.name}** · ${cardSummary(grant.card)}`;
   if (grant.kind === "variant-unlocked")
-    return `🎨 **${grant.card.name}** unlocked the **${variantLabel(grant.variant!)}** variant`;
-  return `💰 **${grant.card.name}** was a duplicate · refunded **${grant.refund}** coins`;
+    return `🎨 **${grant.card.name}** hath revealed its **${variantLabel(grant.variant!)}** variant`;
+  return `💰 **${grant.card.name}** came twice over · **${grant.refund}** coins returned to thy purse`;
 }
 
 export const dailyCommand: Command = {
-  data: slash("daily", "Claim your free daily card pack"),
+  data: slash("daily", "Claim thy free daily pack of cards"),
 
   async execute(interaction, ctx) {
     const player = ctx.repo.get(interaction.user.id);
     if (!player.story?.starterClaimed) {
       await interaction.reply({
         content:
-          "Your story has not begun yet. Use `/story` first. Your first cards are waiting there; `/daily` unlocks afterwards.",
+          "Thy tale has not yet begun. Speak `/story` first. Thy first cards await thee there; `/daily` opens thereafter.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -41,8 +41,8 @@ export const dailyCommand: Command = {
     if (!result.ok) {
       const content =
         result.reason === "already-claimed"
-          ? "⏳ You already claimed your pack today. Come back tomorrow!"
-          : "🏆 Your collection is complete: every card owns every variant, so there is nothing left to receive.";
+          ? "⏳ Thou hast already claimed thy pack this day. Return upon the morrow."
+          : "🏆 Thy collection is complete: every card bears every variant, so there is naught left to receive.";
       await interaction.reply({ content, flags: MessageFlags.Ephemeral });
       return;
     }
@@ -63,11 +63,11 @@ export const dailyCommand: Command = {
     const refunded = result.grants.reduce((sum, g) => sum + (g.refund ?? 0), 0);
     const footer =
       refunded > 0
-        ? `+${result.coins} coins (+${refunded} refunded) · Total: ${player.coins} coins`
-        : `+${result.coins} coins · Total: ${player.coins} coins`;
+        ? `+${result.coins} coins (+${refunded} refunded) · In all: ${player.coins} coins`
+        : `+${result.coins} coins · In all: ${player.coins} coins`;
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR.daily)
-      .setTitle("🎁 Daily pack")
+      .setTitle("🎁 Thy daily pack")
       .setDescription(result.grants.map(describeGrant).join("\n"))
       .setFooter({ text: footer });
 

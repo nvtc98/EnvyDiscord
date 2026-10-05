@@ -35,7 +35,11 @@ describe("/invite", () => {
     expect(lastPayload(call.reply).content).toContain("<@target>");
     expect(lastPayload(call.reply).allowedMentions).toEqual({ parse: [] });
     const log = ctx.log.entries.find((e) => e.type === "story_invite");
-    expect(log?.data).toMatchObject({ inviterId: "inviter", targetId: "target", ok: true });
+    expect(log?.data).toMatchObject({
+      inviterId: "inviter",
+      targetId: "target",
+      ok: true,
+    });
   });
 
   it("shows the invite-resume gate naming the sanitized inviter for a player with progress", async () => {
@@ -95,7 +99,7 @@ describe("/invite", () => {
       return user;
     }) as typeof call.options.getUser;
     await inviteCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/[Bb]ot/);
+    expect(lastPayload(call.reply).content).toMatch(/automaton/);
     expect(dm.sent).toHaveLength(0);
   });
 });
