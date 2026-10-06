@@ -32,7 +32,7 @@ Rule of thumb: if the player is READING THE STORY, full voice; if the player is 
 
 The whole story is ONE speaker (the stranger / bot) talking to the player. There is no narrator and no other character who ever speaks.
 
-- A gesture or stage-direction line describes the SPEAKER'S OWN action and MUST be first person: write "I draw my hood lower against the colder wind," NOT "He draws his hood lower." Never refer to the speaker as "he/him/the stranger" in narration — that implies an outside narrator, which does not exist here.
+- A gesture or stage-direction line (an italic narration line, not spoken dialogue) describes the SPEAKER'S OWN action. Write it in a clipped first-person stage-direction style that DROPS the leading "I" but KEEPS "my": "Draw my hood lower against the colder wind." (not "I draw my hood lower", and not "Draw the hood lower"). Dropping "I" makes it read like a stage cue; keeping "my" keeps it clearly the speaker's own action. Never refer to the speaker as "he/him/the stranger" in narration — that implies an outside narrator, which does not exist here. This clipped form applies ONLY to italic narration/gesture lines; the stranger's spoken dialogue lines keep normal "I ..." phrasing.
 - "He/him/they" is allowed ONLY when the speaker is talking ABOUT someone else (e.g. the man inside the cave). Other characters never get their own quoted dialogue — the bot reports/paraphrases them in its own voice.
 
 ## Examples

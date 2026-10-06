@@ -382,7 +382,7 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: ROAD,
       lines: [
-        narration("I draw my hood lower against the colder wind."),
+        narration("Draw my hood lower against the colder wind."),
         stranger(
           `Yet I must warn thee. The ${TRIBE} — Bò Tuôi — bear a strange curse. No outsider may walk up to them in the common way. The road bends, and the path forgets thee.`,
         ),
@@ -396,9 +396,22 @@ export const NODES: Record<string, NodeDef> = {
           `That deck lies in ${PLACE_WISDOM}, a place within the lands of The Eyes. Come thither with me, and I shall show thee how to claim it.`,
         ),
       ],
-      choices: go("Continue"),
+      choices: [
+        { label: "Continue", style: "primary" },
+        { label: "Together?", style: "secondary" },
+      ],
     }),
-    choose: () => "map",
+    choose(p, index) {
+      // "Together?" — the player checks they are coming along; the stranger affirms it, and the
+      // curse view (including the deck line) is re-shown with the affirmation on top. Loops.
+      if (index === 1) {
+        story(p).notice = stranger(
+          "Aye — thou and I, together. I'll not walk into that place alone, nor leave thee behind.",
+        );
+        return "curse";
+      }
+      return "map";
+    },
   },
 
   map: {
@@ -538,9 +551,7 @@ export const NODES: Record<string, NodeDef> = {
         stranger(
           `These twelve... a fortunate draw, ${who(p)}. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
         ),
-        narration(
-          "I turn the last page shut with a touch, and it seals itself.",
-        ),
+        narration("Turn the last page shut with a touch, and it seals itself."),
       ],
       choices: go("Continue"),
     }),
@@ -595,7 +606,7 @@ export const NODES: Record<string, NodeDef> = {
       title: TRIBE,
       lines: [
         narration(
-          "I lead thee down where the old road gives way to bare stone, until the land ends at a cliff and the sea roars grey below.",
+          "Lead thee down where the old road gives way to bare stone, until the land ends at a cliff and the sea roars grey below.",
         ),
         stranger(
           "There — seest thou that dark seam in the rock? A cave mouth, half-drowned at the tide's turning. That is our way in.",
@@ -680,7 +691,7 @@ export const NODES: Record<string, NodeDef> = {
         stranger(
           "Refuse? Here, in the deep, with the sea at thy back and the dark before thee — thou thinkest thou mayst refuse?",
         ),
-        narration("I do not raise my voice. I do not need to."),
+        narration("Do not raise my voice. Do not need to."),
       ],
       choices: [
         { label: "...I accept", style: "success" },
