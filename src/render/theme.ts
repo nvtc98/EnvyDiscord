@@ -24,7 +24,7 @@ export const PALETTE = {
 };
 
 /** Marks on cards shown in the story's book. Common cards get no mark. */
-export const RARITY_COLOR = { epic: "#b56cf5", rare: "#58a0ff" } as const;
+export const RARITY_COLOR = { eternal: "#b56cf5", bargain: "#58a0ff" } as const;
 
 /** Border color of the built-in/compact frame when no variant frame file exists. Black matches the metal default. */
 export const DEFAULT_BORDER = "#000000";

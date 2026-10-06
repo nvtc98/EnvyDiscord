@@ -13,6 +13,7 @@ import { loadConfig } from "./config";
 import type { AppContext } from "./discord/command";
 import { commandMap } from "./discord/commands";
 import { notifyInteractionError } from "./discord/interaction-errors";
+import { seenInteraction } from "./discord/interaction-dedup";
 import { describeInteraction, instrument } from "./log/instrument";
 import { logDirectMessages } from "./log/inbound";
 import { JsonlLogger } from "./log/logger";
@@ -55,6 +56,16 @@ logDirectMessages(client, log);
 async function handle(interaction: Interaction): Promise<void> {
   const received = describeInteraction(interaction, log);
   if (received) log.message("interaction", received);
+  // Drop a redelivered interaction (same interaction.id) before it dispatches: the gateway can
+  // deliver one InteractionCreate more than once on a resume/reconnect, and handling it twice would
+  // advance + re-send a story scene a second time. interaction.id is stable across redeliveries.
+  if (
+    (interaction.isMessageComponent() ||
+      interaction.isModalSubmit() ||
+      interaction.isChatInputCommand()) &&
+    seenInteraction(interaction.id)
+  )
+    return;
   if (interaction.isRepliable() && !interaction.isAutocomplete())
     instrument(interaction, log);
 

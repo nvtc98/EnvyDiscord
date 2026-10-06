@@ -45,6 +45,10 @@ export interface Session {
   playerAvatarUrl: string | null;
   /** Decoded-once cache: undefined = not yet fetched, null = fetch failed. */
   playerAvatarImage?: AvatarImage | null;
+  /** Raw player HUD name; renderer falls back to "You" when absent. */
+  playerName?: string;
+  /** Raw opponent HUD name; renderer falls back to "The Enemy" when absent. */
+  opponentName?: string;
   /** For story battles: the sole owner of the story-side end work (set at launch). */
   onStoryEnd?: (
     session: Session,
@@ -134,6 +138,8 @@ export const screenOf = (
   viewer: "bottom",
   selectedUid: session.selectedUid,
   log: session.log,
+  playerName: session.playerName,
+  opponentName: session.opponentName,
 });
 
 /**
@@ -161,6 +167,8 @@ export async function withImage(
       variants: session.variants,
       playerAvatar: session.playerAvatarImage ?? null,
       opponentAvatar,
+      playerName: session.playerName,
+      opponentName: session.opponentName,
     }),
   );
   return { ...screenOf(session, state), image: image ?? undefined };
@@ -198,6 +206,10 @@ export interface StartBattleOpts {
   opponentPortrait?: string | null;
   /** The viewer's Discord avatar URL; null/omitted = placeholder. */
   playerAvatarUrl?: string | null;
+  /** Raw player HUD name; omitted = renderer's "You" default. */
+  playerName?: string;
+  /** Raw opponent HUD name; omitted = renderer's "The Enemy" default. */
+  opponentName?: string;
 }
 
 /**
@@ -227,6 +239,8 @@ export function startBattle(opts: StartBattleOpts): Session {
     opponentPortrait: opts.opponentPortrait ?? null,
     playerAvatarUrl: opts.playerAvatarUrl ?? null,
     playerAvatarImage: undefined,
+    playerName: opts.playerName,
+    opponentName: opts.opponentName,
   };
   const opening = [
     first === "bottom" ? "You go first." : "The enemy goes first.",
@@ -436,7 +450,7 @@ async function animateEndOfTurn(
   });
 
   const preTurnLog = [...session.log];
-  const own = endTurn(session.state);
+  const own = endTurn(session.state, ctx.rng);
   session.selectedUid = null;
   const playback = advanceAiBeats(
     own.state,

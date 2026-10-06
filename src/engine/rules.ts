@@ -1,7 +1,7 @@
-import type { Rng } from '../util/rng';
-import { shuffle } from '../util/rng';
-import { hasContinuous } from './abilities';
-import { entryCell, pushInto, wouldPush } from './push';
+import type { Rng } from "../util/rng";
+import { shuffle } from "../util/rng";
+import { hasContinuous } from "./abilities";
+import { entryCell, pushInto, pushMovers, wouldPush } from "./push";
 import {
   CELLS,
   LANES,
@@ -18,7 +18,7 @@ import {
   type LaneIndex,
   type Play,
   type Seat,
-} from './types';
+} from "./types";
 
 export interface Step {
   state: GameState;
@@ -28,19 +28,36 @@ export interface Step {
 const laneIndexes = Array.from({ length: LANES }, (_, i) => i as LaneIndex);
 
 /** Shuffles both decks, deals the opening hands, and starts the first player's first turn. */
-export function newGame(decks: Record<Seat, CardDef[]>, first: Seat, rng: Rng): Step {
+export function newGame(
+  decks: Record<Seat, CardDef[]>,
+  first: Seat,
+  rng: Rng,
+): Step {
   const second = opponentOf(first);
   const state: GameState = {
     lanes: Array.from({ length: LANES }, () => Array<Cell>(CELLS).fill(null)),
     players: {
-      bottom: { hp: MAX_HP, energy: 0, turns: 0, deck: shuffle(decks.bottom, rng), hand: [] },
-      top: { hp: MAX_HP, energy: 0, turns: 0, deck: shuffle(decks.top, rng), hand: [] },
+      bottom: {
+        hp: MAX_HP,
+        energy: 0,
+        turns: 0,
+        deck: shuffle(decks.bottom, rng),
+        hand: [],
+      },
+      top: {
+        hp: MAX_HP,
+        energy: 0,
+        turns: 0,
+        deck: shuffle(decks.top, rng),
+        hand: [],
+      },
     },
     first,
     active: first,
     round: 1,
     winner: null,
     nextUid: 1,
+    destroyedPower: 0,
   };
   const events: GameEvent[] = [];
   draw(state, first, OPENING_HAND.first, events);
@@ -49,13 +66,23 @@ export function newGame(decks: Record<Seat, CardDef[]>, first: Seat, rng: Rng): 
   return { state, events };
 }
 
-function draw(state: GameState, seat: Seat, count: number, events: GameEvent[]): void {
+function draw(
+  state: GameState,
+  seat: Seat,
+  count: number,
+  events: GameEvent[],
+): void {
   const player = state.players[seat];
   for (let i = 0; i < count && player.deck.length > 0; i++) {
     const card = player.deck.shift()!;
-    const instance: CardInstance = { uid: state.nextUid++, def: card, owner: seat, bonus: 0 };
+    const instance: CardInstance = {
+      uid: state.nextUid++,
+      def: card,
+      owner: seat,
+      bonus: 0,
+    };
     player.hand.push(instance);
-    events.push({ type: 'drew', seat, uid: instance.uid, card });
+    events.push({ type: "drew", seat, uid: instance.uid, card });
   }
 }
 
@@ -64,14 +91,229 @@ function startTurn(state: GameState, events: GameEvent[]): void {
   player.turns += 1;
   player.energy = Math.min(player.turns, MAX_ENERGY);
   draw(state, state.active, 1, events);
-  events.push({ type: 'turn_started', seat: state.active, round: state.round, energy: player.energy });
+  applyStartOfTurnDrains(state, events);
+  events.push({
+    type: "turn_started",
+    seat: state.active,
+    round: state.round,
+    energy: player.energy,
+  });
 }
 
-const cardsOnBoard = (state: GameState): CardInstance[] => state.lanes.flat().filter((c): c is CardInstance => c !== null);
+const cardsOnBoard = (state: GameState): CardInstance[] =>
+  state.lanes.flat().filter((c): c is CardInstance => c !== null);
+
+/** The drain amount a Venom (continuous `drainStartOfTurn`) applies, else 0. The kind check narrows the effect. */
+const drainAmount = (card: CardInstance): number => {
+  const ability = card.def.ability;
+  return ability?.timing === "continuous" &&
+    ability.effect.kind === "drainStartOfTurn"
+    ? ability.effect.amount
+    : 0;
+};
+
+/**
+ * Venom: at the start of every turn (both seats), every non-Venom card on the board loses `totalDrain`
+ * power, where `totalDrain` is the sum of every Venom's drain. All Venoms are exempt (self and others).
+ * Seat-agnostic: it does not read `state.active`. Power floors at read time, not here.
+ */
+function applyStartOfTurnDrains(state: GameState, events: GameEvent[]): void {
+  const board = cardsOnBoard(state);
+  const venoms = board.filter((c) => drainAmount(c) > 0);
+  if (venoms.length === 0) return;
+  const totalDrain = venoms.reduce((n, v) => n + drainAmount(v), 0);
+  const venomUids = new Set(venoms.map((v) => v.uid));
+  for (const card of board) {
+    if (venomUids.has(card.uid)) continue; // every Venom is exempt (self + other Venoms)
+    card.bonus -= totalDrain;
+  }
+  for (const venom of venoms) {
+    events.push({
+      type: "ability",
+      seat: venom.owner,
+      card: venom.def,
+      text: `drained ${drainAmount(venom)} power from every other card`,
+    });
+  }
+}
+
+/** True while the card is still protected from the enemy's pushes by Bedrock's shield. */
+export const isShielded = (card: CardInstance, state: GameState): boolean =>
+  card.shieldedUntil !== undefined &&
+  state.players[opponentOf(card.owner)].turns <= card.shieldedUntil;
+
+/** True if a push by `seat` into `cells` would displace a shielded enemy card. */
+function pushHitsShieldedEnemy(
+  state: GameState,
+  cells: readonly Cell[],
+  seat: Seat,
+): boolean {
+  return pushMovers(cells, seat).some((i) => {
+    const c = cells[i];
+    return c != null && c.owner !== seat && isShielded(c, state);
+  });
+}
+
+function assertNever(x: never): never {
+  throw new Error(`Unhandled active effect: ${JSON.stringify(x)}`);
+}
+
+type DestroyCause = "push" | "siren" | "laser";
+
+/**
+ * Resolves "card is destroyed." Phoenix (onDestroy: rebirth) intercepts: the card returns to its owner's
+ * hand as a fresh instance with `bonus += amount`, and its power is NOT added to the tally. Otherwise the
+ * card's actual power at this moment (`Math.max(0, def.power + bonus)`) is added to `state.destroyedPower`.
+ * Mutates `state`; the card is already off the board when this runs.
+ */
+function destroyCard(
+  state: GameState,
+  card: CardInstance,
+  events: GameEvent[],
+  _cause: DestroyCause,
+): void {
+  const ability = card.def.ability;
+  if (ability?.timing === "onDestroy" && ability.effect.kind === "rebirth") {
+    const amount = ability.effect.amount;
+    const revived: CardInstance = {
+      uid: state.nextUid++,
+      def: card.def,
+      owner: card.owner,
+      bonus: card.bonus + amount,
+    };
+    state.players[card.owner].hand.push(revived);
+    events.push({
+      type: "ability",
+      seat: card.owner,
+      card: card.def,
+      text: `returned to its owner's hand with +${amount} power`,
+    });
+    return; // NOT counted into destroyedPower
+  }
+  state.destroyedPower += Math.max(0, card.def.power + card.bonus);
+}
+
+/**
+ * Siren: an extra push step on the whole lane toward the far edge (away from `seat`). Visits cells far-edge
+ * first so each card moves into an already-vacated slot. A shielded enemy card stops the shove (it and
+ * everything behind it stay put). At most one card falls off the far edge and is routed through `destroyCard`.
+ */
+function sirenPush(
+  state: GameState,
+  lane: LaneIndex,
+  seat: Seat,
+  sirenDef: CardDef,
+  events: GameEvent[],
+): void {
+  const cells = state.lanes[lane];
+  const step = seat === "bottom" ? -1 : 1;
+  const farEdge = seat === "bottom" ? 0 : CELLS - 1;
+  const order: number[] = [];
+  for (let k = 0; k < CELLS; k++) order.push(farEdge - step * k); // far edge first, near edge last
+  let blocked = false;
+  let destroyed: CardInstance | null = null;
+  for (const i of order) {
+    const occupant = cells[i];
+    if (!occupant) continue;
+    if (occupant.owner !== seat && isShielded(occupant, state)) {
+      blocked = true;
+      break;
+    }
+    const dest = i + step;
+    if (dest < 0 || dest >= CELLS) {
+      cells[i] = null;
+      destroyed = occupant; // at most one card falls off a single-step shove
+    } else {
+      cells[dest] = occupant;
+      cells[i] = null;
+    }
+  }
+  if (destroyed) destroyCard(state, destroyed, events, "siren");
+  events.push({
+    type: "ability",
+    seat,
+    card: sirenDef,
+    text: blocked
+      ? "pushed the lane, blocked by a shielded card"
+      : "pushed the lane",
+  });
+}
+
+interface OceanReturn {
+  uid: number;
+  owner: Seat;
+  lane: LaneIndex;
+  amount: number;
+}
+
+/** Pass 1: snapshot every oceanReturn instance on the board, lanes L->R, each lane top->bottom. No mutation. */
+function collectOceanReturns(state: GameState): OceanReturn[] {
+  const out: OceanReturn[] = [];
+  state.lanes.forEach((lane, laneIndex) => {
+    for (const card of lane) {
+      const ability = card?.def.ability;
+      if (
+        card &&
+        ability?.timing === "endOfRound" &&
+        ability.effect.kind === "oceanReturn"
+      ) {
+        out.push({
+          uid: card.uid,
+          owner: card.owner,
+          lane: laneIndex as LaneIndex,
+          amount: ability.effect.amount,
+        });
+      }
+    }
+  });
+  return out;
+}
+
+/** Pass 2: buff friendlies +amount (excluding self), remove Ocean, splice its def back into the deck at a seeded slot. */
+function applyOceanReturn(
+  state: GameState,
+  o: OceanReturn,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const cells = state.lanes[o.lane];
+  const idx = cells.findIndex((c) => c?.uid === o.uid);
+  if (idx < 0) return; // defensive: already gone
+  const card = cells[idx]!;
+
+  for (const l of state.lanes)
+    for (const other of l)
+      if (other && other.owner === o.owner && other.uid !== card.uid)
+        other.bonus += o.amount;
+  events.push({
+    type: "ability",
+    seat: o.owner,
+    card: card.def,
+    text: `gave +${o.amount} power to allied cards`,
+  });
+
+  cells[idx] = null;
+
+  const deck = state.players[o.owner].deck;
+  const pos = deck.length === 0 ? 0 : Math.floor(rng() * (deck.length + 1));
+  deck.splice(pos, 0, card.def); // CardDef only -> bonus discarded, returns clean
+  events.push({
+    type: "ability",
+    seat: o.owner,
+    card: card.def,
+    text: "returned to the deck",
+  });
+}
 
 /** Power a card currently deals: base + permanent buffs, doubled by a friendly `laneDouble` in its lane (never below 0). */
-export function effectivePower(state: GameState, lane: number, card: CardInstance): number {
-  const doubled = state.lanes[lane].some((c) => c && c.owner === card.owner && hasContinuous(c.def, 'laneDouble'));
+export function effectivePower(
+  state: GameState,
+  lane: number,
+  card: CardInstance,
+): number {
+  const doubled = state.lanes[lane].some(
+    (c) => c && c.owner === card.owner && hasContinuous(c.def, "laneDouble"),
+  );
   return Math.max(0, card.def.power + card.bonus) * (doubled ? 2 : 1);
 }
 
@@ -79,23 +321,41 @@ export function effectivePower(state: GameState, lane: number, card: CardInstanc
 export function totalPower(state: GameState, owner: Seat): number {
   let sum = 0;
   state.lanes.forEach((lane, laneIndex) => {
-    for (const card of lane) if (card && card.owner === owner) sum += effectivePower(state, laneIndex, card);
+    for (const card of lane)
+      if (card && card.owner === owner)
+        sum += effectivePower(state, laneIndex, card);
   });
   return sum;
 }
 
-export const isAnchored = (lane: readonly Cell[]): boolean => lane.some((c) => c !== null && hasContinuous(c.def, 'anchor'));
+export const isAnchored = (lane: readonly Cell[]): boolean =>
+  lane.some((c) => c !== null && hasContinuous(c.def, "anchor"));
 
-export type PlayCheck = { ok: true } | { ok: false; reason: 'over' | 'not-in-hand' | 'energy' | 'anchored' };
+export type PlayCheck =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "over" | "not-in-hand" | "energy" | "anchored" | "shielded";
+    };
 
-export function canPlay(state: GameState, uid: number, lane: LaneIndex): PlayCheck {
-  if (state.winner) return { ok: false, reason: 'over' };
+export function canPlay(
+  state: GameState,
+  uid: number,
+  lane: LaneIndex,
+): PlayCheck {
+  if (state.winner) return { ok: false, reason: "over" };
   const player = state.players[state.active];
   const card = player.hand.find((c) => c.uid === uid);
-  if (!card) return { ok: false, reason: 'not-in-hand' };
-  if (card.def.cost > player.energy) return { ok: false, reason: 'energy' };
+  if (!card) return { ok: false, reason: "not-in-hand" };
+  if (card.def.cost > player.energy) return { ok: false, reason: "energy" };
   const cells = state.lanes[lane];
-  if (isAnchored(cells) && wouldPush(cells, state.active)) return { ok: false, reason: 'anchored' };
+  if (isAnchored(cells) && wouldPush(cells, state.active))
+    return { ok: false, reason: "anchored" };
+  if (
+    wouldPush(cells, state.active) &&
+    pushHitsShieldedEnemy(state, cells, state.active)
+  )
+    return { ok: false, reason: "shielded" };
   return { ok: true };
 }
 
@@ -104,7 +364,9 @@ export function legalPlays(state: GameState): Play[] {
   if (state.winner) return [];
   const plays: Play[] = [];
   for (const card of state.players[state.active].hand) {
-    for (const lane of laneIndexes) if (canPlay(state, card.uid, lane).ok) plays.push({ uid: card.uid, lane });
+    for (const lane of laneIndexes)
+      if (canPlay(state, card.uid, lane).ok)
+        plays.push({ uid: card.uid, lane });
   }
   return plays;
 }
@@ -112,7 +374,8 @@ export function legalPlays(state: GameState): Play[] {
 /** Plays a card from the active player's hand into a lane. Does not modify `prev`. */
 export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
   const check = canPlay(prev, uid, lane);
-  if (!check.ok) throw new Error(`Cannot play card ${uid} in lane ${lane}: ${check.reason}`);
+  if (!check.ok)
+    throw new Error(`Cannot play card ${uid} in lane ${lane}: ${check.reason}`);
 
   const state = structuredClone(prev);
   const events: GameEvent[] = [];
@@ -125,49 +388,65 @@ export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
   const { lane: nextLane, destroyed } = pushInto(state.lanes[lane], card, seat);
   state.lanes[lane] = nextLane;
   events.push({
-    type: 'played',
+    type: "played",
     seat,
     uid,
     card: card.def,
     lane,
-    destroyed: destroyed ? { card: destroyed.def, owner: destroyed.owner } : null,
+    destroyed: destroyed
+      ? { card: destroyed.def, owner: destroyed.owner }
+      : null,
   });
 
+  // Route the entry-push destruction through destroyCard BEFORE applyActive, so Stella's tally
+  // already includes the card her own entry push shoved off.
+  if (destroyed) destroyCard(state, destroyed, events, "push");
+
   const ability = card.def.ability;
-  if (ability?.timing === 'active') applyActive(state, card, lane, events);
+  if (ability?.timing === "active") applyActive(state, card, lane, events);
   return { state, events };
 }
 
-function applyActive(state: GameState, card: CardInstance, lane: LaneIndex, events: GameEvent[]): void {
+function applyActive(
+  state: GameState,
+  card: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+): void {
   const seat = card.owner;
   const me = state.players[seat];
   const foe = state.players[opponentOf(seat)];
-  const effect = card.def.ability!.effect;
-  const say = (text: string) => events.push({ type: 'ability', seat, card: card.def, text });
+  const ability = card.def.ability!;
+  if (ability.timing !== "active") return; // only called for active abilities; narrows `effect`
+  const effect = ability.effect;
+  const say = (text: string) =>
+    events.push({ type: "ability", seat, card: card.def, text });
 
   switch (effect.kind) {
-    case 'heal': {
+    case "heal": {
       const before = me.hp;
       me.hp = Math.min(MAX_HP, me.hp + effect.amount);
       say(`healed ${me.hp - before} HP`);
       break;
     }
-    case 'damage':
+    case "damage":
       foe.hp -= effect.amount;
       say(`dealt ${effect.amount} damage`);
-      if (foe.hp <= 0) finish(state, seat, 'hp', events);
+      if (foe.hp <= 0) finish(state, seat, "hp", events);
       break;
-    case 'draw': {
+    case "draw": {
       const before = me.hand.length;
       draw(state, seat, effect.count, events);
-      say(`drew ${me.hand.length - before} card${me.hand.length - before === 1 ? '' : 's'}`);
+      say(
+        `drew ${me.hand.length - before} card${me.hand.length - before === 1 ? "" : "s"}`,
+      );
       break;
     }
-    case 'energy':
+    case "energy":
       me.energy += effect.amount;
       say(`gained ${effect.amount} energy`);
       break;
-    case 'buffLane': {
+    case "buffLane": {
       let buffed = 0;
       for (const other of state.lanes[lane]) {
         if (other && other.uid !== card.uid && other.owner === seat) {
@@ -175,23 +454,62 @@ function applyActive(state: GameState, card: CardInstance, lane: LaneIndex, even
           buffed += 1;
         }
       }
-      say(`gave +${effect.amount} power to ${buffed} other card${buffed === 1 ? '' : 's'}`);
+      say(
+        `gave +${effect.amount} power to ${buffed} other card${buffed === 1 ? "" : "s"}`,
+      );
       break;
     }
+    case "destroyedPower":
+      // Base power is 0, so effective power = tally. Mutates the live board instance by reference.
+      card.bonus = state.destroyedPower;
+      say(`gained ${state.destroyedPower} power from destroyed cards`);
+      break;
+    case "shield":
+      card.shieldedUntil = state.players[opponentOf(seat)].turns + 1;
+      say("cannot be pushed by the enemy this turn");
+      break;
+    case "pushLane":
+      sirenPush(state, lane, seat, card.def, events);
+      break;
+    case "destroyLane": {
+      const cells = state.lanes[lane];
+      const destroyedNames: string[] = [];
+      for (let i = 0; i < cells.length; i++) {
+        const occupant = cells[i];
+        if (occupant && occupant.uid !== card.uid) {
+          cells[i] = null;
+          destroyedNames.push(occupant.def.name);
+          destroyCard(state, occupant, events, "laser");
+        }
+      }
+      say(
+        destroyedNames.length === 0
+          ? "found no other cards to destroy"
+          : `destroyed ${destroyedNames.join(", ")}`,
+      );
+      break;
+    }
+    default:
+      assertNever(effect);
   }
 }
 
-function finish(state: GameState, winner: Seat | 'draw', reason: 'hp' | 'rounds' | 'forfeit', events: GameEvent[]): void {
+function finish(
+  state: GameState,
+  winner: Seat | "draw",
+  reason: "hp" | "rounds" | "forfeit",
+  events: GameEvent[],
+): void {
   state.winner = winner;
-  events.push({ type: 'game_over', winner, reason });
+  events.push({ type: "game_over", winner, reason });
 }
 
 /**
  * Ends the active player's turn. After the first player this starts the second player's turn; after the second
  * player it resolves the round (end-of-round passives, then damage) and starts the next round.
  */
-export function endTurn(prev: GameState): Step {
-  if (prev.winner) throw new Error('The game is already over');
+export function endTurn(prev: GameState, rng: Rng): Step {
+  if (prev.winner) throw new Error("The game is already over");
   const state = structuredClone(prev);
   const events: GameEvent[] = [];
 
@@ -201,7 +519,7 @@ export function endTurn(prev: GameState): Step {
     return { state, events };
   }
 
-  resolveRound(state, events);
+  resolveRound(state, events, rng);
   if (!state.winner) {
     state.round += 1;
     state.active = state.first;
@@ -210,38 +528,70 @@ export function endTurn(prev: GameState): Step {
   return { state, events };
 }
 
-function resolveRound(state: GameState, events: GameEvent[]): void {
-  // End-of-round passives, lane by lane (Left to Right), each lane top to bottom.
+function resolveRound(state: GameState, events: GameEvent[], rng: Rng): void {
+  // Phase A: pre-damage end-of-round heals, lane by lane (Left to Right), each lane top to bottom.
   for (const lane of state.lanes) {
     for (const card of lane) {
       const ability = card?.def.ability;
-      if (!card || ability?.timing !== 'endOfRound') continue;
+      if (
+        !card ||
+        ability?.timing !== "endOfRound" ||
+        ability.effect.kind !== "heal"
+      )
+        continue;
       const owner = state.players[card.owner];
       const before = owner.hp;
       owner.hp = Math.min(MAX_HP, owner.hp + ability.effect.amount);
-      events.push({ type: 'ability', seat: card.owner, card: card.def, text: `healed ${owner.hp - before} HP at the end of the round` });
+      events.push({
+        type: "ability",
+        seat: card.owner,
+        card: card.def,
+        text: `healed ${owner.hp - before} HP at the end of the round`,
+      });
     }
   }
 
-  const damage: Record<Seat, number> = { bottom: totalPower(state, 'top'), top: totalPower(state, 'bottom') };
+  const damage: Record<Seat, number> = {
+    bottom: totalPower(state, "top"),
+    top: totalPower(state, "bottom"),
+  };
   state.players.bottom.hp -= damage.bottom;
   state.players.top.hp -= damage.top;
-  const hp: Record<Seat, number> = { bottom: state.players.bottom.hp, top: state.players.top.hp };
-  events.push({ type: 'round_resolved', round: state.round, damage, hp });
+  const hp: Record<Seat, number> = {
+    bottom: state.players.bottom.hp,
+    top: state.players.top.hp,
+  };
+  events.push({ type: "round_resolved", round: state.round, damage, hp });
 
   const bottomDown = hp.bottom <= 0;
   const topDown = hp.top <= 0;
   if (bottomDown || topDown) {
-    finish(state, bottomDown && topDown ? 'draw' : bottomDown ? 'top' : 'bottom', 'hp', events);
+    finish(
+      state,
+      bottomDown && topDown ? "draw" : bottomDown ? "top" : "bottom",
+      "hp",
+      events,
+    );
   } else if (state.round >= MAX_ROUNDS) {
-    finish(state, hp.bottom === hp.top ? 'draw' : hp.bottom > hp.top ? 'bottom' : 'top', 'rounds', events);
+    finish(
+      state,
+      hp.bottom === hp.top ? "draw" : hp.bottom > hp.top ? "bottom" : "top",
+      "rounds",
+      events,
+    );
+  }
+
+  // Phase B: post-damage end-of-round effects (Ocean), only if the game is not finished.
+  if (!state.winner) {
+    const oceans = collectOceanReturns(state); // Pass 1: snapshot
+    for (const o of oceans) applyOceanReturn(state, o, events, rng); // Pass 2: process live
   }
 }
 
 export function forfeit(prev: GameState, seat: Seat): Step {
   const state = structuredClone(prev);
   const events: GameEvent[] = [];
-  if (!state.winner) finish(state, opponentOf(seat), 'forfeit', events);
+  if (!state.winner) finish(state, opponentOf(seat), "forfeit", events);
   return { state, events };
 }
 

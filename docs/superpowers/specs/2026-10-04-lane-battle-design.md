@@ -2,7 +2,7 @@
 
 Supersedes the 3v3 skill battle described in `2026-10-02-card-battle-bot-design.md`. Everything else in that document (hosting, storage, logging, images, commands that are not mentioned here) still applies.
 
-> **Update:** the 15 placeholder cards in this document were replaced by the 229 cards of `eyes-names.json` (placeholder stats, no abilities yet). See [story design](2026-10-04-story-design.md). Practice battles via `/battle` are owner-only until the story reaches its first duel.
+> **Update:** the 15 placeholder cards in this document were replaced by the 229 cards of `src/data/cards.json` (frozen stats; abilities on the designed cards). See [story design](2026-10-04-story-design.md). Practice battles via `/battle` are owner-only until the story reaches its first duel.
 
 ## Goal
 

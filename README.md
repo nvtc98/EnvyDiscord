@@ -15,16 +15,16 @@ Design documents: the story is in [docs/superpowers/specs/2026-10-04-story-desig
 
 ### Common commands
 
-| Task                                                               | Command                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------ |
-| Run the bot (reloads on code changes)                              | `npm run dev`                                          |
-| Run the bot (no reload, use this on the NAS)                       | `npm start`                                            |
-| Register the `/` commands with Discord                             | `npm run deploy`                                       |
-| Tests / type check                                                 | `npm test` · `npm run typecheck`                       |
-| Render sample card and battle images without Discord               | `npm run preview` (writes to `preview/`)               |
-| AI vs AI games to check game balance                               | `npm run simulate`                                     |
-| Remove the white background of a card frame exported from Dextrous | `npm run frame:cutout -- in.png out.png [layout.json]` |
-| Regenerate the colour variant frames from the Blue frame | `npm run frames:variants [-- --sheet preview/variants.png]` |
+| Task                                                               | Command                                                     |
+| ------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Run the bot (reloads on code changes)                              | `npm run dev`                                               |
+| Run the bot (no reload, use this on the NAS)                       | `npm start`                                                 |
+| Register the `/` commands with Discord                             | `npm run deploy`                                            |
+| Tests / type check                                                 | `npm test` · `npm run typecheck`                            |
+| Render sample card and battle images without Discord               | `npm run preview` (writes to `preview/`)                    |
+| AI vs AI games to check game balance                               | `npm run simulate`                                          |
+| Remove the white background of a card frame exported from Dextrous | `npm run frame:cutout -- in.png out.png [layout.json]`      |
+| Regenerate the colour variant frames from the Blue frame           | `npm run frames:variants [-- --sheet preview/variants.png]` |
 
 Stop the bot with `Ctrl+C`. After editing `.env`, stop and restart the bot (`tsx watch` does not watch `.env`).
 
@@ -79,7 +79,7 @@ The whole bot interface (command names, options, messages, card and skill names)
 2. **Map**: a simple picture with places to go (never more than four choices).
 3. **Card duel**: the lane battle below (not in the story yet).
 
-**What exists now (the prologue):** the Guide asks whether you are one of The Eyes; if you say yes you give your name, and the game adds "Eyes" for you (type `Ocean`, you become `Ocean Eyes`). The name is checked against the list of The Eyes in `src/data/eyes-names.json`; if it is not found, the Guide suggests the closest name and lets you say it again or keep what you typed. Every name you typed is saved. Then the Guide asks whether you know where the Bò Tuôi live, warns you about the tribe's curse, and you meet the Informant, who wants a duel but owns no Eyes deck. The map shows The Eyes Of Wisdom (left), where you are (middle) and Bò Tuôi (right); Bò Tuôi is "not yet". In The Eyes Of Wisdom you open a book that gives your **first 12 cards: 2 epic, 2 rare and 8 common, all different**. You can close the book and open it again for another twelve as often as you like; the cards are yours only when you take them, which also sets them as your deck and unlocks `/daily`. The prologue ends there for now.
+**What exists now (the prologue):** the Guide asks whether you are one of The Eyes; if you say yes you give your name, and the game adds "Eyes" for you (type `Ocean`, you become `Ocean Eyes`). The name is checked against the list of The Eyes in `src/data/cards.json`; if it is not found, the Guide suggests the closest name and lets you say it again or keep what you typed. Every name you typed is saved. Then the Guide asks whether you know where the Bò Tuôi live, warns you about the tribe's curse, and you meet the Informant, who wants a duel but owns no Eyes deck. The map shows The Eyes Of Wisdom (left), where you are (middle) and Bò Tuôi (right); Bò Tuôi is "not yet". In The Eyes Of Wisdom you open a book that gives your **first 12 cards: 2 eternal, 2 bargain and 8 common, all different**. You can close the book and open it again for another twelve as often as you like; the cards are yours only when you take them, which also sets them as your deck and unlocks `/daily`. The prologue ends there for now.
 
 The story's text and scenes are in `src/story/prologue.ts`; the story engine is `src/story/engine.ts` (pure logic, no Discord), and the Discord side is `src/discord/commands/story.ts`. Design: [story design](docs/superpowers/specs/2026-10-04-story-design.md).
 
@@ -209,7 +209,7 @@ npm run typecheck
 npm run simulate    # AI vs AI games to check balance (win rates by seat and difficulty, game length)
 ```
 
-The card list is `src/data/eyes-names.json` (a name and a rarity per card: `common`, `rare` or `epic`). Cards have no stats or abilities there yet, so `src/data/cards.ts` gives each one a placeholder cost and power derived from its id and rarity (the same card always gets the same numbers). The card id is made from the name (`Alterra's Eyes` becomes `alterras-eyes`), so **renaming a card changes its id and breaks players' saved collections**. When real stats and abilities exist, add them to the card entries in `cards.ts`; the rules text is generated from the ability unless you set `text`.
+The card list is `src/data/cards.json` (one entry per card with its name, rarity — `common`, `bargain` or `eternal` — cost, power, an optional ability shorthand, and an optional Vietnamese designer `note`). This file is the single source of truth; `src/data/cards.ts` loads it and `src/data/ability-parse.ts` turns each ability shorthand (e.g. `rebirth 4`) into the card's ability. The card id is made from the name (`Alterra's Eyes` becomes `alterras-eyes`), so **renaming a card changes its id and breaks players' saved collections**. To add or edit stats and abilities, edit `cards.json`; the rules text is generated from the ability unless you set `text`.
 Add an ability kind: add it to the types in `src/engine/types.ts`, give it a rules-text sentence in `src/engine/abilities.ts`, handle it in `src/engine/rules.ts`, and add tests in `tests/engine.test.ts`.
 Run `npm run preview` after changing anything under `src/render/` to see the result.
 Add a command: create a file in `src/discord/commands/`, add it to `src/discord/commands/index.ts`, then run `npm run deploy`.

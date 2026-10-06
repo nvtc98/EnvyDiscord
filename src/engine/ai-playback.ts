@@ -1,8 +1,8 @@
-import type { Rng } from '../util/rng';
-import { chooseTurn, type Difficulty } from './ai';
-import { describeEvents } from './events';
-import { endTurn, playCard } from './rules';
-import type { GameEvent, GameState, Seat } from './types';
+import type { Rng } from "../util/rng";
+import { chooseTurn, type Difficulty } from "./ai";
+import { describeEvents } from "./events";
+import { endTurn, playCard } from "./rules";
+import type { GameEvent, GameState, Seat } from "./types";
 
 /**
  * One diegetic step of the opponent's turn: the engine state *after* this beat's events have been
@@ -40,7 +40,7 @@ export function advanceAiBeats(
   const events: GameEvent[] = [];
   let state = start;
 
-  while (!state.winner && state.active === 'top') {
+  while (!state.winner && state.active === "top") {
     let turnOver = false;
     for (const play of chooseTurn(state, difficulty, rng)) {
       // One beat per AI card played, carrying any active-ability events from the same step.
@@ -55,7 +55,7 @@ export function advanceAiBeats(
     }
     if (turnOver) break;
     // Round resolution (end-of-round heals, damage, a possible game over) is its own beat.
-    const ended = endTurn(state);
+    const ended = endTurn(state, rng);
     state = ended.state;
     events.push(...ended.events);
     beats.push({ state, lines: describeEvents(ended.events, viewer) });

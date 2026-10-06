@@ -1,31 +1,44 @@
-import { pick, type Rng } from '../util/rng';
-import { endTurn, legalPlays, playCard, totalPower, type Step } from './rules';
-import { opponentOf, type GameEvent, type GameState, type Play, type Seat } from './types';
+import { pick, type Rng } from "../util/rng";
+import { endTurn, legalPlays, playCard, totalPower, type Step } from "./rules";
+import {
+  opponentOf,
+  type GameEvent,
+  type GameState,
+  type Play,
+  type Seat,
+} from "./types";
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
+export type Difficulty = "easy" | "normal" | "hard";
 
 /**
  * How good a position is for `me`. Board power counts triple because it keeps dealing damage every round;
  * a board that can already kill (or that would kill us) dominates everything else.
  */
 export function evaluate(state: GameState, me: Seat): number {
-  if (state.winner) return state.winner === me ? 1000 : state.winner === 'draw' ? 0 : -1000;
+  if (state.winner)
+    return state.winner === me ? 1000 : state.winner === "draw" ? 0 : -1000;
   const foe = opponentOf(me);
   const mine = totalPower(state, me);
   const theirs = totalPower(state, foe);
-  let value = (mine - theirs) * 3 + (state.players[me].hp - state.players[foe].hp);
+  let value =
+    (mine - theirs) * 3 + (state.players[me].hp - state.players[foe].hp);
   if (mine >= state.players[foe].hp) value += 200;
   if (theirs >= state.players[me].hp) value -= 200;
   return value;
 }
 
 const costOf = (state: GameState, play: Play): number =>
-  state.players[state.active].hand.find((c) => c.uid === play.uid)?.def.cost ?? 0;
+  state.players[state.active].hand.find((c) => c.uid === play.uid)?.def.cost ??
+  0;
 
 /** Plans the active seat's whole turn (a list of plays) without ending it. */
-export function chooseTurn(state: GameState, difficulty: Difficulty, rng: Rng): Play[] {
-  if (difficulty === 'easy') return planEasy(state, rng);
-  if (difficulty === 'normal') return planGreedy(state);
+export function chooseTurn(
+  state: GameState,
+  difficulty: Difficulty,
+  rng: Rng,
+): Play[] {
+  if (difficulty === "easy") return planEasy(state, rng);
+  if (difficulty === "normal") return planGreedy(state);
   return planBeam(state);
 }
 
@@ -67,7 +80,9 @@ function planBeam(start: GameState): Play[] {
   const me = start.active;
   const WIDTH = 12;
   type Node = { state: GameState; plan: Play[]; value: number };
-  let frontier: Node[] = [{ state: start, plan: [], value: evaluate(start, me) }];
+  let frontier: Node[] = [
+    { state: start, plan: [], value: evaluate(start, me) },
+  ];
   let best: Node = frontier[0];
 
   for (let depth = 0; depth < 12 && frontier.length > 0; depth++) {
@@ -76,7 +91,11 @@ function planBeam(start: GameState): Play[] {
       if (node.state.winner !== null) continue;
       for (const play of legalPlays(node.state)) {
         const state = playCard(node.state, play.uid, play.lane).state;
-        next.push({ state, plan: [...node.plan, play], value: evaluate(state, me) });
+        next.push({
+          state,
+          plan: [...node.plan, play],
+          value: evaluate(state, me),
+        });
       }
     }
     next.sort((a, b) => b.value - a.value);
@@ -87,7 +106,11 @@ function planBeam(start: GameState): Play[] {
 }
 
 /** Plays the active seat's turn with the AI and ends it. Returns every event that happened. */
-export function playAiTurn(start: GameState, difficulty: Difficulty, rng: Rng): Step {
+export function playAiTurn(
+  start: GameState,
+  difficulty: Difficulty,
+  rng: Rng,
+): Step {
   const events: GameEvent[] = [];
   let state = start;
   for (const play of chooseTurn(state, difficulty, rng)) {
@@ -96,6 +119,6 @@ export function playAiTurn(start: GameState, difficulty: Difficulty, rng: Rng): 
     events.push(...step.events);
     if (state.winner) return { state, events };
   }
-  const ended = endTurn(state);
+  const ended = endTurn(state, rng);
   return { state: ended.state, events: [...events, ...ended.events] };
 }

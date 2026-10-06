@@ -5,15 +5,15 @@ Cards without a file get a generated placeholder, so you can add art one card at
 
 ## Which cards exist
 
-Every card comes from `src/data/eyes-names.json` — that list is the single source of truth, and a card can only exist if it is in that file. There are no other cards.
+Every card comes from `src/data/cards.json` — that list is the single source of truth, and a card can only exist if it is in that file. There are no other cards.
 
 The card **id** is the card name run through `slugify()` (lowercase, accents stripped, apostrophes removed, every run of non-alphanumerics turned into a single `-`). So the file name follows directly from the name:
 
-| Card name (in eyes-names.json) | Card id          | Art file              |
-| ------------------------------ | ---------------- | --------------------- |
-| `Abyss Eyes`                   | `abyss-eyes`     | `abyss-eyes.png`      |
-| `Alterra's Eyes`               | `alterras-eyes`  | `alterras-eyes.png`   |
-| `Celestial Eyes`               | `celestial-eyes` | `celestial-eyes.webp` |
+| Card name (in cards.json) | Card id          | Art file              |
+| ------------------------- | ---------------- | --------------------- |
+| `Abyss Eyes`              | `abyss-eyes`     | `abyss-eyes.png`      |
+| `Alterra's Eyes`          | `alterras-eyes`  | `alterras-eyes.png`   |
+| `Celestial Eyes`          | `celestial-eyes` | `celestial-eyes.webp` |
 
 Drop a file named after the id and that exact card shows the art immediately.
 

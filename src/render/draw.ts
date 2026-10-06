@@ -206,6 +206,32 @@ function drawParagraph(ctx: Ctx, f: TextField, text: string): void {
   });
 }
 
+/**
+ * Fraction of the vertical overflow trimmed off the very TOP of cover-scaled art, so the crop window
+ * anchors near the top of the picture (a small 10% margin shaved) instead of centring. One source of
+ * truth, shared by every art draw (full card, compact card -> battle board/hand/book, /card, /collection).
+ */
+export const ART_CROP_TOP = 0.2;
+
+/**
+ * Vertical draw `y` for cover-scaled art of height `drawnHeight` placed into a rect at `rY` of height
+ * `rHeight`. When the art is NOT taller than the rect (overflow <= 0) it keeps the centred offset
+ * `rY + (rHeight - drawnHeight) / 2`. When it IS taller (overflow > 0) it slides the art UP by
+ * `ART_CROP_TOP` of the overflow — `rY - ART_CROP_TOP * overflow` — so the visible window starts
+ * ~10% down from the art's top. The result is clamped to `[rY - overflow, rY]` so the art always
+ * fully covers the rect (never shows above its top or below its bottom), staying safe even if
+ * ART_CROP_TOP is later tuned outside [0, 1].
+ */
+export function artCropOffset(
+  rY: number,
+  rHeight: number,
+  drawnHeight: number,
+): number {
+  const overflow = drawnHeight - rHeight;
+  if (overflow <= 0) return rY + (rHeight - drawnHeight) / 2;
+  return Math.min(rY, Math.max(rY - overflow, rY - ART_CROP_TOP * overflow));
+}
+
 /** Real art if there is a file, otherwise a murky gradient whose hue comes from the card id, so every card looks different. */
 export function drawArt(
   ctx: Ctx,
@@ -220,7 +246,7 @@ export function drawArt(
     ctx.drawImage(
       art,
       r.x + (r.width - dw) / 2,
-      r.y + (r.height - dh) / 2,
+      artCropOffset(r.y, r.height, dh),
       dw,
       dh,
     );
@@ -388,7 +414,7 @@ export interface CompactFace {
   index?: number;
   selected?: boolean;
   dim?: boolean;
-  /** Rare and epic cards get a coloured line and a gem. */
+  /** Bargain and eternal cards get a coloured line and a gem. */
   rarity?: Rarity;
 }
 
@@ -409,7 +435,7 @@ export function drawCompactCard(ctx: Ctx, face: CompactFace, art: Art): void {
   ctx.strokeStyle = DEFAULT_BORDER;
   ctx.stroke();
   const rarityColor =
-    face.rarity === "epic" || face.rarity === "rare"
+    face.rarity === "eternal" || face.rarity === "bargain"
       ? RARITY_COLOR[face.rarity]
       : null;
   const innerColor = face.owner
@@ -624,7 +650,8 @@ export function drawHud(ctx: Ctx, d: HudData, width: number): void {
   ctx.textAlign = "left";
   ctx.font = heading(15);
   ctx.fillStyle = d.color;
-  ctx.fillText(d.label, 0, 14);
+  // HUD labels render in all-caps; callers pass the raw name and drawHud uppercases here.
+  ctx.fillText(d.label.toUpperCase(), 0, 14);
 
   ctx.font = body(400, 12);
   ctx.fillStyle = PALETTE.muted;

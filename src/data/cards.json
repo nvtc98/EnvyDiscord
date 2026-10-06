@@ -1,0 +1,1390 @@
+[
+  {
+    "name": "Abyss Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Aether Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Alpha Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Alterra's Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Amber Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Ancient Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Angel Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Apex Eyes",
+    "rarity": "bargain",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Arcane Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Arsenic Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Artfulness Eyes",
+    "rarity": "eternal",
+    "cost": 6,
+    "power": 8
+  },
+  {
+    "name": "Asmodeus Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 8
+  },
+  {
+    "name": "Astral Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 7
+  },
+  {
+    "name": "Aura Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Balance Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Banded Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Bedrock Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5,
+    "ability": "shield",
+    "note": "Không thể bị địch đẩy trong lượt này."
+  },
+  {
+    "name": "Behemoth Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Berserk Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Beyond Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Blank Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Bleeding Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Broken Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Ceased Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Celestial Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 7
+  },
+  {
+    "name": "Charming Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Chrome Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Chronos Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Circuit Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Closed Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Clouded Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Cloudy Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Contrast Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Cosmic Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Craving Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Crescent Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Crystal Eyes",
+    "rarity": "eternal",
+    "cost": 6,
+    "power": 7
+  },
+  {
+    "name": "Crystallin Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Current Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Cyber Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Dead Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Deep Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Devil Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Dewy Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Diamond Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Digital Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Dimmed Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Dire Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Dispersed Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Dissolved Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Distorted Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Divine Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Doran's Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Dragon Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Dreamveil Eyes",
+    "rarity": "eternal",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Dreamweaver Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Dreamy Eyes",
+    "rarity": "bargain",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Drowned Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Dual Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Echo Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Eden's Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Elemental Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Elysian Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Ember Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Emerald Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Enchanted Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Eternal Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Ethereal Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Evil Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Facet Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Faded Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Farsight Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Fever Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Fierce Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Fiery Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Flower Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Frozen Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Galaxy Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Gentle Eyes",
+    "rarity": "eternal",
+    "cost": 6,
+    "power": 9
+  },
+  {
+    "name": "Glacial Eyes",
+    "rarity": "bargain",
+    "cost": 5,
+    "power": 6
+  },
+  {
+    "name": "Glazed Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Glimmer Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Glimmering Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Gloom Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Glossy Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Goddess Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 8
+  },
+  {
+    "name": "Golden Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Goliath Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Grim Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Guardian Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Haze Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Heavenly Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Herald's Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Hollow Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Infrared Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Jade Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Jadeite Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Joyful Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Keen Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Killing Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Laser Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4,
+    "ability": "destroyLane",
+    "note": "Hủy toàn bộ lane hiện tại (trừ bản thân)."
+  },
+  {
+    "name": "Lavender Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Legend Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Liquid Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Locked Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Lost Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Lotus Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Lovely Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Loving Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Lustre Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Lustrous Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Lyco Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Master Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Metal Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Midnight Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Monochrome Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Moonlit Eyes",
+    "rarity": "bargain",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Mortal Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Mysterious Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Mystic Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 7
+  },
+  {
+    "name": "Nasty Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Nebula Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Nexus Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Noble Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Null Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Obsidian Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Occult Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Ocean Eyes",
+    "rarity": "eternal",
+    "cost": 1,
+    "power": 2,
+    "ability": "oceanReturn 1",
+    "note": "Cuối lượt: +1 power cho đồng minh trên sân rồi trở về vị trí ngẫu nhiên trong deck."
+  },
+  {
+    "name": "Odd Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Odin Eyes",
+    "rarity": "eternal",
+    "cost": 6,
+    "power": 8
+  },
+  {
+    "name": "Offal Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Omen Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Omni Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Onyx Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Optic Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Oracle Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Orbit Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Orphan Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Outcast Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Outer Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "PaleMoon Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Pearl Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Peridot Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Phantom Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Phasing Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Phoenix Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4,
+    "ability": "rebirth 4",
+    "note": "Mỗi lần bị hủy, trở lại trên tay với power +4."
+  },
+  {
+    "name": "Piercing Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Polarizing Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Portent Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Pretty Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Prism Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Psyche Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Reflecting Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Relic Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Sapphire Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Savage Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Scanner Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Scarlet Eyes",
+    "rarity": "eternal",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Sealed Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Secret Eyes",
+    "rarity": "eternal",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Sensor Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Sentinel Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Seraph Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Seraphic Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Serene Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Shade Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Shadow Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Sharp Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Shunned Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Silent Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Silver Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Siren Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 2,
+    "ability": "pushLane",
+    "note": "Đẩy lane hiện tại."
+  },
+  {
+    "name": "Sly Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Solstice Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Sorrowful Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Soulfire Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Spectra Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Spectral Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Stalker Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Stalking Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Stance Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Starlight Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Starlit Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Starry Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Steel Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Stella Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 0,
+    "ability": "destroyedPower",
+    "note": "Nhận power bằng tổng power của mọi thẻ đã bị hủy trong trận (cả hai phe)."
+  },
+  {
+    "name": "Stellar Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 4
+  },
+  {
+    "name": "Styx Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Sunbeam Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Sund0wn Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Sunfire Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 5
+  },
+  {
+    "name": "Sunken Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Sunr1se Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Sunset Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Target Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Tearful Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 3
+  },
+  {
+    "name": "Titan Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Tracking Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Translucent Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Twilight Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Vague Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Vanished Eyes",
+    "rarity": "bargain",
+    "cost": 3,
+    "power": 4
+  },
+  {
+    "name": "Veil Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Veiled Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Venom Eyes",
+    "rarity": "bargain",
+    "cost": 5,
+    "power": 8,
+    "ability": "drainStartOfTurn 1",
+    "note": "Đầu mỗi lượt, giảm 1 power của mọi thẻ khác trên sân (tối đa về 0)."
+  },
+  {
+    "name": "Venomous Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Verdent Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Vesper Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Vine Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 2
+  },
+  {
+    "name": "Violet Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Viper Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Vision Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 5
+  },
+  {
+    "name": "Vista Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Vitreous Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Void Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Waiting Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Warden's Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 3
+  },
+  {
+    "name": "Watcher's Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Weaving Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Whisper Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Whispering Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Wicked Eyes",
+    "rarity": "eternal",
+    "cost": 5,
+    "power": 7
+  },
+  {
+    "name": "Widow Eyes",
+    "rarity": "bargain",
+    "cost": 2,
+    "power": 4
+  },
+  {
+    "name": "Wild Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 6
+  },
+  {
+    "name": "Wise Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Wither Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "X-Ray Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 2
+  },
+  {
+    "name": "Yin-Yang Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 1
+  },
+  {
+    "name": "Zenith Eyes",
+    "rarity": "bargain",
+    "cost": 2,
+    "power": 2
+  }
+]

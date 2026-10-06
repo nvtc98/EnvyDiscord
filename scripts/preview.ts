@@ -14,7 +14,7 @@ const outDir = `${root}preview/`;
 await mkdir(outDir, { recursive: true });
 
 const renderer = await createImageRenderer({ assetsDir: `${root}assets` });
-const byRarity = (rarity: "common" | "rare" | "epic", n = 0) =>
+const byRarity = (rarity: "common" | "bargain" | "eternal", n = 0) =>
   CARDS.filter((c) => c.rarity === rarity)[n];
 const save = async (name: string, buffer: Buffer) => {
   await writeFile(`${outDir}${name}`, buffer);
@@ -23,7 +23,7 @@ const save = async (name: string, buffer: Buffer) => {
 
 await save(
   "card-single.png",
-  await renderer.cards([{ def: byRarity("epic"), variant: "purple" }], {
+  await renderer.cards([{ def: byRarity("eternal"), variant: "purple" }], {
     scale: 2,
   }),
 );
@@ -31,8 +31,8 @@ await save(
   "daily.png",
   await renderer.cards([
     { def: byRarity("common", 3), variant: "metal", badge: "NEW" },
-    { def: byRarity("rare", 2), variant: "blue", badge: "Blue" },
-    { def: byRarity("epic", 4), variant: "red", badge: "Red" },
+    { def: byRarity("bargain", 2), variant: "blue", badge: "Blue" },
+    { def: byRarity("eternal", 4), variant: "red", badge: "Red" },
   ]),
 );
 
@@ -51,7 +51,7 @@ for (let round = 0; round < 3; round++) {
       legalPlays(state).some((p) => p.uid === play.uid && p.lane === play.lane)
     )
       state = playCard(state, play.uid, play.lane).state;
-  state = endTurn(state).state; // you end, round resolves
+  state = endTurn(state, rng).state; // you end, round resolves
   state = playAiTurn(state, "hard", rng).state;
 }
 const selected = state.players.bottom.hand[1]?.uid ?? null;
@@ -77,7 +77,7 @@ await save(
   }),
 );
 
-// The story: the map at the crossroads, and the book with a starter set (2 epic, 2 rare, 8 common).
+// The story: the map at the crossroads, and the book with a starter set (2 eternal, 2 bargain, 8 common).
 await save(
   "story-map.png",
   await renderer.map({

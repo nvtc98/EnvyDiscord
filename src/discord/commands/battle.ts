@@ -57,6 +57,8 @@ export const battleCommand: Command = {
         extension: "png",
         size: 128,
       }),
+      playerName: player.story?.name ?? undefined,
+      // opponentName left undefined so the renderer's "The Enemy" default applies (practice has no story opponent).
     });
 
     await interaction.reply({

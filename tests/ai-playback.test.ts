@@ -82,7 +82,7 @@ describe("advanceAiBeats", () => {
       "bottom",
       mulberry32(3),
     );
-    const afterHuman = endTurn(game.state); // now active === "top"
+    const afterHuman = endTurn(game.state, mulberry32(99)); // now active === "top"
     expect(afterHuman.state.active).toBe("top");
     const playback = advanceAiBeats(
       afterHuman.state,

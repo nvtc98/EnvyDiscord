@@ -8,6 +8,7 @@ import { playAiTurn } from "../src/engine/ai";
 import { endTurn, legalPlays, newGame, playCard } from "../src/engine/rules";
 import type { GameState } from "../src/engine/types";
 import { parseLayout, DEFAULT_LAYOUT } from "../src/render/layout";
+import { ART_CROP_TOP, artCropOffset } from "../src/render/draw";
 import { createImageRenderer } from "../src/render/renderer";
 import { mulberry32 } from "../src/util/rng";
 
@@ -71,7 +72,7 @@ function midGame(): GameState {
   for (let round = 0; round < 3; round++) {
     for (const play of legalPlays(state).slice(0, 1))
       state = playCard(state, play.uid, play.lane).state;
-    state = endTurn(state).state;
+    state = endTurn(state, mulberry32(0)).state;
     state = playAiTurn(state, "normal", rng).state;
   }
   return state;
@@ -106,6 +107,28 @@ describe("layout", () => {
 
   it("rejects a layout with a missing number instead of drawing garbage", () => {
     expect(() => parseLayout({ card: { width: 240 } })).toThrow(/card.height/);
+  });
+});
+
+describe("art crop", () => {
+  it("anchors cover-scaled art near the top when it overflows the rect", () => {
+    // Art taller than the rect: slide up by ART_CROP_TOP of the overflow (300 - 100 = 200).
+    const overflow = 300 - 100;
+    expect(artCropOffset(0, 100, 300)).toBe(-ART_CROP_TOP * overflow);
+    expect(artCropOffset(0, 100, 300)).toBe(-40);
+  });
+
+  it("keeps the offset within the overflow so the art always covers the rect", () => {
+    const rY = 50;
+    const offset = artCropOffset(rY, 100, 300);
+    const overflow = 300 - 100;
+    expect(offset).toBeLessThanOrEqual(rY);
+    expect(offset).toBeGreaterThanOrEqual(rY - overflow);
+  });
+
+  it("falls back to centring when the art is not taller than the rect", () => {
+    // overflow <= 0: centred offset (300 - 100) / 2 = 100.
+    expect(artCropOffset(0, 300, 100)).toBe(100);
   });
 });
 
@@ -238,7 +261,7 @@ describe("battle scene", () => {
     });
     const perImage = (performance.now() - started) / 4;
 
-    expect(size(normal).width).toBe(1050);
+    expect(size(normal).width).toBe(1400);
     expect(size(normal).height).toBeGreaterThan(900);
     for (const png of [normal, won, lost, drawn])
       expect(png.length).toBeLessThan(3 * 1024 * 1024);
@@ -353,7 +376,7 @@ describe("story images", () => {
     expect(moved.equals(a)).toBe(false);
   });
 
-  it("draws the book as a grid of cards, and rare and epic cards are visibly marked", async () => {
+  it("draws the book as a grid of cards, and bargain and eternal cards are visibly marked", async () => {
     const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
     const twelve = CARDS.slice(0, 12);
     const png = await renderer.pack(twelve);
@@ -369,9 +392,9 @@ describe("story images", () => {
         ...c,
         rarity:
           i < 2
-            ? ("epic" as const)
+            ? ("eternal" as const)
             : i < 4
-              ? ("rare" as const)
+              ? ("bargain" as const)
               : ("common" as const),
       })),
     );

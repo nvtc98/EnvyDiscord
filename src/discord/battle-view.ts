@@ -31,6 +31,10 @@ export interface BattleScreen {
   log: string[];
   /** The board image. When absent the board is described in text. */
   image?: Buffer;
+  /** Shown as the player's HUD label; the renderer falls back to "You" when absent. */
+  playerName?: string;
+  /** Shown as the opponent's HUD label; the renderer falls back to "The Enemy" when absent. */
+  opponentName?: string;
 }
 
 const LANES = [0, 1, 2] as const;

@@ -9,25 +9,36 @@ export const DECK_SIZE = 12;
 export const OPENING_HAND = { first: 2, second: 3 } as const;
 
 /** Where a player sits. `bottom` is the human at the bottom of the board, `top` is the opponent. */
-export type Seat = 'bottom' | 'top';
+export type Seat = "bottom" | "top";
 export type LaneIndex = 0 | 1 | 2;
 
 export type ActiveEffect =
-  | { kind: 'heal'; amount: number }
-  | { kind: 'damage'; amount: number }
-  | { kind: 'draw'; count: number }
-  | { kind: 'energy'; amount: number }
-  | { kind: 'buffLane'; amount: number };
-export type ContinuousEffect = { kind: 'laneDouble' } | { kind: 'anchor' };
-export type EndOfRoundEffect = { kind: 'heal'; amount: number };
+  | { kind: "heal"; amount: number }
+  | { kind: "damage"; amount: number }
+  | { kind: "draw"; count: number }
+  | { kind: "energy"; amount: number }
+  | { kind: "buffLane"; amount: number }
+  | { kind: "destroyedPower" } // Stella: set bonus so effective power = destroyedPower tally
+  | { kind: "shield" } // Bedrock: shield self from enemy pushes this turn
+  | { kind: "pushLane" } // Siren: extra push step on the lane, far direction
+  | { kind: "destroyLane" }; // Laser: destroy every other card in the lane
+export type ContinuousEffect =
+  | { kind: "laneDouble" }
+  | { kind: "anchor" }
+  | { kind: "drainStartOfTurn"; amount: number }; // Venom: -amount power to every other card each turn start
+export type EndOfRoundEffect =
+  | { kind: "heal"; amount: number }
+  | { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
+export type OnDestroyEffect = { kind: "rebirth"; amount: number }; // Phoenix: return to hand with +amount
 
 /** Active: once, when the card is played. Passive: while on the board, either always or at the end of each round. */
 export type Ability =
-  | { timing: 'active'; effect: ActiveEffect }
-  | { timing: 'continuous'; effect: ContinuousEffect }
-  | { timing: 'endOfRound'; effect: EndOfRoundEffect };
+  | { timing: "active"; effect: ActiveEffect }
+  | { timing: "continuous"; effect: ContinuousEffect }
+  | { timing: "endOfRound"; effect: EndOfRoundEffect }
+  | { timing: "onDestroy"; effect: OnDestroyEffect };
 
-export type Rarity = 'common' | 'rare' | 'epic';
+export type Rarity = "common" | "bargain" | "eternal";
 
 export interface CardDef {
   id: string;
@@ -48,6 +59,11 @@ export interface CardInstance {
   owner: Seat;
   /** Permanent power changes from abilities. */
   bonus: number;
+  /**
+   * Enemy pushes cannot displace this card while `state.players[opponentOf(owner)].turns <= shieldedUntil`.
+   * Set by Bedrock Eyes. Omitted/undefined means no shield.
+   */
+  shieldedUntil?: number;
 }
 
 export interface PlayerState {
@@ -69,8 +85,10 @@ export interface GameState {
   first: Seat;
   active: Seat;
   round: number;
-  winner: Seat | 'draw' | null;
+  winner: Seat | "draw" | null;
   nextUid: number;
+  /** Running sum of the actual power of every card destroyed this match, both seats. Read by Stella Eyes. */
+  destroyedPower: number;
 }
 
 export interface Play {
@@ -79,12 +97,29 @@ export interface Play {
 }
 
 export type GameEvent =
-  | { type: 'drew'; seat: Seat; uid: number; card: CardDef }
-  | { type: 'turn_started'; seat: Seat; round: number; energy: number }
-  | { type: 'played'; seat: Seat; uid: number; card: CardDef; lane: LaneIndex; destroyed: { card: CardDef; owner: Seat } | null }
-  | { type: 'ability'; seat: Seat; card: CardDef; text: string }
-  | { type: 'round_resolved'; round: number; damage: Record<Seat, number>; hp: Record<Seat, number> }
-  | { type: 'game_over'; winner: Seat | 'draw'; reason: 'hp' | 'rounds' | 'forfeit' };
+  | { type: "drew"; seat: Seat; uid: number; card: CardDef }
+  | { type: "turn_started"; seat: Seat; round: number; energy: number }
+  | {
+      type: "played";
+      seat: Seat;
+      uid: number;
+      card: CardDef;
+      lane: LaneIndex;
+      destroyed: { card: CardDef; owner: Seat } | null;
+    }
+  | { type: "ability"; seat: Seat; card: CardDef; text: string }
+  | {
+      type: "round_resolved";
+      round: number;
+      damage: Record<Seat, number>;
+      hp: Record<Seat, number>;
+    }
+  | {
+      type: "game_over";
+      winner: Seat | "draw";
+      reason: "hp" | "rounds" | "forfeit";
+    };
 
-export const opponentOf = (seat: Seat): Seat => (seat === 'bottom' ? 'top' : 'bottom');
-export const LANE_NAMES = ['Left', 'Middle', 'Right'] as const;
+export const opponentOf = (seat: Seat): Seat =>
+  seat === "bottom" ? "top" : "bottom";
+export const LANE_NAMES = ["Left", "Middle", "Right"] as const;

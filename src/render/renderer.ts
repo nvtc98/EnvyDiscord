@@ -53,6 +53,10 @@ export interface BattleView {
   playerAvatar?: AvatarImage | null;
   /** The opponent's portrait, already decoded. Null/omitted -> generated placeholder. */
   opponentAvatar?: AvatarImage | null;
+  /** Raw player HUD name (e.g. "Ocean Eyes"). drawHud uppercases it; falls back to "You" when absent. */
+  playerName?: string;
+  /** Raw opponent HUD name. drawHud uppercases it; falls back to "The Enemy" when absent. */
+  opponentName?: string;
 }
 
 export interface ImageRenderer {
@@ -62,7 +66,7 @@ export interface ImageRenderer {
   battle(view: BattleView): Promise<Buffer>;
   /** A story map: places and the paths between them. */
   map(map: MapView): Promise<Buffer>;
-  /** The cards shown in the story's book, as a grid with rare and epic cards marked. */
+  /** The cards shown in the story's book, as a grid with bargain and eternal cards marked. */
   pack(cards: CardDef[]): Promise<Buffer>;
 }
 
@@ -80,8 +84,13 @@ const FONT_FILES: [file: string, family: string][] = [
   ["Aleo-Bold.woff2", CARD_FONT],
 ];
 
-// Battle scene geometry, in CSS pixels. The image is drawn at SCENE_SCALE times this for sharpness.
+// Battle scene geometry, in CSS pixels. The image is drawn at a scale times this for sharpness.
 const SCENE_SCALE = 1.5;
+// The battle image is supersampled 2x for a crisp downscaled Discord preview; the map keeps SCENE_SCALE.
+const BATTLE_SCALE = 2;
+/** Caps a raw HUD name so a long one cannot overflow the single-line HUD label. */
+const hudName = (s: string): string =>
+  s.length > 22 ? s.slice(0, 21) + "…" : s;
 const SCENE_W = 700;
 const MARGIN = 40;
 const LANE_W = COMPACT.w;
@@ -168,6 +177,8 @@ export async function createImageRenderer({
       variants,
       playerAvatar = null,
       opponentAvatar = null,
+      playerName,
+      opponentName,
     }) {
       const me = state.players[viewer];
       const foeSeat = opponentOf(viewer);
@@ -185,11 +196,11 @@ export async function createImageRenderer({
           : myHudY + 76;
 
       const canvas = createCanvas(
-        SCENE_W * SCENE_SCALE,
-        Math.round(height * SCENE_SCALE),
+        SCENE_W * BATTLE_SCALE,
+        Math.round(height * BATTLE_SCALE),
       );
       const ctx = canvas.getContext("2d");
-      ctx.scale(SCENE_SCALE, SCENE_SCALE);
+      ctx.scale(BATTLE_SCALE, BATTLE_SCALE);
       drawArena(
         ctx,
         SCENE_W,
@@ -217,7 +228,7 @@ export async function createImageRenderer({
       drawHud(
         ctx,
         {
-          label: "THE ENEMY",
+          label: hudName(opponentName ?? "The Enemy"),
           color: PALETTE.theirs,
           hp: foe.hp,
           maxHp: MAX_HP,
@@ -293,7 +304,7 @@ export async function createImageRenderer({
       drawHud(
         ctx,
         {
-          label: "YOU",
+          label: hudName(playerName ?? "You"),
           color: PALETTE.mine,
           hp: me.hp,
           maxHp: MAX_HP,
@@ -384,7 +395,7 @@ export async function createImageRenderer({
       ctx.scale(scale, scale);
       drawArena(ctx, w, h, h / 2, cards.length * 71 + 3);
 
-      const count = (rarity: "epic" | "rare" | "common") =>
+      const count = (rarity: "eternal" | "bargain" | "common") =>
         cards.filter((c) => c.rarity === rarity).length;
       ctx.textAlign = "center";
       ctx.font = `700 22px ${TITLE_FONT}`;
@@ -393,7 +404,7 @@ export async function createImageRenderer({
       ctx.font = `700 12px ${FONT_FAMILY}`;
       ctx.fillStyle = PALETTE.muted;
       ctx.fillText(
-        `${count("epic")} EPIC  ·  ${count("rare")} RARE  ·  ${count("common")} COMMON`,
+        `${count("eternal")} ETERNAL  ·  ${count("bargain")} BARGAIN  ·  ${count("common")} COMMON`,
         w / 2,
         50,
       );

@@ -117,7 +117,7 @@ A single stranger meets the player on the road and stays with them to the end. H
 4. **The curse** — the tribe is cursed and cannot be approached normally. The stranger reports a **man on the inside** who can lead _us_ — bot and player together — in by the ways beneath, but his price is a duel: we must beat _him_ at cards before he opens the road. To sit at that table the player needs a deck of The Eyes of their own, and that deck lies in The Eyes Of Wisdom. (The duel is against the inside man, not the stranger himself.) The scene ends coaxing the player on to the book. The one gesture line is first person ("I draw my hood lower…"), never "He".
 5. **Map** — the curse beat leads straight to the map; there is no "a figure steps out at the crossroads" beat and no second character ever appears on screen. The map shows The Eyes Of Wisdom (left), The Crossroads (here, middle), Bò Tuôi (right). Both choices share the primary style and carry arrow emojis, ⬅️ for The Eyes Of Wisdom and ➡️ for Bò Tuôi. Choosing Bò Tuôi gets "not yet" and returns to the map. (The old `informant` scene is removed; its one useful line — set the way to The Eyes Of Wisdom — folds into the map's intro, re-voiced in first person.)
 6. **The Eyes Of Wisdom** — the stranger guides the way in and points to a book that gives up the deck. The player may ask "How do you know all this?"; he answers evasively, telling them to just call him "Stranger Eyes" with a knowing smile, then they go to the book. Choosing "Just open the book" skips straight to it.
-7. **The book** — twelve different cards: 2 epic, 2 rare, 8 common. "Take these cards" or "Close the book and open it again" (another twelve; the stranger reacts with a different line each time). Taking the cards grants all twelve, sets them as the deck, and unlocks `/daily`.
+7. **The book** — twelve different cards: 2 eternal, 2 bargain, 8 common. "Take these cards" or "Close the book and open it again" (another twelve; the stranger reacts with a different line each time). Taking the cards grants all twelve, sets them as the deck, and unlocks `/daily`.
 
 The cards are granted only when taken, so redrawing costs nothing and the player never ends up with cards they did not choose.
 
@@ -137,7 +137,7 @@ After the book is taken the prologue flows straight into the first chapter and i
 
 ## Cards
 
-The card list is `src/data/eyes-names.json` (229 names: 195 common, 19 rare, 15 epic). It has no stats, so each card gets a placeholder cost and power from its id and rarity until real values arrive. Rarity is used only by the starter pack; ordinary `/daily` packs ignore it, as before. The previous 15 placeholder cards with abilities were removed with this change; abilities will be added when they are designed (epic cards are expected to have several exclusive, complex abilities).
+The card list is `src/data/cards.json` (229 cards: 195 common, 19 bargain, 15 eternal), each with its name, rarity, cost, power and an optional ability shorthand. This file is the single source of truth. Rarity is used only by the starter pack; ordinary `/daily` packs ignore it, as before. The previous 15 placeholder cards with abilities were removed with this change; abilities will be added when they are designed (eternal cards are expected to have several exclusive, complex abilities).
 
 ## Known limits
 

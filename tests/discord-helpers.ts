@@ -38,14 +38,27 @@ export function dmChannel() {
   // Each sent payload keyed by the id send() returned, so clearComponents can strip buttons off the
   // SAME object instances the `sent` array (and the live()/buttons() helpers) read from.
   const byId = new Map<string, any>();
+  // The reverse map: the id send() returned for a given payload object, so a test can press the exact
+  // message the handler recorded as live (needed by the gate/scene stale guards).
+  const idByPayload = new Map<any, string>();
   let typingCount = 0;
   let next = 1;
-  const send = vi.fn(async (payload: any) => {
+  // Overlap seam: when paused, each send() records its payload immediately but withholds its resolution
+  // (the `{ id }`) until flushSends() is called. This lets a test start a SECOND handling while the
+  // first deliverScene is still awaiting its paced sends, modelling a redelivered/duplicate interaction
+  // the way production times out. Default (unpaused) resolves immediately so existing tests are unchanged.
+  let paused = false;
+  const pending: Array<() => void> = [];
+  const send = vi.fn((payload: any) => {
     const id = `dm-${next++}`;
     sent.push(payload);
     events.push(payload);
     byId.set(id, payload);
-    return { id };
+    idByPayload.set(payload, id);
+    if (!paused) return Promise.resolve({ id });
+    return new Promise<{ id: string }>((resolve) => {
+      pending.push(() => resolve({ id }));
+    });
   });
   const sendTyping = vi.fn(async () => {
     typingCount++;
@@ -65,6 +78,22 @@ export function dmChannel() {
     events,
     /** The current components of the message with this id (as sent/edited), or undefined if unknown. */
     componentsOf: (id: string) => byId.get(id)?.components,
+    /** The id send() returned for a given sent payload object (the message a test should press). */
+    idOf: (payload: any): string => {
+      const id = idByPayload.get(payload);
+      if (id === undefined)
+        throw new Error("payload was never sent on this DM");
+      return id;
+    },
+    /** Hold every subsequent send()'s resolution until flushSends(), to model overlapping handlings. */
+    pauseSends: () => {
+      paused = true;
+    },
+    /** Resolve all withheld sends and resume immediate resolution. */
+    flushSends: () => {
+      paused = false;
+      while (pending.length) pending.shift()!();
+    },
     get typingCount() {
       return typingCount;
     },
