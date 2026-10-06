@@ -34,11 +34,6 @@ export const GATE = {
   readyLine: "Hark, traveler. Might I beg a moment of thy time?",
   readyYes: "Yes, let's go",
   readyNo: "Not now",
-  /** Plain, instantly-readable label for the "to what end?" gate choice (dialed-down voice for UI). */
-  askLabel: "What's this about?",
-  /** The bot's answer, in full story voice, shown before the gate is posed anew. */
-  askAnswer:
-    "A fair thing to ask. I must go before the Chieftain of the Bò Tuôi and beg of him a boon — a precious thing, lent for a while. Alone I cannot reach him; with thee, I may. Wilt thou walk with me?",
   /** Shown after declining the ready-gate; nothing is saved. */
   declineLine:
     "No matter at all. When the hour suits thee, speak /story and here I shall wait.",

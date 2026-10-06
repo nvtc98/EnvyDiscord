@@ -123,7 +123,7 @@ describe("/story gate and DM delivery", () => {
     expect(lastPayload(call.deferReply as any).flags).toBeDefined();
     expect(lastPayload(call.reply as any).content).toMatch(/Check your DMs/);
     expect(content(gate)).toBe(GATE.readyLine);
-    expect(labels(gate)).toEqual([GATE.readyYes, GATE.askLabel, GATE.readyNo]);
+    expect(labels(gate)).toEqual([GATE.readyYes, GATE.readyNo]);
     // GATE strings follow the archaic rewrite; the assertions reference the constants, not literals.
     // Nothing persisted before the player agrees.
     expect(ctx.repo.get("u").story).toBeNull();
@@ -165,11 +165,7 @@ describe("/story", () => {
     // A second /story offers the resume gate.
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
-    expect(labels(second.gate)).toEqual([
-      GATE.resumeYes,
-      GATE.askLabel,
-      GATE.resumeNo,
-    ]);
+    expect(labels(second.gate)).toEqual([GATE.resumeYes, GATE.resumeNo]);
     await pressGate(ctx, second.dm, GATE.resumeYes);
     const resumed = live(second.dm);
     expect(second.dm.sent.some((p) => content(p)?.match(/No matter/))).toBe(
@@ -550,48 +546,6 @@ describe("/story gate persistence", () => {
     // a second /story re-asks the ready-gate from scratch
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.readyLine);
-  });
-
-  it("the ask button answers 'what's this about?' then re-poses the same three choices, and loops", async () => {
-    const ctx = makeCtx();
-    const { dm } = await openGate(ctx);
-    // first ask
-    await pressGate(ctx, dm, GATE.askLabel);
-    expect(dm.sent.some((p) => content(p) === GATE.askAnswer)).toBe(true);
-    const reposed = dm.sent.at(-1);
-    expect(labels(reposed)).toEqual([
-      GATE.readyYes,
-      GATE.askLabel,
-      GATE.readyNo,
-    ]);
-    // ask again — it loops: another answer + another three-button gate, nothing persisted
-    await pressGate(ctx, dm, GATE.askLabel);
-    expect(dm.sent.filter((p) => content(p) === GATE.askAnswer).length).toBe(2);
-    expect(labels(dm.sent.at(-1))).toEqual([
-      GATE.readyYes,
-      GATE.askLabel,
-      GATE.readyNo,
-    ]);
-    expect(ctx.repo.get("u").story).toBeNull();
-    // can still begin from the re-posed gate
-    await pressGate(ctx, dm, GATE.readyYes);
-    expect(ctx.repo.get("u").story).toMatchObject({ node: "greeting" });
-  });
-
-  it("the ask button re-poses the resume gate for a player with progress", async () => {
-    const ctx = makeCtx();
-    const { dm } = await begin(ctx);
-    await click(ctx, dm, "No, I am not");
-    const second = await openGate(ctx);
-    await pressGate(ctx, second.dm, GATE.askLabel);
-    expect(second.dm.sent.some((p) => content(p) === GATE.askAnswer)).toBe(
-      true,
-    );
-    expect(labels(second.dm.sent.at(-1))).toEqual([
-      GATE.resumeYes,
-      GATE.askLabel,
-      GATE.resumeNo,
-    ]);
   });
 
   it("beginning the gate creates the story and delivers the greeting", async () => {

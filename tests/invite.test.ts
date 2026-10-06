@@ -31,10 +31,9 @@ describe("/invite", () => {
     expect(dm.sent[0].content).toBe(GATE.readyLine);
     const gateButtons = dm.sent[0].components[0].toJSON().components;
     expect(gateButtons[0].custom_id).toBe("story:gate:begin");
-    // invite inherits the shared three-button gate (ask + decline) for free.
+    // invite inherits the shared two-button gate (yes + decline) for free.
     expect(gateButtons.map((b: any) => b.custom_id)).toEqual([
       "story:gate:begin",
-      "story:gate:ask",
       "story:gate:decline",
     ]);
 

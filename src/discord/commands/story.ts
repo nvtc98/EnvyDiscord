@@ -168,7 +168,7 @@ export async function deliverScene(
   await ctx.repo.save(player);
 }
 
-/** The single source of the gate's three-button row: yes (primary), ask (secondary), decline (secondary). */
+/** The single source of the gate's two-button row: yes (primary), decline (secondary). */
 export function gateComponents(
   yesLabel: string,
   yesId: string, // "story:gate:begin" | "story:gate:resume"
@@ -179,10 +179,6 @@ export function gateComponents(
       .setCustomId(yesId)
       .setLabel(yesLabel)
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("story:gate:ask")
-      .setLabel(GATE.askLabel)
-      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("story:gate:decline")
       .setLabel(noLabel)
@@ -453,17 +449,6 @@ async function handleGate(
       content: player.story ? GATE.resumeDeclineLine : GATE.declineLine,
       allowedMentions: { parse: [] },
     });
-    return;
-  }
-
-  if (kind === "ask") {
-    // Answer the "what's this about?" question, then re-pose the same three choices. Persists nothing;
-    // loops indefinitely because every re-posed gate still carries the ask button.
-    const dm = dmFrom(interaction);
-    await dm.send({ content: GATE.askAnswer, allowedMentions: { parse: [] } });
-    const player = ctx.repo.get(user.id);
-    const g = buildGate(player);
-    await dm.send(gateMessage(g.line, g.yesLabel, g.yesId, g.noLabel));
     return;
   }
 
