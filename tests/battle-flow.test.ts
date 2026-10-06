@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { battleCommand } from "../src/discord/commands/battle";
+import { setBattleStepDelay } from "../src/discord/battle-session";
 import { createImageRenderer } from "../src/render/renderer";
 import {
   buttonInteraction,
@@ -45,6 +46,20 @@ async function press(
   return interaction;
 }
 
+/**
+ * The frame the player ends up on after a press. The animated end-of-turn path finishes with
+ * `editReply`; the instant paths (lane, forfeit, stale) finish with `update`. This reads whichever
+ * one was called last.
+ */
+function finalFrame(interaction: {
+  update: ReturnType<typeof import("vitest").vi.fn>;
+  editReply: ReturnType<typeof import("vitest").vi.fn>;
+}): any {
+  const edits = interaction.editReply.mock.calls;
+  if (edits.length > 0) return edits.at(-1)![0];
+  return lastPayload(interaction.update);
+}
+
 async function pick(ctx: Ctx, userId: string, id: string, uid: string) {
   const interaction = selectInteraction(userId, `battle:${id}:pick`, [uid]);
   await battleCommand.component!(interaction as never, ctx);
@@ -68,6 +83,9 @@ async function startWithPlayableCard(userId = "u1") {
 }
 
 describe("/battle", () => {
+  // Animated opponent-turn playback uses real timers in production; keep tests instant and timer-free.
+  beforeEach(() => setBattleStepDelay(0));
+
   it("is for the bot owner only while the story is being built", async () => {
     const ctx = makeCtx(3);
     const stranger = slashInteraction("stranger", {}, "someone-else");
@@ -170,7 +188,9 @@ describe("/battle", () => {
     const ctx = makeCtx(5);
     const { payload, id } = await start(ctx);
     const click = await press(ctx, "u1", id, "end");
-    const update = lastPayload(click.update);
+    // Controls vanish while the opponent acts (the acknowledge frame).
+    expect(lastPayload(click.update).components).toEqual([]);
+    const update = finalFrame(click);
     expect(embedOf(update).title).toMatch(/Round 2 · Thy turn/);
     expect(embedOf(update).description).toMatch(/Round 1 ends/);
     expect(rows(update)[2].components.every((c: any) => !c.disabled)).toBe(
@@ -185,7 +205,7 @@ describe("/battle", () => {
     let last: any;
     for (let i = 0; i < 80; i++) {
       const click = await press(ctx, "u9", id, "end");
-      last = lastPayload(click.update);
+      last = finalFrame(click);
       if (last.components.length === 0) break; // the end screen has no controls
     }
     expect(embedOf(last).title).toMatch(/Defeat|Victory|Draw/);
@@ -287,9 +307,43 @@ describe("/battle", () => {
     expect(payload.files).toHaveLength(1);
     expect(embedOf(payload).fields ?? []).toHaveLength(0);
     const click = await press(ctx, "u1", id, "end");
-    const update = lastPayload(click.update);
+    const update = finalFrame(click);
     expect(update.files).toHaveLength(1);
     expect(update.attachments).toEqual([]); // drops the previous image
     expect(update.files[0].name).not.toBe(payload.files[0].name); // never a cached image
+    // Every image-swapping frame of the animation also drops the prior image.
+    for (const [frame] of click.editReply.mock.calls)
+      expect((frame as any).attachments).toEqual([]);
+  });
+
+  it("animates the opponent's turn as several sequential render steps", async () => {
+    // A seed where the human goes first, so pressing End hands over to the AI for a full turn.
+    let found: Awaited<ReturnType<typeof start>> | null = null;
+    let ctx!: Ctx;
+    for (let seed = 1; seed <= 60; seed++) {
+      ctx = makeCtx(seed);
+      const started = await start(ctx, "u1", "hard");
+      if (/Thou goest first/.test(embedOf(started.payload).description)) {
+        found = started;
+        break;
+      }
+    }
+    expect(found).not.toBeNull();
+    const { id } = found!;
+    const click = await press(ctx, "u1", id, "end");
+    // The acknowledge frame strips all controls while the opponent acts.
+    expect(click.update).toHaveBeenCalledTimes(1);
+    expect(lastPayload(click.update).components).toEqual([]);
+    // Multiple sequential render steps: at least one timed editReply beat beyond the acknowledge.
+    expect(click.editReply.mock.calls.length).toBeGreaterThan(0);
+    const final = finalFrame(click);
+    if (final.components.length === 0) {
+      // The game ended during the AI turn: the end screen, no controls.
+      expect(embedOf(final).title).toMatch(/Victory|Defeat|Draw/);
+    } else {
+      // Control returns to the player with all three rows re-enabled.
+      expect(rows(final)).toHaveLength(3);
+      expect(embedOf(final).title).toMatch(/Thy turn/);
+    }
   });
 });
