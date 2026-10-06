@@ -58,7 +58,13 @@ const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {
 // Proper nouns bolded wherever they appear in story text. "The Eyes Of Wisdom" must come before any
 // shorter overlap; "The Eyes" is deliberately NOT bolded (too common). Player names are bolded at the
 // source (the prologue wraps ${name} in ** itself), so they are not listed here.
-const BOLD_NAMES = ["The Eyes Of Wisdom", "Stranger Eyes", "Bò Tuôi"];
+const BOLD_NAMES = [
+  "The Eyes Of Wisdom",
+  "Bo Tuoi Khan",
+  "Stranger Eyes",
+  "Bò Tuôi",
+  "Bò SPD",
+];
 
 /** Bold the known proper nouns in a line, without double-bolding ones already wrapped in **. */
 function boldNames(text: string): string {
