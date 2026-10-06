@@ -41,10 +41,10 @@ function summaryPage(
           .map((p) => summaryLine(p, ctx))
           .join("\n")
           .slice(0, DESC_CAP)
-      : "No souls yet walk the road.";
+      : "No players yet.";
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR.neutral)
-    .setTitle("🛠️ The souls upon the road")
+    .setTitle("🛠️ Players")
     .setDescription(description)
     .setFooter({
       text: `Page ${page + 1}/${pages} · ${players.length} players`,
@@ -72,7 +72,7 @@ function detailEmbed(player: Player, ctx: AppContext): EmbedBuilder {
     .setTitle(`🛠️ <@${player.id}>`);
   const story = player.story;
   if (!story) {
-    embed.setDescription("This soul hath not yet set foot upon the road.");
+    embed.setDescription("This player hasn't started yet.");
     embed.addFields({
       name: "🎴 Cards",
       value: `owns ${cardCount(player, ctx)}`,
@@ -111,15 +111,12 @@ function detailEmbed(player: Player, ctx: AppContext): EmbedBuilder {
 }
 
 export const adminCommand: Command = {
-  data: slash(
-    "admin",
-    "Owner only: look upon the souls on the road",
-  ).addSubcommand((s) =>
+  data: slash("admin", "Owner only: view players").addSubcommand((s) =>
     s
       .setName("summary")
-      .setDescription("List every soul, or look upon one")
+      .setDescription("List all players, or view one")
       .addUserOption((o) =>
-        o.setName("user").setDescription("Look upon one soul"),
+        o.setName("user").setDescription("View one player"),
       ),
   ),
 

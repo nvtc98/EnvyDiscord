@@ -237,9 +237,9 @@ describe("story: the prologue", () => {
       suggestion: "Abyss Eyes",
     });
     expect(currentView(player, c).choices.map((x) => x.label)).toEqual([
-      "Aye, I am Abyss Eyes",
-      "I shall speak it again",
-      "Aye, I am Abiss Eyes",
+      "Yes, I am Abyss Eyes",
+      "Say it again",
+      "Yes, I am Abiss Eyes",
     ]);
     applyAction(player, "confirm_name", { type: "choice", index: 2 }, c); // keep what I typed
     expect(player.story!.name).toBe("Abiss Eyes");
@@ -451,7 +451,7 @@ describe("story: the prologue", () => {
       expect(view.pack!.cards).toHaveLength(12);
       expect(view.choices.map((c) => c.label)).toEqual([
         "Take these cards",
-        "Close the tome and open it anew",
+        "Close the book and open it again",
       ]);
     });
 
@@ -627,7 +627,7 @@ describe("story: the prologue", () => {
       expect(player.story!.node).toBe("cave_loss");
       expect(player.story!.caveWon).toBe(false);
       expect(player.story!.battle).not.toBeNull();
-      // retry: "Take up the cards again" clears the lost snapshot and returns to cave_battle
+      // retry: "Try again" clears the lost snapshot and returns to cave_battle
       applyAction(player, "cave_loss", { type: "choice", index: 0 }, ctx());
       expect(player.story!.node).toBe("cave_battle");
       expect(player.story!.battle).toBeNull();

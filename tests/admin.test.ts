@@ -85,6 +85,6 @@ describe("/admin summary", () => {
     const call = slashInteraction("owner", { user: "nobody" }, "owner");
     await adminCommand.execute(call as never, ctx);
     const embed = embedOf(lastPayload(call.reply));
-    expect(embed.description).toMatch(/not yet set foot upon the road/);
+    expect(embed.description).toMatch(/hasn't started/);
   });
 });

@@ -13,11 +13,11 @@ import { isOwner } from "../owner";
 export const battleCommand: Command = {
   data: slash(
     "battle",
-    "Do battle against the foe across three lanes",
+    "Battle an opponent across three lanes",
   ).addStringOption((option) =>
     option
       .setName("difficulty")
-      .setDescription("The measure of the foe (default: normal)")
+      .setDescription("Opponent difficulty (default: normal)")
       .addChoices(
         { name: "Easy", value: "easy" },
         { name: "Normal", value: "normal" },
@@ -29,8 +29,7 @@ export const battleCommand: Command = {
     // Practice battles are for the owner while the story is being built; players reach battles through /story.
     if (!(await isOwner(interaction.client, interaction.user.id))) {
       await interaction.reply({
-        content:
-          "Battles are woven into the tale now. Speak `/story` to go on.",
+        content: "Battles are part of the story now. Use `/story` to continue.",
         flags: MessageFlags.Ephemeral,
       });
       return;

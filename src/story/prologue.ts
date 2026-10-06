@@ -32,8 +32,8 @@ export const PLACE_WISDOM = "The Eyes Of Wisdom";
 export const GATE = {
   /** No-progress greeting shown before the real `greeting` scene (both /story and /invite). */
   readyLine: "Hark, traveler. Might I beg a moment of thy time?",
-  readyYes: "Aye, gladly",
-  readyNo: "Not at this hour",
+  readyYes: "Yes, let's go",
+  readyNo: "Not now",
   /** Plain, instantly-readable label for the "to what end?" gate choice (dialed-down voice for UI). */
   askLabel: "What's this about?",
   /** The bot's answer, in full story voice, shown before the gate is posed anew. */
@@ -45,8 +45,8 @@ export const GATE = {
   /** /story resume (progress exists). */
   resumeLine:
     "There thou art again. Shall we take up the road where we left it?",
-  resumeYes: "Aye, let us go on",
-  resumeNo: "Not at this hour",
+  resumeYes: "Yes, continue",
+  resumeNo: "Not now",
   /** /invite resume (progress exists); `inviter` is already a sanitized display name. */
   inviteResumeLine: (inviter: string): string =>
     `${inviter} bade me remember thee. Shall we go on from where we left the road?`,
@@ -132,8 +132,8 @@ export const NODES: Record<string, NodeDef> = {
         stranger("Tell me, then: are you one of The Eyes?"),
       ],
       choices: [
-        { label: "Aye, I am one of The Eyes", style: "primary" },
-        { label: "Nay, I am not", style: "secondary" },
+        { label: "Yes, I am one of The Eyes", style: "primary" },
+        { label: "No, I am not", style: "secondary" },
       ],
     }),
     choose(p, index) {
@@ -155,9 +155,9 @@ export const NODES: Record<string, NodeDef> = {
       ],
       choices: [],
       input: {
-        buttonLabel: "Speak my name",
-        modalTitle: "Speak thy name",
-        label: "Thy name (Eyes is added for thee)",
+        buttonLabel: "Enter my name",
+        modalTitle: "Enter your name",
+        label: "Your name (Eyes is added for you)",
         placeholder: "Phantom",
       },
     }),
@@ -210,7 +210,7 @@ export const NODES: Record<string, NodeDef> = {
           `${story(p).name}. Yes... I know that name. 'Tis written in the old records. I should have known thee at once.`,
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "tribe",
   },
@@ -234,12 +234,12 @@ export const NODES: Record<string, NodeDef> = {
       const choices: StoryChoice[] = [];
       if (pending.suggestion)
         choices.push({
-          label: `Aye, I am ${pending.suggestion}`,
+          label: `Yes, I am ${pending.suggestion}`,
           style: "primary",
         });
-      choices.push({ label: "I shall speak it again", style: "secondary" });
+      choices.push({ label: "Say it again", style: "secondary" });
       choices.push({
-        label: `Aye, I am ${pending.typed}`,
+        label: `Yes, I am ${pending.typed}`,
         style: pending.suggestion ? "secondary" : "primary",
       });
       return { title: ROAD, lines, choices };
@@ -271,7 +271,7 @@ export const NODES: Record<string, NodeDef> = {
           `Very well, ${story(p).name}. A name is but what its bearer makes of it.`,
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "tribe",
   },
@@ -289,9 +289,9 @@ export const NODES: Record<string, NodeDef> = {
       ],
       choices: [],
       input: {
-        buttonLabel: "Speak my name",
-        modalTitle: "Speak thy name",
-        label: "Thy name (whatever thou art called)",
+        buttonLabel: "Enter my name",
+        modalTitle: "Enter your name",
+        label: "Your name",
         placeholder: "Phantom",
       },
     }),
@@ -317,7 +317,7 @@ export const NODES: Record<string, NodeDef> = {
           `${who(p)}. A fine name, and one I have not met upon this road. 'Tis thine alone, and that is no small thing.`,
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "tribe",
   },
@@ -331,8 +331,8 @@ export const NODES: Record<string, NodeDef> = {
         ),
       ],
       choices: [
-        { label: "Aye, I know where they dwell", style: "primary" },
-        { label: "Nay, I do not", style: "secondary" },
+        { label: "Yes, I know where they are", style: "primary" },
+        { label: "No, I don't", style: "secondary" },
       ],
     }),
     choose(p, index) {
@@ -351,7 +351,7 @@ export const NODES: Record<string, NodeDef> = {
           "Then thou art worth more to me than most who wander. Keep that knowledge close — I shall have need of it before the end.",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "curse",
   },
@@ -378,7 +378,7 @@ export const NODES: Record<string, NodeDef> = {
           "Then we search together, thou and I. Two pairs of eyes see further than one.",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "curse",
   },
@@ -401,7 +401,7 @@ export const NODES: Record<string, NodeDef> = {
           `That deck lies in ${PLACE_WISDOM}, a place within the lands of The Eyes. Come thither with me, and I shall show thee how to claim it.`,
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "map",
   },
@@ -458,7 +458,7 @@ export const NODES: Record<string, NodeDef> = {
         ),
       ],
       choices: [
-        { label: "How dost thou know all this?", style: "primary" },
+        { label: "How do you know all this?", style: "primary" },
         { label: "Just open the book", style: "secondary" },
       ],
     }),
@@ -477,7 +477,7 @@ export const NODES: Record<string, NodeDef> = {
           "Let us say I keep an eye on things. For now, do but call me Stranger Eyes. The book is waiting.",
         ),
       ],
-      choices: go("Open the tome"),
+      choices: go("Open the book"),
     }),
     choose: () => "book",
   },
@@ -496,7 +496,7 @@ export const NODES: Record<string, NodeDef> = {
         lines,
         choices: [
           { label: "Take these cards", style: "success" },
-          { label: "Close the tome and open it anew", style: "secondary" },
+          { label: "Close the book and open it again", style: "secondary" },
         ],
         pack: { cards },
       };
@@ -529,7 +529,7 @@ export const NODES: Record<string, NodeDef> = {
           "These shall serve. Remember what I asked of thee, and I shall remember what thou tookest.",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "deck_praise",
   },
@@ -547,7 +547,7 @@ export const NODES: Record<string, NodeDef> = {
           "I turn the last page shut with a touch, and it seals itself.",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "to_bo_tuoi",
   },
@@ -606,7 +606,7 @@ export const NODES: Record<string, NodeDef> = {
           "There — seest thou that dark seam in the rock? A cave mouth, half-drowned at the tide's turning. That is our way in.",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "curse_underground",
   },
@@ -622,7 +622,7 @@ export const NODES: Record<string, NodeDef> = {
           "But we shall not set foot upon it. We go beneath — up through the dark, from the roots of the earth. The curse looks ever downward from the sky, and will not find us rising.",
         ),
       ],
-      choices: go("Into the dark"),
+      choices: go("Enter the cave"),
     }),
     choose: () => "cave_mouth",
   },
@@ -641,7 +641,7 @@ export const NODES: Record<string, NodeDef> = {
           "But look at thy face... thinner than when last we met, and paler by half. The deep hath been feeding on thee, hath it not?",
         ),
       ],
-      choices: go("Onward"),
+      choices: go("Continue"),
     }),
     choose: () => "reveal_face",
   },
@@ -671,8 +671,8 @@ export const NODES: Record<string, NodeDef> = {
         stranger("Win, and the road opens. That is the whole of the wager."),
       ],
       choices: [
-        { label: "I accept", style: "success" },
-        { label: "I will not", style: "danger" },
+        { label: "Accept", style: "success" },
+        { label: "Refuse", style: "danger" },
       ],
     }),
     choose: (_p, index) => (index === 0 ? "cave_battle" : "cave_refuse"),
@@ -716,7 +716,7 @@ export const NODES: Record<string, NodeDef> = {
           "The deck slips from thy grasp... but hold. The dark here runs strange, and time with it. I can turn us back to the moment before the first card fell. Try once more.",
         ),
       ],
-      choices: go("Take up the cards again", "primary"),
+      choices: go("Try again", "primary"),
     }),
     // Discard the lost snapshot so the launcher takes the FRESH path on retry.
     choose: (p) => {

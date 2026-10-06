@@ -24,7 +24,7 @@ export function cardEmbed(
     .setColor(EMBED_COLOR.neutral)
     .setTitle(def.name)
     .setDescription(
-      `**Cost ${def.cost}** · **Power ${def.power}**\n${cardText(def) || "No power stirs within."}`,
+      `**Cost ${def.cost}** · **Power ${def.power}**\n${cardText(def) || "No ability."}`,
     )
     .addFields({ name: "Frame", value: variantLabel(variant), inline: true });
   if (footer) embed.setFooter({ text: footer });

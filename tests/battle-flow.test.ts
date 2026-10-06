@@ -70,7 +70,7 @@ async function pick(ctx: Ctx, userId: string, id: string, uid: string) {
 /** An option in the card menu the player can afford right now. */
 const affordable = (payload: any) =>
   rows(payload)[0].components[0].options.find(
-    (o: any) => !o.description.startsWith("Beyond thy means"),
+    (o: any) => !o.description.startsWith("Too expensive"),
   );
 
 /** Starts battles with successive seeds until the opening hand contains a card that can be played at once. */
@@ -115,8 +115,8 @@ describe("/battle", () => {
     ]);
     expect(laneRow.components.every((c: any) => c.disabled)).toBe(true); // nothing selected yet
     expect(actionRow.components.map((c: any) => c.label)).toEqual([
-      "End the turn",
-      "Yield",
+      "End turn",
+      "Forfeit",
     ]);
     expect(embedOf(payload).title).toMatch(/Round 1/);
     expect(
@@ -171,9 +171,7 @@ describe("/battle", () => {
     expect(
       handAfter.length === handBefore - 1 || handAfter[0].value === "none",
     ).toBe(true);
-    expect(embedOf(update).fields.map((f: any) => f.name)).toContain(
-      "The field",
-    ); // text mode
+    expect(embedOf(update).fields.map((f: any) => f.name)).toContain("Board"); // text mode
     expect(
       ctx.log.entries.some(
         (e) => e.type === "battle_event" && e.data.type === "played",
@@ -186,7 +184,7 @@ describe("/battle", () => {
     const { id } = await start(ctx);
     const click = await press(ctx, "u1", id, "lane", "0");
     expect(click.update).not.toHaveBeenCalled();
-    expect(lastPayload(click.reply).content).toMatch(/canst not play/i);
+    expect(lastPayload(click.reply).content).toMatch(/can't play/i);
   });
 
   it("ending the turn lets the AI answer, resolves the round and returns control to the player", async () => {
@@ -196,7 +194,7 @@ describe("/battle", () => {
     // Controls vanish while the opponent acts (the acknowledge frame).
     expect(lastPayload(click.update).components).toEqual([]);
     const update = finalFrame(click);
-    expect(embedOf(update).title).toMatch(/Round 2 · Thy turn/);
+    expect(embedOf(update).title).toMatch(/Round 2 · Your turn/);
     expect(embedOf(update).description).toMatch(/Round 1 ends/);
     expect(rows(update)[2].components.every((c: any) => !c.disabled)).toBe(
       true,
@@ -225,7 +223,7 @@ describe("/battle", () => {
     });
     // The battle is over, so old buttons are stale.
     const stale = await press(ctx, "u9", id, "end");
-    expect(lastPayload(stale.update).content).toMatch(/ended or passed away/);
+    expect(lastPayload(stale.update).content).toMatch(/has ended/);
   });
 
   it("forfeiting ends the battle as a loss", async () => {
@@ -248,7 +246,7 @@ describe("/battle", () => {
     expect(second.id).not.toBe(first.id);
     expect(
       lastPayload((await press(ctx, "u1", first.id, "end")).update).content,
-    ).toMatch(/ended or passed away/);
+    ).toMatch(/has ended/);
     expect(
       lastPayload((await press(ctx, "u1", second.id, "end")).update).embeds,
     ).toBeDefined();
@@ -258,9 +256,7 @@ describe("/battle", () => {
     const ctx = makeCtx(3);
     const { id } = await start(ctx, "owner");
     const stranger = await press(ctx, "stranger", id, "forfeit");
-    expect(lastPayload(stranger.update).content).toMatch(
-      /ended or passed away/,
-    );
+    expect(lastPayload(stranger.update).content).toMatch(/has ended/);
     expect(ctx.repo.get("owner").losses).toBe(0);
     expect(
       lastPayload((await press(ctx, "owner", id, "end")).update).embeds,
@@ -274,7 +270,7 @@ describe("/battle", () => {
       const { payload } = await start(ctx, "u1", "hard");
       if (/The enemy goes first/.test(embedOf(payload).description)) {
         found = true;
-        expect(embedOf(payload).title).toMatch(/Thy turn/);
+        expect(embedOf(payload).title).toMatch(/Your turn/);
         expect(rows(payload)[2].components.every((c: any) => !c.disabled)).toBe(
           true,
         );
@@ -290,7 +286,7 @@ describe("/battle", () => {
     const ctx = makeCtx(3);
     const { payload, id } = await start(ctx);
     const expensive = rows(payload)[0].components[0].options.find((o: any) =>
-      o.description.startsWith("Beyond thy means"),
+      o.description.startsWith("Too expensive"),
     );
     if (expensive) {
       const click = await pick(ctx, "u1", id, expensive.value);
@@ -328,7 +324,7 @@ describe("/battle", () => {
     for (let seed = 1; seed <= 60; seed++) {
       ctx = makeCtx(seed);
       const started = await start(ctx, "u1", "hard");
-      if (/Thou goest first/.test(embedOf(started.payload).description)) {
+      if (/You go first/.test(embedOf(started.payload).description)) {
         found = started;
         break;
       }
@@ -348,7 +344,7 @@ describe("/battle", () => {
     } else {
       // Control returns to the player with all three rows re-enabled.
       expect(rows(final)).toHaveLength(3);
-      expect(embedOf(final).title).toMatch(/Thy turn/);
+      expect(embedOf(final).title).toMatch(/Your turn/);
     }
   });
 });

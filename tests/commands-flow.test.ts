@@ -111,9 +111,7 @@ describe("/collection", () => {
     const ctx = makeCtx();
     const call = slashInteraction("viewer", { user: "stranger" });
     await collectionCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(
-      /not yet set foot upon the road/,
-    );
+    expect(lastPayload(call.reply).content).toMatch(/hasn't started/);
   });
 });
 
@@ -135,7 +133,7 @@ describe("/deck", () => {
     expect([menu.min_values, menu.max_values]).toEqual([DECK_SIZE, DECK_SIZE]);
     expect(menu.options).toHaveLength(25); // a select menu holds at most 25 options
     expect(lastPayload(call.reply).content).toMatch(
-      /showing thy 25 cheapest of 229/,
+      /showing your 25 cheapest of 229/,
     );
 
     const chosen = menu.options.slice(0, DECK_SIZE).map((o: any) => o.value);
@@ -158,14 +156,14 @@ describe("/deck", () => {
       CARDS.slice(0, 11).map((c) => c.id),
     );
     await deckCommand.component!(tooFew as never, ctx);
-    expect(lastPayload(tooFew.update).content).toMatch(/will not stand/);
+    expect(lastPayload(tooFew.update).content).toMatch(/won't work/);
     const notOwned = selectInteraction(
       "u",
       "deck:select",
       CARDS.slice(3, 15).map((c) => c.id),
     ); // includes cards 12..14
     await deckCommand.component!(notOwned as never, ctx);
-    expect(lastPayload(notOwned.update).content).toMatch(/will not stand/);
+    expect(lastPayload(notOwned.update).content).toMatch(/won't work/);
     expect(ctx.repo.get("u").deck).toEqual([]);
   });
 });
@@ -180,7 +178,7 @@ describe("/card", () => {
     expect(embed.title).toBe("Abyss Eyes");
     expect(embed.description).toContain(`Cost ${def.cost}`);
     expect(embed.description).toContain(`Power ${def.power}`);
-    expect(embed.footer.text).toMatch(/not yet thine/);
+    expect(embed.footer.text).toMatch(/don't own/i);
   });
 
   it("says so when no card matches", async () => {
@@ -229,9 +227,7 @@ describe("/profile", () => {
     const ctx = makeCtx();
     const call = slashInteraction("viewer", { user: "stranger" });
     await profileCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(
-      /not yet set foot upon the road/,
-    );
+    expect(lastPayload(call.reply).content).toMatch(/hasn't started/);
   });
 });
 
@@ -261,9 +257,9 @@ describe("/shop", () => {
       "shop:summon",
       "shop:variant",
     ]);
-    // The card button is mystical, not "Buy a card".
-    expect(buttons[0].label).toMatch(/Summon/);
-    expect(buttons[0].label).not.toMatch(/Buy/i);
+    // The card button reads plainly as "Buy a card".
+    expect(buttons[0].label).toMatch(/Buy/i);
+    expect(buttons[0].label).not.toMatch(/Summon/i);
   });
 
   it("summons a card via the button, deducting coins and saving it", async () => {
@@ -275,7 +271,7 @@ describe("/shop", () => {
 
     const press = buttonInteraction("u", "shop:summon");
     await shopCommand.component!(press as never, ctx);
-    expect(embedOf(lastPayload(press.reply)).title).toMatch(/claimed/);
+    expect(embedOf(lastPayload(press.reply)).title).toMatch(/bought/);
     const saved = ctx.repo.get("u");
     expect(Object.keys(saved.cards).length).toBe(before + 1);
     expect(saved.coins).toBe(500 - SHOP_CARD_PRICE);
@@ -347,7 +343,7 @@ describe("/shop", () => {
     void ctx.repo.save(player);
     const open = buttonInteraction("u", "shop:variant");
     await shopCommand.component!(open as never, ctx);
-    expect(lastPayload(open.reply).content).toMatch(/No card of thine/);
+    expect(lastPayload(open.reply).content).toMatch(/no card/i);
   });
 
   it("refuses when the player already owns the chosen variant", async () => {
@@ -370,7 +366,7 @@ describe("/shop", () => {
       "blue",
     ]);
     await shopCommand.component!(pick as never, ctx);
-    expect(lastPayload(pick.update).content).toMatch(/not yet thine/);
+    expect(lastPayload(pick.update).content).toMatch(/don't own/i);
   });
 
   it("refuses when the player cannot afford the variant", async () => {

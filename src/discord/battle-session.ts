@@ -229,10 +229,10 @@ export function startBattle(opts: StartBattleOpts): Session {
     playerAvatarImage: undefined,
   };
   const opening = [
-    first === "bottom" ? "Thou goest first." : "The enemy goes first.",
+    first === "bottom" ? "You go first." : "The enemy goes first.",
     ...(guests.length > 0
       ? [
-          `${guests.length} guest card${guests.length === 1 ? "" : "s"} fill thy deck for this battle. They are not added to thy collection.`,
+          `${guests.length} guest card${guests.length === 1 ? "" : "s"} fill your deck for this battle. They are not added to your collection.`,
         ]
       : []),
   ];
@@ -282,8 +282,7 @@ export async function handleBattleComponent(
 
   if (!session || session.id !== battleId) {
     await interaction.update({
-      content:
-        "⌛ This battle hath ended or passed away. Speak `/battle` to fight anew.",
+      content: "⌛ This battle has ended. Use `/battle` to start a new one.",
       embeds: [],
       components: [],
       attachments: [],
@@ -315,7 +314,7 @@ export async function handleBattleComponent(
     const lane = Number(arg) as LaneIndex;
     const uid = session.selectedUid;
     if (uid === null || !canPlay(session.state, uid, lane).ok) {
-      await reject("Thou canst not play that card there at this moment.");
+      await reject("You can't play that card there right now.");
       return;
     }
     const step = playCard(session.state, uid, lane);
@@ -325,7 +324,7 @@ export async function handleBattleComponent(
     pushLog(session, describeEvents(events, "bottom"));
   } else if (kind === "end") {
     if (session.state.active !== "bottom" || session.state.winner) {
-      await reject("'Tis not thy turn.");
+      await reject("It's not your turn.");
       return;
     }
     await animateEndOfTurn(interaction, ctx, session, battleId, userId, kind);
@@ -334,7 +333,7 @@ export async function handleBattleComponent(
     const step = forfeit(session.state, "bottom");
     session.state = step.state;
     events = step.events;
-    pushLog(session, ["Thou hast yielded."]);
+    pushLog(session, ["You forfeited."]);
   } else {
     return;
   }
@@ -402,10 +401,10 @@ async function finishBattle(
   });
   const summary =
     outcome === "won"
-      ? `Victory is thine! **+${coins} coins**`
+      ? `You win! **+${coins} coins**`
       : outcome === "draw"
         ? `A draw. **+${coins} coins**`
-        : `Thou art bested. **+${coins} coins** for thy trouble.`;
+        : `You lose. **+${coins} coins** for your trouble.`;
   await send({
     ...renderBattleEnd(await withImage(ctx, session), summary),
     attachments: [],

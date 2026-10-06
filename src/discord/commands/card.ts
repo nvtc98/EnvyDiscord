@@ -7,13 +7,12 @@ import { attach, tryRender } from "../images";
 import { cardEmbed, variantLabel } from "../render";
 
 export const cardCommand: Command = {
-  data: slash("card", "Behold the particulars of a card").addStringOption(
-    (option) =>
-      option
-        .setName("name")
-        .setDescription("Card name")
-        .setRequired(true)
-        .setAutocomplete(true),
+  data: slash("card", "View a card's details").addStringOption((option) =>
+    option
+      .setName("name")
+      .setDescription("Card name")
+      .setRequired(true)
+      .setAutocomplete(true),
   ),
 
   async autocomplete(interaction, ctx) {
@@ -36,15 +35,15 @@ export const cardCommand: Command = {
       ctx.cards.find((c) => normalize(c.name) === wanted);
     if (!def) {
       await interaction.reply({
-        content: `No card named "${input}" is known to me.`,
+        content: `No card named "${input}".`,
         flags: MessageFlags.Ephemeral,
       });
       return;
     }
     const active = activeVariant(ctx.repo.get(interaction.user.id), def.id);
     const note = active
-      ? `This card is thine · ${variantLabel(active)} variant`
-      : "This card is not yet thine";
+      ? `You own this card · ${variantLabel(active)} variant`
+      : "You don't own this card yet";
     const variant = active ?? DEFAULT_VARIANT;
 
     const image = await tryRender(ctx, (r) =>

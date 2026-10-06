@@ -3,16 +3,16 @@ import { slash, type Command } from "../command";
 import { isOwner } from "../owner";
 
 export const dmCommand: Command = {
-  data: slash("dm", "Owner only: send word to a soul in the bot\u2019s voice")
+  data: slash("dm", "Owner only: send a DM in the bot\u2019s voice")
     .addStringOption((option) =>
       option
         .setName("message")
-        .setDescription("The word to send")
+        .setDescription("The message to send")
         .setRequired(true)
         .setMaxLength(2000),
     )
     .addUserOption((option) =>
-      option.setName("user").setDescription("Whom to send word"),
+      option.setName("user").setDescription("Who to message"),
     )
     .addStringOption((option) =>
       option.setName("user-id").setDescription("Or paste a user ID"),
@@ -32,14 +32,14 @@ export const dmCommand: Command = {
       interaction.options.getUser("user")?.id ??
       interaction.options.getString("user-id")?.trim();
     if (!userId || !/^\d{17,20}$/.test(userId)) {
-      await reply("Name a soul, or paste a valid numeric user ID.");
+      await reply("Name a user, or paste a valid numeric user ID.");
       return;
     }
 
     try {
       const user = await interaction.client.users.fetch(userId);
       if (user.bot) {
-        await reply("An automaton cannot receive word from another automaton.");
+        await reply("A bot can't receive a DM from another bot.");
         return;
       }
       // Repeat the text verbatim but never ping anyone through it.
@@ -51,7 +51,7 @@ export const dmCommand: Command = {
         ok: true,
         content: ctx.log.text(content),
       });
-      await reply(`✅ Word sent to **${user.username}**.`);
+      await reply(`✅ Message sent to **${user.username}**.`);
     } catch (error) {
       ctx.log.message("owner_dm", {
         userId: interaction.user.id,
@@ -67,8 +67,8 @@ export const dmCommand: Command = {
         error.code === RESTJSONErrorCodes.CannotSendMessagesToThisUser
       ) {
         await reply(
-          "❌ Discord refused: that soul hath private messages closed, or doth not share a server with the bot. " +
-            "A bot may send word only to those who share a server with it and allow DMs from server members.",
+          "❌ Discord refused: that user has DMs closed, or doesn't share a server with the bot. " +
+            "A bot can only DM users who share a server with it and allow DMs from server members.",
         );
         return;
       }
@@ -76,7 +76,7 @@ export const dmCommand: Command = {
         error instanceof DiscordAPIError &&
         error.code === RESTJSONErrorCodes.UnknownUser
       ) {
-        await reply("❌ Discord knows no soul with that ID.");
+        await reply("❌ Discord has no user with that ID.");
         return;
       }
       throw error;

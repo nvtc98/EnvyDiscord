@@ -108,7 +108,7 @@ describe("/invite", () => {
       return user;
     }) as typeof call.options.getUser;
     await inviteCommand.execute(call as never, ctx);
-    expect(lastPayload(call.reply).content).toMatch(/automaton/);
+    expect(lastPayload(call.reply).content).toMatch(/can't invite a bot/i);
     expect(dm.sent).toHaveLength(0);
   });
 });

@@ -121,7 +121,7 @@ describe("/story gate and DM delivery", () => {
     // The command defers ephemerally first (so slow DM work can't blow the 3s interaction window),
     // then edits in the pointer; the ephemeral flag lives on the defer.
     expect(lastPayload(call.deferReply as any).flags).toBeDefined();
-    expect(lastPayload(call.reply as any).content).toMatch(/private messages/);
+    expect(lastPayload(call.reply as any).content).toMatch(/Check your DMs/);
     expect(content(gate)).toBe(GATE.readyLine);
     expect(labels(gate)).toEqual([GATE.readyYes, GATE.askLabel, GATE.readyNo]);
     // GATE strings follow the archaic rewrite; the assertions reference the constants, not literals.
@@ -136,8 +136,8 @@ describe("/story gate and DM delivery", () => {
     expect(payload.embeds).toBeUndefined();
     expect(content(payload)).toMatch(/are you one of The Eyes\?/);
     expect(labels(payload)).toEqual([
-      "Aye, I am one of The Eyes",
-      "Nay, I am not",
+      "Yes, I am one of The Eyes",
+      "No, I am not",
     ]);
     expect(ctx.repo.get("u").story).toMatchObject({ node: "greeting" });
     // The greeting has two lines, so after the gate there are two more messages.
@@ -161,7 +161,7 @@ describe("/story", () => {
   it("continues where the player left off via the resume gate", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not"); // moves to the free-name form (ask_name_free)
+    await click(ctx, dm, "No, I am not"); // moves to the free-name form (ask_name_free)
     // A second /story offers the resume gate.
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
@@ -175,20 +175,20 @@ describe("/story", () => {
     expect(second.dm.sent.some((p) => content(p)?.match(/No matter/))).toBe(
       true,
     );
-    expect(labels(resumed)).toEqual(["Speak my name"]);
+    expect(labels(resumed)).toEqual(["Enter my name"]);
   });
 
   it("asks for a name in a form that explains Eyes is added, and welcomes a name from the list", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    const { payload: ask } = await click(ctx, dm, "Aye, I am one of The Eyes");
-    expect(labels(ask)).toEqual(["Speak my name"]);
+    const { payload: ask } = await click(ctx, dm, "Yes, I am one of The Eyes");
+    expect(labels(ask)).toEqual(["Enter my name"]);
 
     const { modal, payload: update } = await submitName(ctx, dm, "abyss");
     expect(modal.custom_id).toBe("story:ask_name:text");
-    expect(modal.title).toBe("Speak thy name");
+    expect(modal.title).toBe("Enter your name");
     expect(modal.components[0].components[0]).toMatchObject({
-      label: "Thy name (Eyes is added for thee)",
+      label: "Your name (Eyes is added for you)",
       placeholder: "Phantom",
       min_length: 1,
       max_length: 40,
@@ -208,22 +208,22 @@ describe("/story", () => {
   it("asks again when the name is not in the list, offering the closest one, and remembers every attempt", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Aye, I am one of The Eyes");
+    await click(ctx, dm, "Yes, I am one of The Eyes");
     const { payload: confirm } = await submitName(ctx, dm, "abiss");
     expect(
       dm.sent.some((p) => content(p)?.match(/Could thy name be Abyss Eyes\?/)),
     ).toBe(true);
     expect(labels(confirm)).toEqual([
-      "Aye, I am Abyss Eyes",
-      "I shall speak it again",
-      "Aye, I am Abiss Eyes",
+      "Yes, I am Abyss Eyes",
+      "Say it again",
+      "Yes, I am Abiss Eyes",
     ]);
     // One of the earlier scene lines carried the "I find no" line.
     expect(
       dm.sent.some((p) => content(p)?.match(/I find no “Abiss Eyes”/)),
     ).toBe(true);
 
-    await click(ctx, dm, "I shall speak it again");
+    await click(ctx, dm, "Say it again");
     expect(dm.sent.some((p) => content(p)?.match(/Speak it again, then/))).toBe(
       true,
     );
@@ -232,11 +232,11 @@ describe("/story", () => {
       dm.sent.some((p) => content(p)?.match(/Nor aught close to it/)),
     ).toBe(true);
     expect(labels(confirm2)).toEqual([
-      "I shall speak it again",
-      "Aye, I am Zzzzzzzz Eyes",
+      "Say it again",
+      "Yes, I am Zzzzzzzz Eyes",
     ]);
 
-    const { payload: kept } = await click(ctx, dm, "Aye, I am Zzzzzzzz Eyes");
+    const { payload: kept } = await click(ctx, dm, "Yes, I am Zzzzzzzz Eyes");
     expect(content(kept)).toMatch(/Very well, Zzzzzzzz Eyes/);
     expect(ctx.repo.get("u").story).toMatchObject({
       name: "Zzzzzzzz Eyes",
@@ -250,7 +250,7 @@ describe("/story", () => {
   it("does not let a name carry formatting, mentions or links into the story text", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Aye, I am one of The Eyes");
+    await click(ctx, dm, "Yes, I am one of The Eyes");
     const { payload: update } = await submitName(
       ctx,
       dm,
@@ -273,12 +273,12 @@ describe("/story", () => {
   it("refuses an empty name and stays on the question", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Aye, I am one of The Eyes");
+    await click(ctx, dm, "Yes, I am one of The Eyes");
     const { payload: update } = await submitName(ctx, dm, "  Eyes  ");
     expect(dm.sent.some((p) => content(p)?.match(/cannot be empty/))).toBe(
       true,
     );
-    expect(labels(update)).toEqual(["Speak my name"]);
+    expect(labels(update)).toEqual(["Enter my name"]);
     expect(ctx.repo.get("u").story!.nameAttempts).toEqual([]);
   });
 
@@ -287,11 +287,11 @@ describe("/story", () => {
     const { dm } = await begin(ctx);
     const greeting = live(dm);
     const greetingBtn = buttons(greeting).find(
-      (b: any) => b.label === "Aye, I am one of The Eyes",
+      (b: any) => b.label === "Yes, I am one of The Eyes",
     );
     const greetingMsgId = ctx.repo.get("u").story!.liveMessageId!;
     // advance via a different choice first so the greeting message is no longer live
-    await click(ctx, dm, "Nay, I am not"); // -> ask_name_free
+    await click(ctx, dm, "No, I am not"); // -> ask_name_free
     expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     // now press the stale greeting button
     const stale = dmButtonInteraction(
@@ -313,7 +313,7 @@ describe("/story", () => {
     const { dm } = await begin(ctx);
     const payload = live(dm);
     const button = buttons(payload).find(
-      (b: any) => b.label === "Nay, I am not",
+      (b: any) => b.label === "No, I am not",
     );
     const liveId = ctx.repo.get("u").story!.liveMessageId!;
     const first = dmButtonInteraction("u", button.custom_id, liveId, dm);
@@ -330,7 +330,7 @@ describe("/story", () => {
   it("works for a player who says they are not one of The Eyes, all the way to the map and the book", async () => {
     const ctx = makeCtx(4);
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     // the non-Eyes branch now asks a name a different way: a free form, no card match, no "Eyes" appended
     const { payload: ack } = await submitName(ctx, dm, "Nomad");
     expect(content(ack)).toMatch(/Nomad/);
@@ -339,15 +339,15 @@ describe("/story", () => {
       name: "Nomad",
       node: "name_free_ack",
     });
-    let p = (await click(ctx, dm, "Onward")).payload;
+    let p = (await click(ctx, dm, "Continue")).payload;
     expect(content(p)).toMatch(/Do you know where they live\?/);
     expect(dm.sent.some((m) => content(m)?.includes("Bò Tuôi"))).toBe(true);
-    p = (await click(ctx, dm, "Nay, I do not")).payload;
+    p = (await click(ctx, dm, "No, I don't")).payload;
     expect(content(p)).toMatch(/search together/);
-    p = (await click(ctx, dm, "Onward")).payload;
+    p = (await click(ctx, dm, "Continue")).payload;
     expect(dm.sent.some((m) => content(m)?.match(/strange curse/))).toBe(true);
     // curse now leads straight to the rich map embed (the informant scene is gone).
-    p = (await click(ctx, dm, "Onward")).payload;
+    p = (await click(ctx, dm, "Continue")).payload;
     expect(embedOf(p).title).toBe("The Crossroads");
     expect(embedOf(p).fields.find((f: any) => f.name === "Map").value).toBe(
       "○ The Eyes Of Wisdom  ──  ● The Crossroads (you are here)  ──  ○ Bò Tuôi",
@@ -362,17 +362,16 @@ describe("/story", () => {
     // wisdom is a plain conversation scene again
     expect(content(p)).toMatch(/there is a book/);
     expect(labels(p)).toEqual([
-      "How dost thou know all this?",
+      "How do you know all this?",
       "Just open the book",
     ]);
 
-    const asked = (await click(ctx, dm, "How dost thou know all this?"))
-      .payload;
+    const asked = (await click(ctx, dm, "How do you know all this?")).payload;
     expect(dm.sent.some((m) => content(m)?.includes("Stranger Eyes"))).toBe(
       true,
     );
-    expect(labels(asked)).toEqual(["Open the tome"]);
-    p = (await click(ctx, dm, "Open the tome")).payload;
+    expect(labels(asked)).toEqual(["Open the book"]);
+    p = (await click(ctx, dm, "Open the book")).payload;
 
     // the book is a RICH scene (embed) with the twelve cards listed
     const cardsText = embedOf(p).fields.find((f: any) => f.name === "The cards")
@@ -383,12 +382,12 @@ describe("/story", () => {
     expect(cardsText.match(/common/g)).toHaveLength(8);
     expect(labels(p)).toEqual([
       "Take these cards",
-      "Close the tome and open it anew",
+      "Close the book and open it again",
     ]);
     expect(embedOf(p).footer.text).toBe("Opened 1 time");
     expect(ctx.repo.get("u").cards).toEqual({});
 
-    const again = (await click(ctx, dm, "Close the tome and open it anew"))
+    const again = (await click(ctx, dm, "Close the book and open it again"))
       .payload;
     expect(
       embedOf(again).fields.find((f: any) => f.name === "The cards").value,
@@ -416,25 +415,25 @@ describe("/story", () => {
     ).toBe(true);
 
     // Onward from book_taken now opens the first chapter: the bot praises the lucky draw.
-    const praise = (await click(ctx, dm, "Onward")).payload;
+    const praise = (await click(ctx, dm, "Continue")).payload;
     expect(dm.sent.some((m) => content(m)?.match(/fortunate draw/))).toBe(true);
     expect(ctx.repo.get("u").story!.node).toBe("deck_praise");
-    expect(labels(praise)).toEqual(["Onward"]);
+    expect(labels(praise)).toEqual(["Continue"]);
 
     const daily = slashInteraction("u");
     await dailyCommand.execute(daily as never, ctx);
     expect(embedOf(lastPayload(daily.reply as any)).title).toBe(
-      "🎁 Thy daily pack",
+      "🎁 Your daily pack",
     );
   });
 
   it("an Eye who does not know the way is asked to point it out", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Aye, I am one of The Eyes");
+    await click(ctx, dm, "Yes, I am one of The Eyes");
     await submitName(ctx, dm, "abyss");
-    await click(ctx, dm, "Onward");
-    const { payload: p } = await click(ctx, dm, "Nay, I do not");
+    await click(ctx, dm, "Continue");
+    const { payload: p } = await click(ctx, dm, "No, I don't");
     expect(
       dm.sent.some((m) =>
         content(m)?.match(/you are one of The Eyes\. Surely thou knowest/),
@@ -449,12 +448,12 @@ describe("/story", () => {
       await createImageRenderer({ assetsDir: join(__dirname, "..", "assets") }),
     );
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     await submitName(ctx, dm, "Nomad"); // the non-Eyes free-name step
     // ... tribe, no, curse, and the last Onward lands on the rich map (curse -> map directly).
-    for (const label of ["Onward", "Nay, I do not", "Onward"])
+    for (const label of ["Continue", "No, I don't", "Continue"])
       await click(ctx, dm, label);
-    let p = (await click(ctx, dm, "Onward")).payload;
+    let p = (await click(ctx, dm, "Continue")).payload;
     expect(p.files).toHaveLength(1);
     expect(embedOf(p).fields ?? []).toHaveLength(0); // no text copy of the map
     p = (await click(ctx, dm, "The Eyes Of Wisdom")).payload;
@@ -478,7 +477,7 @@ describe("/story", () => {
     const call = slashInteraction("u", {}, "u", { dm: null });
     await storyCommand.execute(call as never, ctx);
     expect(lastPayload(call.reply as any).content).toMatch(
-      /could not reach thee/,
+      /couldn't reach you/,
     );
     expect(ctx.repo.get("u").story).toBeNull();
   });
@@ -524,14 +523,14 @@ describe("/story typing + paced delivery", () => {
   it("a rich (map) scene does exactly one typing beat before its single send", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     await submitName(ctx, dm, "Nomad");
-    for (const label of ["Onward", "Nay, I do not", "Onward"])
+    for (const label of ["Continue", "No, I don't", "Continue"])
       await click(ctx, dm, label);
     const typingBefore = dm.typingCount;
     const sentBefore = dm.sent.length;
     // The last Onward (curse -> map) lands on the rich map embed.
-    const p = (await click(ctx, dm, "Onward")).payload;
+    const p = (await click(ctx, dm, "Continue")).payload;
     expect(embedOf(p).title).toBe("The Crossroads"); // the rich map scene
     // The rich scene added exactly one typing beat and one send.
     expect(dm.typingCount - typingBefore).toBe(1);
@@ -582,7 +581,7 @@ describe("/story gate persistence", () => {
   it("the ask button re-poses the resume gate for a player with progress", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     const second = await openGate(ctx);
     await pressGate(ctx, second.dm, GATE.askLabel);
     expect(second.dm.sent.some((p) => content(p) === GATE.askAnswer)).toBe(
@@ -606,7 +605,7 @@ describe("/story gate persistence", () => {
   it("a player with progress sees the resume gate and resume lands at the saved node", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not"); // ask_name_free
+    await click(ctx, dm, "No, I am not"); // ask_name_free
     const node = ctx.repo.get("u").story!.node;
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
@@ -620,7 +619,7 @@ describe("/story gate persistence", () => {
   it("declining a resume leaves saved progress unchanged", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     const before = ctx.repo.get("u").story;
     const second = await openGate(ctx);
     const press = await pressGate(ctx, second.dm, GATE.resumeNo);
@@ -636,7 +635,7 @@ describe("/story restart", () => {
   it("only the owner can erase progress, and it starts a brand new story", async () => {
     const ctx = makeCtx();
     const { dm } = await begin(ctx);
-    await click(ctx, dm, "Nay, I am not");
+    await click(ctx, dm, "No, I am not");
     expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     const player = ctx.repo.get("u");
     player.cards["abyss-eyes"] = { variants: ["metal"], active: "metal" };

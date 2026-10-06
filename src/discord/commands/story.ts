@@ -241,8 +241,8 @@ export async function resolveDm(user: User): Promise<DmChannel | null> {
 }
 
 const CLOSED_DM =
-  "❌ I could not reach thee. Open thy private messages (Privacy Settings → allow DMs from server members) and try again.";
-const DM_POINTER = "📬 Look to thy private messages — we shall speak there.";
+  "❌ I couldn't reach you. Open your DMs (Privacy Settings → allow DMs from server members) and try again.";
+const DM_POINTER = "📬 Check your DMs — we'll talk there.";
 
 function nameModal(nodeId: string, view: StoryView): ModalBuilder {
   const input = view.input!;
@@ -266,11 +266,11 @@ function nameModal(nodeId: string, view: StoryView): ModalBuilder {
 export const storyCommand: Command = {
   data: slash(
     "story",
-    "Begin the tale, or take up the road where thou left it",
+    "Begin the story, or continue where you left off",
   ).addBooleanOption((option) =>
     option
       .setName("restart")
-      .setDescription("Owner only: erase all thy progress and begin anew"),
+      .setDescription("Owner only: erase all your progress and start over"),
   ),
 
   async execute(interaction, ctx) {

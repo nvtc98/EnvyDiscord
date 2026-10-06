@@ -9,14 +9,14 @@ import { slash, type Command } from "../command";
 import { cardSummary } from "../render";
 
 export const deckCommand: Command = {
-  data: slash("deck", `Choose the ${DECK_SIZE} cards thou bearest into battle`),
+  data: slash("deck", `Choose the ${DECK_SIZE} cards you take into battle`),
 
   async execute(interaction, ctx) {
     const player = ctx.repo.get(interaction.user.id);
     const owned = ownedCards(player, ctx.cardIndex);
     if (owned.length < DECK_SIZE) {
       await interaction.reply({
-        content: `Thou ownest ${owned.length} different card${owned.length === 1 ? "" : "s"}, and a deck asks for ${DECK_SIZE}. Until then, battles fill the empty places with guest cards that are not added to thy collection. Speak \`/daily\` to gather more.`,
+        content: `You own ${owned.length} different card${owned.length === 1 ? "" : "s"}, and a deck needs ${DECK_SIZE}. Until then, battles fill the empty slots with guest cards that are not added to your collection. Use \`/daily\` to get more.`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -42,7 +42,7 @@ export const deckCommand: Command = {
       );
     const shown = Math.min(owned.length, 25);
     await interaction.reply({
-      content: `Choose thy ${DECK_SIZE}-card deck:${owned.length > shown ? ` (showing thy ${shown} cheapest of ${owned.length} cards; browsing the rest shall come anon)` : ""}`,
+      content: `Choose your ${DECK_SIZE}-card deck:${owned.length > shown ? ` (showing your ${shown} cheapest of ${owned.length} cards; browsing the rest will come later)` : ""}`,
       components: [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
       ],
@@ -58,7 +58,7 @@ export const deckCommand: Command = {
     );
     if (chosen.length !== DECK_SIZE) {
       await interaction.update({
-        content: "That choosing will not stand; speak `/deck` once more.",
+        content: "That selection won't work; use `/deck` again.",
         components: [],
       });
       return;
@@ -71,7 +71,7 @@ export const deckCommand: Command = {
       deck: chosen,
     });
     await interaction.update({
-      content: `✅ Thy deck is set: ${chosen.map((id) => ctx.cardIndex.get(id)!.name).join(" · ")}`,
+      content: `✅ Your deck is set: ${chosen.map((id) => ctx.cardIndex.get(id)!.name).join(" · ")}`,
       components: [],
     });
   },

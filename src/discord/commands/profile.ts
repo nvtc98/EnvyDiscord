@@ -5,10 +5,8 @@ import { EMBED_COLOR } from "../../render/theme";
 import { slash, type Command } from "../command";
 
 export const profileCommand: Command = {
-  data: slash("profile", "Behold thy standing").addUserOption((o) =>
-    o
-      .setName("user")
-      .setDescription("Behold another's standing (for the eyes only)"),
+  data: slash("profile", "View your profile").addUserOption((o) =>
+    o.setName("user").setDescription("View another player's profile"),
   ),
 
   async execute(interaction, ctx) {
@@ -18,7 +16,7 @@ export const profileCommand: Command = {
 
     if (viewingOther && !hasPlayed(player)) {
       await interaction.reply({
-        content: "That soul hath not yet set foot upon the road.",
+        content: "That player hasn't started yet.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -33,7 +31,7 @@ export const profileCommand: Command = {
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR.profile)
-      .setTitle(`👤 The record of ${target.displayName}`)
+      .setTitle(`👤 ${target.displayName}'s profile`)
       .setThumbnail(avatarUrl)
       .addFields(
         { name: "💰 Coins", value: String(player.coins), inline: true },

@@ -19,7 +19,7 @@ import { deliverScene, storyContext, type DmChannel } from "./commands/story";
 /** The one-line caption on the finished board image (player-facing UI: archaic-but-plain, terse). */
 const END_SUMMARY: Record<"won" | "lost", string> = {
   won: "The last card falls. The road opens.",
-  lost: "The cards turn against thee.",
+  lost: "The cards turn against you.",
 };
 
 /**

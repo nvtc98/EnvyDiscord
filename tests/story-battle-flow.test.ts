@@ -70,7 +70,7 @@ async function walkToBattle(ctx: Ctx, userId = "u"): Promise<Dm> {
   await storyCommand.execute(call as never, ctx);
   await pressGate(ctx, dm, GATE.readyYes, userId);
   // greeting -> ask_name (Eye) -> name -> ... -> book -> take -> chapter -> cave_terms -> accept
-  await click(ctx, dm, "Aye, I am one of The Eyes", userId);
+  await click(ctx, dm, "Yes, I am one of The Eyes", userId);
   // submit the name via the modal flow
   const askPayload = live(dm);
   const inputBtn = buttons(askPayload).find((b: any) =>
@@ -99,21 +99,21 @@ async function walkToBattle(ctx: Ctx, userId = "u"): Promise<Dm> {
   };
   await storyCommand.modal!(submit as never, ctx);
   // name_exact -> tribe -> known -> curse -> map -> wisdom -> book
-  await click(ctx, dm, "Onward", userId); // name_exact -> tribe
-  await click(ctx, dm, "Aye, I know where they dwell", userId); // tribe -> tribe_known
-  await click(ctx, dm, "Onward", userId); // tribe_known -> curse
-  await click(ctx, dm, "Onward", userId); // curse -> map
+  await click(ctx, dm, "Continue", userId); // name_exact -> tribe
+  await click(ctx, dm, "Yes, I know where they are", userId); // tribe -> tribe_known
+  await click(ctx, dm, "Continue", userId); // tribe_known -> curse
+  await click(ctx, dm, "Continue", userId); // curse -> map
   await click(ctx, dm, "The Eyes Of Wisdom", userId); // map -> wisdom
   await click(ctx, dm, "Just open the book", userId); // wisdom -> book
   await click(ctx, dm, "Take these cards", userId); // book -> book_taken
-  await click(ctx, dm, "Onward", userId); // book_taken -> deck_praise
-  await click(ctx, dm, "Onward", userId); // deck_praise -> to_bo_tuoi (map)
+  await click(ctx, dm, "Continue", userId); // book_taken -> deck_praise
+  await click(ctx, dm, "Continue", userId); // deck_praise -> to_bo_tuoi (map)
   await click(ctx, dm, "Bò Tuôi", userId); // to_bo_tuoi -> sea_cliff
-  await click(ctx, dm, "Onward", userId); // sea_cliff -> curse_underground
-  await click(ctx, dm, "Into the dark", userId); // curse_underground -> cave_mouth
-  await click(ctx, dm, "Onward", userId); // cave_mouth -> reveal_face
+  await click(ctx, dm, "Continue", userId); // sea_cliff -> curse_underground
+  await click(ctx, dm, "Enter the cave", userId); // curse_underground -> cave_mouth
+  await click(ctx, dm, "Continue", userId); // cave_mouth -> reveal_face
   await click(ctx, dm, "I am ready", userId); // reveal_face -> cave_terms
-  await click(ctx, dm, "I accept", userId); // cave_terms -> cave_battle (launches)
+  await click(ctx, dm, "Accept", userId); // cave_terms -> cave_battle (launches)
   return dm;
 }
 
@@ -184,10 +184,10 @@ describe("story -> cave battle integration", () => {
     expect(player.story!.caveWon).toBe(false);
     // cave_loss offers a single retry button
     const loss = live(dm);
-    expect(labels(loss)).toEqual(["Take up the cards again"]);
+    expect(labels(loss)).toEqual(["Try again"]);
 
     // retry: clears the lost snapshot and launches a brand-new battle
-    await click(ctx, dm, "Take up the cards again", "lose");
+    await click(ctx, dm, "Try again", "lose");
     expect(ctx.repo.get("lose").story!.node).toBe("cave_battle");
     expect(liveBattle(dm)).toBeDefined();
   });

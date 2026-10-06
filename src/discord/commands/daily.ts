@@ -15,19 +15,19 @@ function describeGrant(grant: GrantResult): string {
   if (grant.kind === "new")
     return `🆕 **${grant.card.name}** · ${cardSummary(grant.card)}`;
   if (grant.kind === "variant-unlocked")
-    return `🎨 **${grant.card.name}** hath revealed its **${variantLabel(grant.variant!)}** variant`;
-  return `💰 **${grant.card.name}** came twice over · **${grant.refund}** coins returned to thy purse`;
+    return `🎨 **${grant.card.name}** revealed its **${variantLabel(grant.variant!)}** variant`;
+  return `💰 **${grant.card.name}** came up again · **${grant.refund}** coins refunded`;
 }
 
 export const dailyCommand: Command = {
-  data: slash("daily", "Claim thy free daily pack of cards"),
+  data: slash("daily", "Claim your free daily pack of cards"),
 
   async execute(interaction, ctx) {
     const player = ctx.repo.get(interaction.user.id);
     if (!player.story?.starterClaimed) {
       await interaction.reply({
         content:
-          "Thy tale has not yet begun. Speak `/story` first. Thy first cards await thee there; `/daily` opens thereafter.",
+          "Your story hasn't started yet. Use `/story` first — your first cards are there, and `/daily` opens after that.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -41,8 +41,8 @@ export const dailyCommand: Command = {
     if (!result.ok) {
       const content =
         result.reason === "already-claimed"
-          ? "⏳ Thou hast already claimed thy pack this day. Return upon the morrow."
-          : "🏆 Thy collection is complete: every card bears every variant, so there is naught left to receive.";
+          ? "⏳ You've already claimed your pack today. Come back tomorrow."
+          : "🏆 Your collection is complete: every card has every variant, so there's nothing left to receive.";
       await interaction.reply({ content, flags: MessageFlags.Ephemeral });
       return;
     }
@@ -67,7 +67,7 @@ export const dailyCommand: Command = {
         : `+${result.coins} coins · In all: ${player.coins} coins`;
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR.daily)
-      .setTitle("🎁 Thy daily pack")
+      .setTitle("🎁 Your daily pack")
       .setDescription(result.grants.map(describeGrant).join("\n"))
       .setFooter({ text: footer });
 

@@ -1,11 +1,11 @@
 import { slash, type Command } from "../command";
 
 export const sayCommand: Command = {
-  data: slash("say", "Bid the bot speak thy words exactly").addStringOption(
+  data: slash("say", "Make the bot repeat your words exactly").addStringOption(
     (option) =>
       option
         .setName("content")
-        .setDescription("The words the bot shall speak")
+        .setDescription("The words the bot will say")
         .setRequired(true)
         .setMaxLength(2000),
   ),

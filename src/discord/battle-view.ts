@@ -63,15 +63,15 @@ function select(
   const me = screen.state.players[screen.viewer];
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`battle:${screen.id}:pick`)
-    .setPlaceholder("Choose a card to send forth");
+    .setPlaceholder("Pick a card to play");
   if (me.hand.length === 0) {
     menu
-      .addOptions({ label: "No cards in thy hand", value: "none" })
+      .addOptions({ label: "No cards in your hand", value: "none" })
       .setDisabled(true);
   } else {
     menu.addOptions(
       me.hand.slice(0, 25).map((card, i) => {
-        const text = cardText(card.def) || "No power";
+        const text = cardText(card.def) || "No ability";
         return {
           label:
             `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${card.def.power}`.slice(
@@ -79,7 +79,7 @@ function select(
               100,
             ),
           description:
-            `${card.def.cost > me.energy ? "Beyond thy means. " : ""}${text}`.slice(
+            `${card.def.cost > me.energy ? "Too expensive. " : ""}${text}`.slice(
               0,
               100,
             ),
@@ -139,12 +139,12 @@ function actionButtons(
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`battle:${screen.id}:end`)
-      .setLabel("End the turn")
+      .setLabel("End turn")
       .setStyle(ButtonStyle.Success)
       .setDisabled(!myTurn),
     new ButtonBuilder()
       .setCustomId(`battle:${screen.id}:forfeit`)
-      .setLabel("Yield")
+      .setLabel("Forfeit")
       .setStyle(ButtonStyle.Danger)
       .setDisabled(!myTurn),
   );
@@ -164,7 +164,7 @@ export function battleComponents(screen: BattleScreen) {
 function infoLine(state: GameState, viewer: Seat): string {
   const me = state.players[viewer];
   const foe = state.players[opponentOf(viewer)];
-  return `Thee ${me.hp}/${MAX_HP} HP · Energy ${me.energy} · Hand ${me.hand.length} · Deck ${me.deck.length}   |   Foe ${foe.hp}/${MAX_HP} HP · Hand ${foe.hand.length} · Deck ${foe.deck.length}`;
+  return `You ${me.hp}/${MAX_HP} HP · Energy ${me.energy} · Hand ${me.hand.length} · Deck ${me.deck.length}   |   Enemy ${foe.hp}/${MAX_HP} HP · Hand ${foe.hand.length} · Deck ${foe.deck.length}`;
 }
 
 function embed(
@@ -174,7 +174,7 @@ function embed(
   lead?: string,
 ): EmbedBuilder {
   const { state, viewer } = screen;
-  const log = screen.log.join("\n") || "Choose a card, then press a lane.";
+  const log = screen.log.join("\n") || "Pick a card, then press a lane.";
   const text = (lead ? `${lead}\n\n` : "") + log;
   const e = new EmbedBuilder()
     .setColor(color)
@@ -184,11 +184,11 @@ function embed(
   if (!screen.image) {
     e.addFields(
       {
-        name: "The field",
+        name: "Board",
         value: `\`\`\`\n${boardText(state, viewer)}\n\`\`\``,
       },
       {
-        name: "Thy hand",
+        name: "Your hand",
         value:
           state.players[viewer].hand
             .map(
@@ -211,7 +211,7 @@ export function renderBattle(screen: BattleScreen) {
     embeds: [
       embed(
         screen,
-        `⚔️ Round ${state.round} · ${myTurn ? "Thy turn" : "The foe's turn"}`,
+        `⚔️ Round ${state.round} · ${myTurn ? "Your turn" : "Enemy's turn"}`,
         EMBED_COLOR.battle,
       ),
     ],
