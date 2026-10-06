@@ -31,8 +31,8 @@ export const PLACE_WISDOM = "The Eyes Of Wisdom";
  */
 export const GATE = {
   /** No-progress greeting shown before the real `greeting` scene (both /story and /invite). */
-  readyLine: "Hark, traveler. Might I beg a moment of thy time?",
-  readyYes: "Yes, let's go",
+  readyLine: "Hark, stranger. Might I beg a moment of thy time?",
+  readyYes: "Sure, what is it?",
   readyNo: "Not now",
   /** Shown after declining the ready-gate; nothing is saved. */
   declineLine:
