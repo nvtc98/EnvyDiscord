@@ -252,8 +252,9 @@ export async function deliverScene(
     let last = { id: "" };
     // Pace each line: show typing, wait proportional to its length, then send. Buttons ride the last.
     for (const msg of msgs) {
+      const extra = "pauseBeforeMs" in msg ? (msg.pauseBeforeMs ?? 0) : 0;
       await dm.sendTyping();
-      await sleep(typingDelay(messageText(msg)));
+      await sleep(typingDelay(messageText(msg)) + extra);
       last = await dm.send(msg);
     }
     liveId = last.id;
@@ -462,6 +463,11 @@ export const storyCommand: Command = {
       return;
     }
     logEvents(ctx, user, result.events);
+    // Claim the advance BEFORE the slow paced send: persist the new node now (liveMessageId is still
+    // the OLD message id — recordLive advances it only after the send) so a redelivered/concurrent
+    // handling of this same press reads the advanced node and applyAction's `node !== nodeId` check
+    // short-circuits it. This closes the window where the old node stayed readable during delivery.
+    await ctx.repo.save(player);
     // Kill the pressed message's buttons, then send the next scene as fresh DM message(s). The avatar
     // URL is threaded so a transition into cave_battle (agree / coercion / retry) renders the player.
     await interaction.update({ components: [] });
@@ -507,6 +513,10 @@ export const storyCommand: Command = {
     const result = applyAction(player, nodeId, action, storyContext(ctx));
     if (result.ok) logEvents(ctx, user, result.events);
 
+    // Claim the advance before the paced send (see the component path): persist the new node now so a
+    // redelivered modal submit reads the advanced node and does not re-deliver. liveMessageId stays on
+    // the old message until recordLive runs after the send, keeping the stale-button guard correct.
+    await ctx.repo.save(player);
     // The form was opened from the live message; strip its buttons, then deliver the resulting scene
     // (which may still be ask_name with a notice when the name was rejected).
     if (interaction.isFromMessage())
@@ -548,6 +558,22 @@ async function handleGate(
   kind: string,
 ): Promise<void> {
   const user = interaction.user;
+
+  // Stale/idempotency guard: a gate is live only while it is the last interactive message posted into
+  // the DM. If this press is on an older gate (a prior /story's gate that a newer gate/scene already
+  // superseded), just strip its own buttons and return — do NOT re-run ensureStory/deliverScene, which
+  // would re-deliver the whole greeting. For a brand-new player the live id lives only in the in-memory
+  // tracker; for a player with progress it also lives in the persisted liveMessageId.
+  const pressedId = interaction.message?.id;
+  const liveId =
+    liveGateMessages.get(user.id) ??
+    ctx.repo.get(user.id).story?.liveMessageId ??
+    null;
+  if (liveId !== null && pressedId !== undefined && pressedId !== liveId) {
+    await interaction.update({ components: [] });
+    return;
+  }
+
   // Disable the gate buttons first so it cannot be double-pressed.
   await interaction.update({ components: [] });
 

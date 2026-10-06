@@ -30,6 +30,8 @@ export type StoryMessage =
       components?: ActionRowBuilder<ButtonBuilder>[];
       files?: AttachmentBuilder[];
       allowedMentions: { parse: [] };
+      /** Extra "typing" pause (ms) before this line is sent, for a dramatic beat. */
+      pauseBeforeMs?: number;
     }
   | {
       embeds: EmbedBuilder[];
@@ -116,6 +118,7 @@ export function renderPlain(screen: StoryScreen): StoryMessage[] {
       content,
       components: last && row ? [row] : [],
       allowedMentions: { parse: [] },
+      ...(line.pauseBeforeMs ? { pauseBeforeMs: line.pauseBeforeMs } : {}),
     } satisfies StoryMessage;
   });
 }

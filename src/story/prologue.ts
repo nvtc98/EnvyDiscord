@@ -478,12 +478,12 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         stranger("How do I know the way, and who thou art?"),
-        narration(
-          "A slow, knowing smile crosses his face, and he answers not the rest.",
-        ),
-        stranger(
-          "Let us say I keep an eye on things. For now, do but call me Stranger Eyes. The book is waiting.",
-        ),
+        {
+          speaker: STRANGER,
+          // A long pause before this line, so he seems to muse before answering.
+          pauseBeforeMs: 2500,
+          text: "Let us say I keep an eye on things. For now, do but call me Stranger Eyes. The book is waiting.",
+        },
       ],
       choices: go("Open the book"),
     }),

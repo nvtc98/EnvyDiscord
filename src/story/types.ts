@@ -12,6 +12,8 @@ export interface StoryLine {
   /** Who speaks. A line without a speaker is narration. */
   speaker?: string;
   text: string;
+  /** Extra pause (ms) shown as "typing" before this line, on top of the length-based delay. For dramatic beats. */
+  pauseBeforeMs?: number;
 }
 
 /** Where the player is in the story, and what they have told it. Saved with the player. */
