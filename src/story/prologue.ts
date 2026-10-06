@@ -34,6 +34,11 @@ export const GATE = {
   readyLine: "Hark, traveler. Might I beg a moment of thy time?",
   readyYes: "Aye, gladly",
   readyNo: "Not at this hour",
+  /** Plain, instantly-readable label for the "to what end?" gate choice (dialed-down voice for UI). */
+  askLabel: "What's this about?",
+  /** The bot's answer, in full story voice, shown before the gate is posed anew. */
+  askAnswer:
+    "A fair thing to ask. I must go before the Chieftain of the Bò Tuôi and beg of him a boon — a precious thing, lent for a while. Alone I cannot reach him; with thee, I may. Wilt thou walk with me?",
   /** Shown after declining the ready-gate; nothing is saved. */
   declineLine:
     "No matter at all. When the hour suits thee, speak /story and here I shall wait.",
@@ -382,15 +387,15 @@ export const NODES: Record<string, NodeDef> = {
     view: () => ({
       title: ROAD,
       lines: [
-        narration("He draws his hood lower against the colder wind."),
+        narration("I draw my hood lower against the colder wind."),
         stranger(
           `Yet I must warn thee. The ${TRIBE} — Bò Tuôi — bear a strange curse. No outsider may walk up to them in the common way. The road bends, and the path forgets thee.`,
         ),
         stranger(
-          "But thou hast me. I can bring us in safely — I know the way through.",
+          "But there is one who can lead us in — a man on the inside, who knows the ways beneath. He owes me a reckoning of old.",
         ),
         stranger(
-          "My price is a duel: best me at cards, and I shall bring us in safely. Yet to challenge me, thou must bear a deck of The Eyes of thine own.",
+          "His price is a duel. We must best him at cards, thou and I together — and only then will he open the road. Yet to sit at that table thou must bear a deck of The Eyes of thine own.",
         ),
         stranger(
           `That deck lies in ${PLACE_WISDOM}, a place within the lands of The Eyes. Come thither with me, and I shall show thee how to claim it.`,
@@ -398,29 +403,17 @@ export const NODES: Record<string, NodeDef> = {
       ],
       choices: go("Onward"),
     }),
-    choose: () => "informant",
-  },
-
-  informant: {
-    view: () => ({
-      title: CROSSROADS,
-      lines: [
-        narration(
-          "He steps off the road where it splits three ways, and waits for thee to catch up.",
-        ),
-        stranger(
-          `This is the crossroads. From here, take me to ${PLACE_WISDOM}, and I shall show thee what waits within.`,
-        ),
-      ],
-      choices: go("Look upon the map"),
-    }),
     choose: () => "map",
   },
 
   map: {
     view: () => ({
       title: CROSSROADS,
-      lines: [stranger("So — whither shall we go?")],
+      lines: [
+        stranger(
+          `Here the road splits three ways. Take me to ${PLACE_WISDOM}, and I shall show thee what waits within. So — whither shall we go?`,
+        ),
+      ],
       choices: [
         { label: PLACE_WISDOM, style: "primary", emoji: "⬅️" },
         { label: TRIBE, style: "primary", emoji: "➡️" },
@@ -538,17 +531,210 @@ export const NODES: Record<string, NodeDef> = {
       ],
       choices: go("Onward"),
     }),
-    choose: () => "prologue_end",
+    choose: () => "deck_praise",
   },
 
-  prologue_end: {
+  // ---- The first chapter: the cave duel ----
+
+  deck_praise: {
+    view: (p) => ({
+      title: PLACE_WISDOM,
+      lines: [
+        stranger(
+          `These twelve... a fortunate draw, ${who(p)}. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
+        ),
+        narration(
+          "I turn the last page shut with a touch, and it seals itself.",
+        ),
+      ],
+      choices: go("Onward"),
+    }),
+    choose: () => "to_bo_tuoi",
+  },
+
+  to_bo_tuoi: {
+    view: () => ({
+      title: CROSSROADS,
+      lines: [
+        stranger(
+          `Come. I shall lead thee to the land of the ${TRIBE}. The curse will not wait, and neither shall I.`,
+        ),
+      ],
+      choices: [
+        { label: PLACE_WISDOM, style: "secondary", emoji: "⬅️" },
+        { label: TRIBE, style: "primary", emoji: "➡️" },
+      ],
+      map: {
+        locations: [
+          { id: "wisdom", name: PLACE_WISDOM, x: 0.16, y: 0.5 },
+          { id: "crossroads", name: CROSSROADS, x: 0.5, y: 0.5, here: true },
+          { id: "tribe", name: TRIBE, x: 0.84, y: 0.5 },
+        ],
+        links: [
+          ["crossroads", "wisdom"],
+          ["crossroads", "tribe"],
+        ],
+      },
+    }),
+    onEnter: (p) => {
+      story(p).chapter = "bo-tuoi";
+    },
+    choose: (_p, index) => (index === 0 ? "wisdom_locked" : "sea_cliff"),
+  },
+
+  wisdom_locked: {
     view: () => ({
       title: PLACE_WISDOM,
       lines: [
         stranger(
-          `Come. The road to the ${TRIBE} is long, and the curse will not wait. We set forth at dawn.`,
+          `Back to ${PLACE_WISDOM}? There is naught left for us there — the book has given what it will. Our road runs on to the ${TRIBE}.`,
         ),
-        narration("The tale continues anon."),
+      ],
+      choices: go("Back to the map", "secondary"),
+    }),
+    choose: () => "to_bo_tuoi",
+  },
+
+  sea_cliff: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        narration(
+          "I lead thee down where the old road gives way to bare stone, until the land ends at a cliff and the sea roars grey below.",
+        ),
+        stranger(
+          "There — seest thou that dark seam in the rock? A cave mouth, half-drowned at the tide's turning. That is our way in.",
+        ),
+      ],
+      choices: go("Onward"),
+    }),
+    choose: () => "curse_underground",
+  },
+
+  curse_underground: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          `Hark, for this is the whole of it. The curse of the ${TRIBE} falls upon any who set foot upon their land — any who come to them over the ground above.`,
+        ),
+        stranger(
+          "But we shall not set foot upon it. We go beneath — up through the dark, from the roots of the earth. The curse looks ever downward from the sky, and will not find us rising.",
+        ),
+      ],
+      choices: go("Into the dark"),
+    }),
+    choose: () => "cave_mouth",
+  },
+
+  cave_mouth: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "Ah. There thou art, old friend — I had half feared the dark had swallowed thee.",
+        ),
+        stranger(
+          "Thou askest whether I have brought the deck? Aye. This one at my side has carried it the whole long road.",
+        ),
+        stranger(
+          "But look at thy face... thinner than when last we met, and paler by half. The deep hath been feeding on thee, hath it not?",
+        ),
+      ],
+      choices: go("Onward"),
+    }),
+    choose: () => "reveal_face",
+  },
+
+  reveal_face: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "Step into the light, that my companion may know the face across the table.",
+        ),
+        narration("The torch gutters, and his face swims up out of the black."),
+      ],
+      choices: go("I am ready"),
+      portrait: { assetKey: "enemy1", alt: "The man on the inside" },
+    }),
+    choose: () => "cave_terms",
+  },
+
+  cave_terms: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "His terms are these, and I will not soften them: play him at the cards, and should thou lose, the deck is his — and the curse he will let fall upon thee, here where thou standest.",
+        ),
+        stranger("Win, and the road opens. That is the whole of the wager."),
+      ],
+      choices: [
+        { label: "I accept", style: "success" },
+        { label: "I will not", style: "danger" },
+      ],
+    }),
+    choose: (_p, index) => (index === 0 ? "cave_battle" : "cave_refuse"),
+  },
+
+  cave_refuse: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "Refuse? Here, in the deep, with the sea at thy back and the dark before thee — thou thinkest thou mayst refuse?",
+        ),
+        narration("I do not raise my voice. I do not need to."),
+      ],
+      choices: [
+        { label: "...I accept", style: "success" },
+        { label: "...I accept", style: "secondary" },
+      ],
+    }),
+    choose: () => "cave_battle",
+  },
+
+  cave_battle: {
+    // A valid StoryView: no lines, no choices, flagged as a battle so the Discord layer takes the
+    // battle branch and never renders it as text. `sessionId` is a marker only ("" when no live
+    // session yet); the real session is keyed by userId. onEnter is a pure no-op — the launch is
+    // Discord I/O driven by deliverScene detecting view.battle.
+    view: () => ({
+      title: TRIBE,
+      lines: [],
+      choices: [],
+      battle: { sessionId: "" },
+    }),
+  },
+
+  cave_loss: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "The deck slips from thy grasp... but hold. The dark here runs strange, and time with it. I can turn us back to the moment before the first card fell. Try once more.",
+        ),
+      ],
+      choices: go("Take up the cards again", "primary"),
+    }),
+    // Discard the lost snapshot so the launcher takes the FRESH path on retry.
+    choose: (p) => {
+      story(p).battle = null;
+      return "cave_battle";
+    },
+  },
+
+  chapter_end: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "It is done. The road opens before us, and the man steps aside into the dark. We are through — and the tale continues anon.",
+        ),
+        narration(
+          "The torchlight steadies. Whatever comes next, it waits beyond this page.",
+        ),
       ],
       choices: [],
     }),

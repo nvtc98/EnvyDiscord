@@ -210,7 +210,7 @@ export function buttonInteraction(userId: string, customId: string) {
 export function unlockDaily(ctx: AppContext, userId: string): void {
   const player = ctx.repo.get(userId);
   player.story = {
-    node: "prologue_end",
+    node: "chapter_end",
     name: null,
     isEye: null,
     knowsTribe: null,
@@ -220,6 +220,9 @@ export function unlockDaily(ctx: AppContext, userId: string): void {
     pack: null,
     starterClaimed: true,
     liveMessageId: null,
+    chapter: null,
+    battle: null,
+    caveWon: false,
   };
   void ctx.repo.save(player);
 }

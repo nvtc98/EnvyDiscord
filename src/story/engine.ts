@@ -21,11 +21,20 @@ export const freshStory = (): StoryState => ({
   pack: null,
   starterClaimed: false,
   liveMessageId: null,
+  chapter: null,
+  battle: null,
+  caveWon: false,
 });
 
 /** Starts the story for a player who has none. Returns the events that happened. */
 export function ensureStory(player: Player, ctx: StoryContext): StoryEvent[] {
-  if (player.story) return [];
+  if (player.story) {
+    // Back-fill fields added after this player's story was first saved, so no reader faces `undefined`.
+    player.story.chapter ??= null;
+    player.story.battle ??= null;
+    player.story.caveWon ??= false;
+    return [];
+  }
   player.story = freshStory();
   const events: StoryEvent[] = [{ type: "node", node: START_NODE }];
   NODES[START_NODE].onEnter?.(player, ctx, events);
@@ -90,5 +99,33 @@ export function applyAction(
     events.push({ type: "node", node: next });
     NODES[next].onEnter?.(player, ctx, events);
   }
+  return { ok: true, events };
+}
+
+/**
+ * Called by the battle driver when a story battle finishes. Advances to the win (`chapter_end`) or
+ * loss (`cave_loss`) node. Pure: it only moves the node and flags and runs onEnter — coin/win-loss
+ * recording stays in the Discord driver, exactly as /battle does. A win clears the saved battle; a
+ * loss keeps it so a retry can discard it explicitly.
+ */
+export function resolveStoryBattle(
+  player: Player,
+  outcome: "won" | "lost",
+  ctx: StoryContext,
+): ApplyResult {
+  const story = player.story;
+  if (!story) return { ok: false, reason: "no-story" };
+  if (story.node !== "cave_battle" || story.battle === null)
+    return { ok: false, reason: "invalid" };
+
+  story.notice = null;
+  const next = outcome === "won" ? "chapter_end" : "cave_loss";
+  if (outcome === "won") {
+    story.caveWon = true;
+    story.battle = null;
+  }
+  story.node = next;
+  const events: StoryEvent[] = [{ type: "node", node: next }];
+  NODES[next].onEnter?.(player, ctx, events);
   return { ok: true, events };
 }

@@ -26,6 +26,9 @@ async function seedPlayer(
     pack: null,
     starterClaimed: true,
     liveMessageId: null,
+    chapter: null,
+    battle: null,
+    caveWon: false,
   };
   player.cards[CARDS[0].id] = { variants: ["metal"], active: "metal" };
   player.cards[CARDS[1].id] = { variants: ["metal", "blue"], active: "blue" };

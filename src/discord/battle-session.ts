@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { MessageFlags, type MessageComponentInteraction } from "discord.js";
 import { type Difficulty } from "../engine/ai";
 import { advanceAiBeats } from "../engine/ai-playback";
@@ -13,6 +15,9 @@ import type {
 } from "../engine/types";
 import type { VariantId } from "../data/variants";
 import { applyBattleResult, type Outcome } from "../game/rewards";
+import { ArtLibrary } from "../render/art";
+import { loadPlayerAvatar, type AvatarImage } from "../render/avatar";
+import type { StoryBattleState } from "../story/types";
 import {
   renderBattle,
   renderBattleEnd,
@@ -32,12 +37,31 @@ export interface Session {
   log: string[];
   touched: number;
   userId: string;
+  /** Where this battle came from. Only the game-over branch differs by origin. */
+  origin: "practice" | "story";
+  /** Portrait asset key, e.g. "enemy1"; null = placeholder. */
+  opponentPortrait: string | null;
+  /** The viewer's Discord avatar URL (source for the decode); null = no avatar. */
+  playerAvatarUrl: string | null;
+  /** Decoded-once cache: undefined = not yet fetched, null = fetch failed. */
+  playerAvatarImage?: AvatarImage | null;
+  /** For story battles: the sole owner of the story-side end work (set at launch). */
+  onStoryEnd?: (
+    session: Session,
+    outcome: Outcome,
+    interaction: MessageComponentInteraction,
+  ) => Promise<void>;
 }
 
 /** Battles live in memory only, one per user. A restart drops unfinished battles. */
 export const sessions = new Map<string, Session>();
 export const IDLE_MS = 30 * 60 * 1000;
 export const MAX_LOG_LINES = 14;
+
+// The opponent portrait library (mtime-cached, downscaled to 640), pointed at assets/portraits.
+const portraitLib = new ArtLibrary(
+  join(fileURLToPath(new URL("../../assets", import.meta.url)), "portraits"),
+);
 
 /** How long each beat of the opponent's animated turn lingers so the player can read it. */
 const STEP_DELAY_MS = 1400;
@@ -122,12 +146,21 @@ export async function withImage(
   session: Session,
   state: GameState = session.state,
 ): Promise<BattleScreen> {
+  // Decode the player avatar once and cache it (undefined = not yet fetched, null = fetch failed,
+  // so a failed fetch is not retried every render). The opponent portrait is mtime-cached by ArtLibrary.
+  if (session.playerAvatarImage === undefined)
+    session.playerAvatarImage = await loadPlayerAvatar(session.playerAvatarUrl);
+  const opponentAvatar = session.opponentPortrait
+    ? await portraitLib.get(session.opponentPortrait)
+    : null;
   const image = await tryRender(ctx, (r) =>
     r.battle({
       state,
       viewer: "bottom",
       selectedUid: session.selectedUid,
       variants: session.variants,
+      playerAvatar: session.playerAvatarImage ?? null,
+      opponentAvatar,
     }),
   );
   return { ...screenOf(session, state), image: image ?? undefined };
@@ -136,6 +169,18 @@ export async function withImage(
 export const pushLog = (session: Session, lines: string[]): void => {
   session.log = lines.slice(-MAX_LOG_LINES);
 };
+
+/** For a story battle, mirror the live session into the DB so a resume can rebuild the board. */
+async function mirrorStoryBattle(
+  ctx: AppContext,
+  session: Session,
+): Promise<void> {
+  if (session.origin !== "story") return;
+  const player = ctx.repo.get(session.userId);
+  if (!player.story?.battle) return;
+  player.story.battle = toStoryBattleState(session);
+  await ctx.repo.save(player);
+}
 
 export interface StartBattleOpts {
   ctx: AppContext;
@@ -147,6 +192,12 @@ export interface StartBattleOpts {
   variants: Record<string, VariantId>;
   guests?: CardDef[];
   first?: Seat;
+  /** Where this battle came from. Defaults to "practice" (owner /battle). */
+  origin?: "practice" | "story";
+  /** Opponent portrait asset key (e.g. "enemy1"); null/omitted = placeholder. */
+  opponentPortrait?: string | null;
+  /** The viewer's Discord avatar URL; null/omitted = placeholder. */
+  playerAvatarUrl?: string | null;
 }
 
 /**
@@ -172,6 +223,10 @@ export function startBattle(opts: StartBattleOpts): Session {
     log: [],
     touched: now,
     userId: opts.userId,
+    origin: opts.origin ?? "practice",
+    opponentPortrait: opts.opponentPortrait ?? null,
+    playerAvatarUrl: opts.playerAvatarUrl ?? null,
+    playerAvatarImage: undefined,
   };
   const opening = [
     first === "bottom" ? "Thou goest first." : "The enemy goes first.",
@@ -194,9 +249,22 @@ export function startBattle(opts: StartBattleOpts): Session {
     deck: opts.deck.map((c) => c.id),
     guests: guests.map((c) => c.id),
     enemyDeck: opts.opponentDeck.map((c) => c.id),
+    origin: session.origin,
   });
   logEvents(ctx, session, opts.userId, aiEvents);
   return session;
+}
+
+/** Serialise the live session into the persisted StoryBattleState (variants/avatar are not stored). */
+export function toStoryBattleState(session: Session): StoryBattleState {
+  return {
+    kind: "cave",
+    state: structuredClone(session.state),
+    selectedUid: session.selectedUid,
+    log: [...session.log],
+    difficulty: session.difficulty,
+    opponentPortrait: session.opponentPortrait,
+  };
 }
 
 /**
@@ -273,6 +341,7 @@ export async function handleBattleComponent(
   logEvents(ctx, session, userId, events);
 
   if (!session.state.winner) {
+    await mirrorStoryBattle(ctx, session);
     // `attachments: []` drops the previous image so only the new one stays.
     await interaction.update({
       ...renderBattle(await withImage(ctx, session)),
@@ -309,6 +378,14 @@ async function finishBattle(
       : session.state.winner === "top"
         ? "lost"
         : "draw";
+
+  // Story battles hand ALL end work to the injected callback (reward + node move + end screen +
+  // next scene). It lives in story-battle.ts, the sole importer of both this module and the story
+  // engine/delivery, so battle-session never imports the story layer (no cycle).
+  if (session.origin === "story" && session.onStoryEnd) {
+    await session.onStoryEnd(session, outcome, interaction);
+    return;
+  }
 
   const player = ctx.repo.get(userId);
   const coins = applyBattleResult(player, session.difficulty, outcome);
@@ -454,6 +531,7 @@ async function finalRender(
 ): Promise<void> {
   try {
     if (!session.state.winner) {
+      await mirrorStoryBattle(ctx, session);
       await send({
         ...renderBattle(await withImage(ctx, session)),
         attachments: [],

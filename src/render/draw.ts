@@ -8,6 +8,7 @@ import {
   type VariantId,
 } from "../data/variants";
 import type { MapView } from "../story/types";
+import type { AvatarImage } from "./avatar";
 import { mulberry32 } from "../util/rng";
 import type { CardLayout, Rect, TextField } from "./layout";
 import {
@@ -709,8 +710,51 @@ export function drawLaneHeader(
   ctx.textAlign = "left";
 }
 
+/**
+ * A circular avatar: the image cover-scaled and center-cropped into a circle with a coloured ring,
+ * or a themed eye-motif placeholder when no image is given. Drawn centred at (cx, cy).
+ */
+export function drawAvatar(
+  ctx: Ctx,
+  cx: number,
+  cy: number,
+  size: number,
+  image: AvatarImage | null,
+  ringColor: string,
+): void {
+  const r = size / 2;
+  if (image) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+    // Cover-scale and centre-crop, mirroring drawArt's cover math.
+    const scale = Math.max(size / image.width, size / image.height);
+    const dw = image.width * scale;
+    const dh = image.height * scale;
+    ctx.drawImage(image, cx - dw / 2, cy - dh / 2, dw, dh);
+    ctx.restore();
+  } else {
+    // Placeholder: a low-alpha disc in the side colour with the themed eye glyph.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = ringColor;
+    ctx.globalAlpha = 0.18;
+    ctx.fill();
+    ctx.restore();
+    drawEye(ctx, cx, cy, size * 0.72, ringColor);
+  }
+  // The ring on top of either path.
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = ringColor;
+  ctx.stroke();
+}
+
 /** An almond-shaped eye with an iris, the mark used for every place on the map. */
-function drawEye(
+export function drawEye(
   ctx: Ctx,
   cx: number,
   cy: number,

@@ -52,6 +52,12 @@ export const battleCommand: Command = {
         Object.entries(player.cards).map(([id, owned]) => [id, owned.active]),
       ),
       guests: deck.guests,
+      origin: "practice",
+      opponentPortrait: null,
+      playerAvatarUrl: interaction.user.displayAvatarURL({
+        extension: "png",
+        size: 128,
+      }),
     });
 
     await interaction.reply({

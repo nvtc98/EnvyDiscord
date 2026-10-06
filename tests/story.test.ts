@@ -3,7 +3,12 @@ import { CARDS, CARD_INDEX } from "../src/data/cards";
 import type { CardDef } from "../src/engine/types";
 import { STARTER_SIZE, drawStarterPack } from "../src/game/starter";
 import { createPlayer, type Player } from "../src/game/player";
-import { applyAction, currentView, ensureStory } from "../src/story/engine";
+import {
+  applyAction,
+  currentView,
+  ensureStory,
+  resolveStoryBattle,
+} from "../src/story/engine";
 import { cleanStem, displayName, matchName } from "../src/story/names";
 import { NODES, PLACE_WISDOM, STRANGER, TRIBE } from "../src/story/prologue";
 import type { StoryContext } from "../src/story/types";
@@ -176,17 +181,37 @@ describe("story: the prologue", () => {
     expect(view.choices).toHaveLength(2);
   });
 
-  it("walks the whole prologue as an Eye who knows the way, from the greeting to the end", () => {
-    // yes (an Eye), a name from the list, continue, knows the tribe, continue through curse, informant, map,
-    // wisdom (ask how he knows), wisdom_ask (open the book), book (take), book_taken (continue)
-    const { player, events } = play([0, "abyss", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  it("walks the whole prologue and into the first chapter, as an Eye who knows the way, up to the cave duel", () => {
+    // yes (an Eye), a name from the list, continue, knows the tribe, continue through curse -> map,
+    // wisdom (open the book), book (take), book_taken (continue) -> deck_praise -> to_bo_tuoi (Bò Tuôi ➡️)
+    // -> sea_cliff -> curse_underground -> cave_mouth -> reveal_face -> cave_terms (accept) -> cave_battle.
+    const { player, events } = play([
+      0,
+      "abyss",
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+    ]);
     expect(events.every((e) => e.ok)).toBe(true);
     expect(player.story).toMatchObject({
-      node: "prologue_end",
+      node: "cave_battle",
       isEye: true,
       name: "Abyss Eyes",
       knowsTribe: true,
       starterClaimed: true,
+      chapter: "bo-tuoi",
     });
     expect(Object.keys(player.cards)).toHaveLength(12);
     expect(player.deck).toHaveLength(12);
@@ -367,7 +392,7 @@ describe("story: the prologue", () => {
     expect(knows.player.story!.knowsTribe).toBe(true);
   });
 
-  it("every path reaches the curse and the Informant, and the tribe name is spelled with its Vietnamese letters", () => {
+  it("every path reaches the curse, and the tribe name is spelled with its Vietnamese letters", () => {
     for (const steps of [
       [1, "nomad", 0, 1, 0],
       [1, "nomad", 0, 0, 0],
@@ -384,7 +409,7 @@ describe("story: the prologue", () => {
   });
 
   it("the map offers at most four places, shows three locations and refuses to go to the tribe yet", () => {
-    const { player } = play([1, "nomad", 0, 1, 0, 0, 0]); // ... curse -> informant -> map
+    const { player } = play([1, "nomad", 0, 1, 0, 0]); // ... curse -> map
     expect(player.story!.node).toBe("map");
     const view = currentView(player, ctx());
     expect(view.choices.length).toBeLessThanOrEqual(4);
@@ -411,8 +436,8 @@ describe("story: the prologue", () => {
   });
 
   describe("the book", () => {
-    // not an Eye ... map -> wisdom; "Just open the book" (index 1) -> book
-    const toBook = (seed = 1) => play([1, "nomad", 0, 1, 0, 0, 0, 0, 1], seed);
+    // not an Eye ... curse -> map -> wisdom; "Just open the book" (index 1) -> book
+    const toBook = (seed = 1) => play([1, "nomad", 0, 1, 0, 0, 0, 1], seed);
     const idsOf = (p: Player) => p.story!.pack!.cards;
 
     it("opens with twelve different cards in the 2-2-8 mix, and nothing is granted until the player takes them", () => {
@@ -430,7 +455,7 @@ describe("story: the prologue", () => {
       ]);
     });
 
-    it("closing and reopening shows a different twelve with the same mix, counts the tries, and the Informant reacts", () => {
+    it("closing and reopening shows a different twelve with the same mix, counts the tries, and the stranger reacts", () => {
       const c = ctx(2);
       const { player } = toBook(2);
       const first = [...idsOf(player)];
@@ -487,8 +512,8 @@ describe("story: the prologue", () => {
         node: "book_taken",
       });
       applyAction(player, "book_taken", { type: "choice", index: 0 }, c);
-      expect(player.story!.node).toBe("prologue_end");
-      expect(currentView(player, c).choices).toEqual([]);
+      expect(player.story!.node).toBe("deck_praise");
+      expect(currentView(player, c).choices).toHaveLength(1);
     });
 
     it("rerolling many times and then taking still gives a valid starter set", () => {
@@ -501,6 +526,120 @@ describe("story: the prologue", () => {
       expect(owned).toHaveLength(12);
       expect(owned.filter((x) => x.rarity === "epic")).toHaveLength(2);
       expect(player.story!.pack!.rerolls).toBe(10);
+    });
+  });
+
+  describe("the first chapter (cave duel)", () => {
+    // Walk an Eye all the way into cave_battle.
+    const toCave = (seed = 1) =>
+      play([0, "abyss", 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0], seed);
+
+    it("praises the lucky draw, opens the map to Bò Tuôi, and chains to the cave battle", () => {
+      const { player, events } = toCave();
+      expect(events.every((e) => e.ok)).toBe(true);
+      expect(player.story!.node).toBe("cave_battle");
+      expect(player.story!.chapter).toBe("bo-tuoi");
+      // the battle node is a flagged, text-less view
+      const view = currentView(player, ctx());
+      expect(view.battle).toBeDefined();
+      expect(view.lines).toEqual([]);
+      expect(view.choices).toEqual([]);
+    });
+
+    it("to_bo_tuoi offers the Bò Tuôi arrow and a locked way back to Wisdom", () => {
+      // stop at to_bo_tuoi: ... book_taken -> deck_praise -> to_bo_tuoi
+      const { player } = play([0, "abyss", 0, 0, 0, 0, 0, 1, 0, 0, 0], 1);
+      expect(player.story!.node).toBe("to_bo_tuoi");
+      const view = currentView(player, ctx());
+      expect(view.map!.locations.map((l) => l.name)).toEqual([
+        PLACE_WISDOM,
+        "The Crossroads",
+        TRIBE,
+      ]);
+      // choosing Wisdom (index 0) is the locked detour, Bò Tuôi (index 1) goes on
+      applyAction(player, "to_bo_tuoi", { type: "choice", index: 0 }, ctx());
+      expect(player.story!.node).toBe("wisdom_locked");
+      applyAction(player, "wisdom_locked", { type: "choice", index: 0 }, ctx());
+      expect(player.story!.node).toBe("to_bo_tuoi");
+      applyAction(player, "to_bo_tuoi", { type: "choice", index: 1 }, ctx());
+      expect(player.story!.node).toBe("sea_cliff");
+    });
+
+    it("reveal_face carries the inside man's portrait", () => {
+      // walk to reveal_face: ... cave_mouth -> reveal_face
+      const { player } = play(
+        [0, "abyss", 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+        1,
+      );
+      expect(player.story!.node).toBe("reveal_face");
+      expect(currentView(player, ctx()).portrait).toEqual({
+        assetKey: "enemy1",
+        alt: "The man on the inside",
+      });
+    });
+
+    it("refusing the terms coerces into two accept buttons, both leading to the battle", () => {
+      // walk to cave_terms then refuse
+      const { player } = play(
+        [0, "abyss", 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+        1,
+      );
+      expect(player.story!.node).toBe("cave_refuse");
+      const view = currentView(player, ctx());
+      expect(view.choices.map((c) => c.label)).toEqual([
+        "...I accept",
+        "...I accept",
+      ]);
+      applyAction(player, "cave_refuse", { type: "choice", index: 1 }, ctx());
+      expect(player.story!.node).toBe("cave_battle");
+    });
+
+    it("resolveStoryBattle moves to chapter_end on a win (sets caveWon, clears battle)", () => {
+      const { player } = toCave();
+      player.story!.battle = {
+        kind: "cave",
+        state: {} as never,
+        selectedUid: null,
+        log: [],
+        difficulty: "normal",
+        opponentPortrait: "enemy1",
+      };
+      const result = resolveStoryBattle(player, "won", ctx());
+      expect(result.ok).toBe(true);
+      expect(player.story!.node).toBe("chapter_end");
+      expect(player.story!.caveWon).toBe(true);
+      expect(player.story!.battle).toBeNull();
+      expect(currentView(player, ctx()).choices).toEqual([]);
+    });
+
+    it("resolveStoryBattle moves to cave_loss on a loss (keeps battle), and retry clears it and returns to the battle", () => {
+      const { player } = toCave();
+      player.story!.battle = {
+        kind: "cave",
+        state: {} as never,
+        selectedUid: null,
+        log: [],
+        difficulty: "normal",
+        opponentPortrait: "enemy1",
+      };
+      const result = resolveStoryBattle(player, "lost", ctx());
+      expect(result.ok).toBe(true);
+      expect(player.story!.node).toBe("cave_loss");
+      expect(player.story!.caveWon).toBe(false);
+      expect(player.story!.battle).not.toBeNull();
+      // retry: "Take up the cards again" clears the lost snapshot and returns to cave_battle
+      applyAction(player, "cave_loss", { type: "choice", index: 0 }, ctx());
+      expect(player.story!.node).toBe("cave_battle");
+      expect(player.story!.battle).toBeNull();
+    });
+
+    it("resolveStoryBattle refuses when not on the battle node or with no battle", () => {
+      const { player } = toCave();
+      // no battle snapshot
+      expect(resolveStoryBattle(player, "won", ctx())).toEqual({
+        ok: false,
+        reason: "invalid",
+      });
     });
   });
 
@@ -559,6 +698,7 @@ describe("story: the prologue", () => {
     for (const id of Object.keys(NODES)) {
       player.story!.node = id;
       const view = currentView(player, c);
+      if (view.battle) continue; // battle scenes render no story text (lines:[], choices:[])
       expect(view.choices.length, id).toBeLessThanOrEqual(view.map ? 4 : 5);
       for (const choice of view.choices)
         expect(

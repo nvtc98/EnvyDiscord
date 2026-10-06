@@ -29,8 +29,14 @@ describe("/invite", () => {
 
     expect(dm.sent).toHaveLength(1);
     expect(dm.sent[0].content).toBe(GATE.readyLine);
-    const begin = dm.sent[0].components[0].toJSON().components[0];
-    expect(begin.custom_id).toBe("story:gate:begin");
+    const gateButtons = dm.sent[0].components[0].toJSON().components;
+    expect(gateButtons[0].custom_id).toBe("story:gate:begin");
+    // invite inherits the shared three-button gate (ask + decline) for free.
+    expect(gateButtons.map((b: any) => b.custom_id)).toEqual([
+      "story:gate:begin",
+      "story:gate:ask",
+      "story:gate:decline",
+    ]);
 
     expect(lastPayload(call.reply).content).toContain("<@target>");
     expect(lastPayload(call.reply).allowedMentions).toEqual({ parse: [] });
@@ -56,6 +62,9 @@ describe("/invite", () => {
       pack: null,
       starterClaimed: false,
       liveMessageId: null,
+      chapter: null,
+      battle: null,
+      caveWon: false,
     };
     await ctx.repo.save(target);
 

@@ -276,6 +276,29 @@ describe("battle scene", () => {
     }
   });
 
+  it("accepts decoded player and opponent avatars, and renders with both null (placeholder path)", async () => {
+    const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
+    const state = midGame();
+    // A tiny synthetic image stands in for a decoded avatar (the params are Canvas | Image).
+    const avatar = createCanvas(2, 2);
+    const withAvatars = await renderer.battle({
+      state,
+      viewer: "bottom",
+      playerAvatar: avatar,
+      opponentAvatar: avatar,
+    });
+    const withPlaceholders = await renderer.battle({
+      state,
+      viewer: "bottom",
+      playerAvatar: null,
+      opponentAvatar: null,
+    });
+    for (const png of [withAvatars, withPlaceholders])
+      expect(png.subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true);
+    // Supplying avatars changes the pixels (they are drawn in the HUD gutter).
+    expect(withAvatars.equals(withPlaceholders)).toBe(false);
+  });
+
   it("a tall hand makes a taller image, an empty hand a shorter one", async () => {
     const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
     const base = newGame(

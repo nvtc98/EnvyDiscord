@@ -1,4 +1,5 @@
-import type { CardDef } from "../engine/types";
+import type { Difficulty } from "../engine/ai";
+import type { CardDef, GameState } from "../engine/types";
 import type { Rng } from "../util/rng";
 
 export interface NameAttempt {
@@ -37,6 +38,28 @@ export interface StoryState {
    * before the first DM send.
    */
   liveMessageId: string | null;
+  /** The land the player is being led to after taking the deck. Enables the active Bò Tuôi arrow on the second map view. */
+  chapter: "bo-tuoi" | null;
+  /** The live story-battle, when one is running (null otherwise). Persisted so leaving/resuming behaves sanely. */
+  battle: StoryBattleState | null;
+  /** Set once the cave duel has been won, so the chapter closes and does not restart. */
+  caveWon: boolean;
+}
+
+/** A story-driven battle, serialisable, saved on the player so a resume can rebuild the board. */
+export interface StoryBattleState {
+  /** Which story battle this is (future chapters add more). */
+  kind: "cave";
+  /** The serialised engine GameState (already structuredClone-able plain data). */
+  state: GameState;
+  /** The card picked in the hand select, if any. */
+  selectedUid: number | null;
+  /** The viewer-worded battle log, capped. */
+  log: string[];
+  /** Difficulty, for reward wording / future tuning. */
+  difficulty: Difficulty;
+  /** Opponent portrait asset key for the renderer (e.g. "enemy1"). */
+  opponentPortrait: string | null;
 }
 
 export interface StoryChoice {
@@ -75,6 +98,10 @@ export interface StoryView {
   };
   map?: MapView;
   pack?: { cards: CardDef[] };
+  /** A portrait image to show in a rich scene (e.g. the inside man). Asset key resolved by the Discord layer. */
+  portrait?: { assetKey: string; alt: string };
+  /** When set, this scene IS a running battle; the Discord layer renders the battle view, not story text. */
+  battle?: { sessionId: string };
 }
 
 export type StoryAction =

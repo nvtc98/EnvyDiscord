@@ -123,7 +123,7 @@ describe("/story gate and DM delivery", () => {
     expect(lastPayload(call.deferReply as any).flags).toBeDefined();
     expect(lastPayload(call.reply as any).content).toMatch(/private messages/);
     expect(content(gate)).toBe(GATE.readyLine);
-    expect(labels(gate)).toEqual([GATE.readyYes, GATE.readyNo]);
+    expect(labels(gate)).toEqual([GATE.readyYes, GATE.askLabel, GATE.readyNo]);
     // GATE strings follow the archaic rewrite; the assertions reference the constants, not literals.
     // Nothing persisted before the player agrees.
     expect(ctx.repo.get("u").story).toBeNull();
@@ -165,7 +165,11 @@ describe("/story", () => {
     // A second /story offers the resume gate.
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.resumeLine);
-    expect(labels(second.gate)).toEqual([GATE.resumeYes, GATE.resumeNo]);
+    expect(labels(second.gate)).toEqual([
+      GATE.resumeYes,
+      GATE.askLabel,
+      GATE.resumeNo,
+    ]);
     await pressGate(ctx, second.dm, GATE.resumeYes);
     const resumed = live(second.dm);
     expect(second.dm.sent.some((p) => content(p)?.match(/No matter/))).toBe(
@@ -342,11 +346,8 @@ describe("/story", () => {
     expect(content(p)).toMatch(/search together/);
     p = (await click(ctx, dm, "Onward")).payload;
     expect(dm.sent.some((m) => content(m)?.match(/strange curse/))).toBe(true);
+    // curse now leads straight to the rich map embed (the informant scene is gone).
     p = (await click(ctx, dm, "Onward")).payload;
-    // The crossroads informant scene is still plain text.
-    expect(content(p)).toMatch(/take me to The Eyes Of Wisdom/);
-    // Looking at the map is a RICH scene (embed).
-    p = (await click(ctx, dm, "Look upon the map")).payload;
     expect(embedOf(p).title).toBe("The Crossroads");
     expect(embedOf(p).fields.find((f: any) => f.name === "Map").value).toBe(
       "○ The Eyes Of Wisdom  ──  ● The Crossroads (you are here)  ──  ○ Bò Tuôi",
@@ -414,12 +415,11 @@ describe("/story", () => {
       ),
     ).toBe(true);
 
-    await click(ctx, dm, "Onward");
-    // the terminal scene has no buttons; its text lands and the player ends at prologue_end
-    expect(
-      dm.sent.some((m) => content(m)?.match(/The tale continues anon/)),
-    ).toBe(true);
-    expect(ctx.repo.get("u").story!.node).toBe("prologue_end");
+    // Onward from book_taken now opens the first chapter: the bot praises the lucky draw.
+    const praise = (await click(ctx, dm, "Onward")).payload;
+    expect(dm.sent.some((m) => content(m)?.match(/fortunate draw/))).toBe(true);
+    expect(ctx.repo.get("u").story!.node).toBe("deck_praise");
+    expect(labels(praise)).toEqual(["Onward"]);
 
     const daily = slashInteraction("u");
     await dailyCommand.execute(daily as never, ctx);
@@ -451,9 +451,10 @@ describe("/story", () => {
     const { dm } = await begin(ctx);
     await click(ctx, dm, "Nay, I am not");
     await submitName(ctx, dm, "Nomad"); // the non-Eyes free-name step
-    for (const label of ["Onward", "Nay, I do not", "Onward", "Onward"])
+    // ... tribe, no, curse, and the last Onward lands on the rich map (curse -> map directly).
+    for (const label of ["Onward", "Nay, I do not", "Onward"])
       await click(ctx, dm, label);
-    let p = (await click(ctx, dm, "Look upon the map")).payload;
+    let p = (await click(ctx, dm, "Onward")).payload;
     expect(p.files).toHaveLength(1);
     expect(embedOf(p).fields ?? []).toHaveLength(0); // no text copy of the map
     p = (await click(ctx, dm, "The Eyes Of Wisdom")).payload;
@@ -525,11 +526,12 @@ describe("/story typing + paced delivery", () => {
     const { dm } = await begin(ctx);
     await click(ctx, dm, "Nay, I am not");
     await submitName(ctx, dm, "Nomad");
-    for (const label of ["Onward", "Nay, I do not", "Onward", "Onward"])
+    for (const label of ["Onward", "Nay, I do not", "Onward"])
       await click(ctx, dm, label);
     const typingBefore = dm.typingCount;
     const sentBefore = dm.sent.length;
-    const p = (await click(ctx, dm, "Look upon the map")).payload;
+    // The last Onward (curse -> map) lands on the rich map embed.
+    const p = (await click(ctx, dm, "Onward")).payload;
     expect(embedOf(p).title).toBe("The Crossroads"); // the rich map scene
     // The rich scene added exactly one typing beat and one send.
     expect(dm.typingCount - typingBefore).toBe(1);
@@ -549,6 +551,48 @@ describe("/story gate persistence", () => {
     // a second /story re-asks the ready-gate from scratch
     const second = await openGate(ctx);
     expect(content(second.gate)).toBe(GATE.readyLine);
+  });
+
+  it("the ask button answers 'what's this about?' then re-poses the same three choices, and loops", async () => {
+    const ctx = makeCtx();
+    const { dm } = await openGate(ctx);
+    // first ask
+    await pressGate(ctx, dm, GATE.askLabel);
+    expect(dm.sent.some((p) => content(p) === GATE.askAnswer)).toBe(true);
+    const reposed = dm.sent.at(-1);
+    expect(labels(reposed)).toEqual([
+      GATE.readyYes,
+      GATE.askLabel,
+      GATE.readyNo,
+    ]);
+    // ask again — it loops: another answer + another three-button gate, nothing persisted
+    await pressGate(ctx, dm, GATE.askLabel);
+    expect(dm.sent.filter((p) => content(p) === GATE.askAnswer).length).toBe(2);
+    expect(labels(dm.sent.at(-1))).toEqual([
+      GATE.readyYes,
+      GATE.askLabel,
+      GATE.readyNo,
+    ]);
+    expect(ctx.repo.get("u").story).toBeNull();
+    // can still begin from the re-posed gate
+    await pressGate(ctx, dm, GATE.readyYes);
+    expect(ctx.repo.get("u").story).toMatchObject({ node: "greeting" });
+  });
+
+  it("the ask button re-poses the resume gate for a player with progress", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    await click(ctx, dm, "Nay, I am not");
+    const second = await openGate(ctx);
+    await pressGate(ctx, second.dm, GATE.askLabel);
+    expect(second.dm.sent.some((p) => content(p) === GATE.askAnswer)).toBe(
+      true,
+    );
+    expect(labels(second.dm.sent.at(-1))).toEqual([
+      GATE.resumeYes,
+      GATE.askLabel,
+      GATE.resumeNo,
+    ]);
   });
 
   it("beginning the gate creates the story and delivers the greeting", async () => {

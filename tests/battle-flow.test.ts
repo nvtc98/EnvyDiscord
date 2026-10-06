@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { battleCommand } from "../src/discord/commands/battle";
 import { setBattleStepDelay } from "../src/discord/battle-session";
+import { setFetchAvatar } from "../src/render/avatar";
 import { createImageRenderer } from "../src/render/renderer";
 import {
   buttonInteraction,
@@ -84,7 +85,11 @@ async function startWithPlayableCard(userId = "u1") {
 
 describe("/battle", () => {
   // Animated opponent-turn playback uses real timers in production; keep tests instant and timer-free.
-  beforeEach(() => setBattleStepDelay(0));
+  beforeEach(() => {
+    setBattleStepDelay(0);
+    setFetchAvatar(async () => null); // no network; player avatar -> placeholder
+  });
+  afterEach(() => setFetchAvatar());
 
   it("is for the bot owner only while the story is being built", async () => {
     const ctx = makeCtx(3);

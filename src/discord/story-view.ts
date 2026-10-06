@@ -43,7 +43,7 @@ export type StoryMessage =
  * pack keeps the embed box so those features show in full.
  */
 export function isPlainConversation(view: StoryView): boolean {
-  return !view.map && !view.pack;
+  return !view.map && !view.pack && !view.portrait && !view.battle;
 }
 
 const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {

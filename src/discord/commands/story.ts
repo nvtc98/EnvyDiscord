@@ -12,7 +12,10 @@ import {
   type ModalSubmitInteraction,
   type User,
 } from "discord.js";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { createPlayer, type Player } from "../../game/player";
+import { ArtLibrary } from "../../render/art";
 import { applyAction, currentView, ensureStory } from "../../story/engine";
 import { GATE } from "../../story/prologue";
 import type {
@@ -31,16 +34,21 @@ import {
   type StoryMessage,
   type StoryScreen,
 } from "../story-view";
+import { launchStoryBattle } from "../story-battle";
 
-const storyContext = (ctx: AppContext): StoryContext => ({
+export const storyContext = (ctx: AppContext): StoryContext => ({
   rng: ctx.rng,
   cards: ctx.cards,
   cardIndex: ctx.cardIndex,
 });
 
-/** Just enough of a Discord DM channel for sending scene messages and showing the typing indicator. */
+/**
+ * Just enough of a Discord DM channel for sending scene messages and showing the typing indicator.
+ * `send` also carries battle-view payloads (content/embeds/components/files) when a story battle runs
+ * in the DM, so its parameter is widened beyond StoryMessage.
+ */
 export interface DmChannel {
-  send(payload: StoryMessage): Promise<{ id: string }>;
+  send(payload: StoryMessage | object): Promise<{ id: string }>;
   sendTyping(): Promise<void>;
 }
 
@@ -105,7 +113,19 @@ async function imageFor(
 ): Promise<Buffer | null> {
   if (view.map) return tryRender(ctx, (r) => r.map(view.map!));
   if (view.pack) return tryRender(ctx, (r) => r.pack(view.pack!.cards));
+  if (view.portrait) return loadPortrait(view.portrait.assetKey);
   return null;
+}
+
+// Portrait assets (the inside man etc.) live in assets/portraits; mtime-cached, downscaled to 640.
+const portraitLib = new ArtLibrary(
+  join(fileURLToPath(new URL("../../../assets", import.meta.url)), "portraits"),
+);
+
+/** Loads a portrait asset and returns it as a PNG buffer for the embed image, or null when missing. */
+async function loadPortrait(assetKey: string): Promise<Buffer | null> {
+  const canvas = await portraitLib.get(assetKey);
+  return canvas ? canvas.toBuffer("image/png") : null;
 }
 
 /**
@@ -113,13 +133,20 @@ async function imageFor(
  * message per line with the buttons on the last; a map/book scene is a single embed. The id of the
  * message that carries the live buttons is stored on the player so stale buttons can be detected.
  */
-async function deliverScene(
+export async function deliverScene(
   ctx: AppContext,
   user: { id: string; username: string },
   player: Player,
   dm: DmChannel,
+  avatarUrl: string | null = null,
 ): Promise<void> {
   const screen = await screenFor(ctx, player);
+  // BATTLE branch first: a battle node renders no story text; hand off to the launcher/resumer, which
+  // sends the battle message and sets liveMessageId itself.
+  if (screen.view.battle) {
+    await launchStoryBattle(ctx, user, player, dm, avatarUrl);
+    return;
+  }
   let liveId: string;
   if (isPlainConversation(screen.view)) {
     const msgs = renderPlain(screen);
@@ -141,6 +168,28 @@ async function deliverScene(
   await ctx.repo.save(player);
 }
 
+/** The single source of the gate's three-button row: yes (primary), ask (secondary), decline (secondary). */
+export function gateComponents(
+  yesLabel: string,
+  yesId: string, // "story:gate:begin" | "story:gate:resume"
+  noLabel: string,
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(yesId)
+      .setLabel(yesLabel)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("story:gate:ask")
+      .setLabel(GATE.askLabel)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("story:gate:decline")
+      .setLabel(noLabel)
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
 /** The gate shown before the story: either the ready-gate (no progress) or a resume gate. */
 export function gateMessage(
   line: string,
@@ -148,17 +197,33 @@ export function gateMessage(
   yesId: string,
   noLabel: string,
 ): StoryMessage {
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(yesId)
-      .setLabel(yesLabel)
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("story:gate:decline")
-      .setLabel(noLabel)
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return { content: line, components: [row], allowedMentions: { parse: [] } };
+  return {
+    content: line,
+    components: [gateComponents(yesLabel, yesId, noLabel)],
+    allowedMentions: { parse: [] },
+  };
+}
+
+/** The begin-vs-resume gate line/labels/id for the live player, as an object (callers destructure). */
+function buildGate(player: Player): {
+  line: string;
+  yesLabel: string;
+  yesId: string;
+  noLabel: string;
+} {
+  return player.story
+    ? {
+        line: GATE.resumeLine,
+        yesLabel: GATE.resumeYes,
+        yesId: "story:gate:resume",
+        noLabel: GATE.resumeNo,
+      }
+    : {
+        line: GATE.readyLine,
+        yesLabel: GATE.readyYes,
+        yesId: "story:gate:begin",
+        noLabel: GATE.readyNo,
+      };
 }
 
 /** Opens the user's DM channel, mapping a closed-DM refusal to null (reusing the dm.ts error pattern). */
@@ -236,20 +301,8 @@ export const storyCommand: Command = {
 
     // The ready/resume gate is a command-layer pre-scene: declining it persists nothing.
     const player = ctx.repo.get(user.id);
-    const gate = player.story
-      ? gateMessage(
-          GATE.resumeLine,
-          GATE.resumeYes,
-          "story:gate:resume",
-          GATE.resumeNo,
-        )
-      : gateMessage(
-          GATE.readyLine,
-          GATE.readyYes,
-          "story:gate:begin",
-          GATE.readyNo,
-        );
-    await dm.send(gate);
+    const g = buildGate(player);
+    await dm.send(gateMessage(g.line, g.yesLabel, g.yesId, g.noLabel));
     await reply(DM_POINTER);
   },
 
@@ -305,9 +358,16 @@ export const storyCommand: Command = {
       return;
     }
     logEvents(ctx, user, result.events);
-    // Kill the pressed message's buttons, then send the next scene as fresh DM message(s).
+    // Kill the pressed message's buttons, then send the next scene as fresh DM message(s). The avatar
+    // URL is threaded so a transition into cave_battle (agree / coercion / retry) renders the player.
     await interaction.update({ components: [] });
-    await deliverScene(ctx, user, player, dmFrom(interaction));
+    await deliverScene(
+      ctx,
+      user,
+      player,
+      dmFrom(interaction),
+      avatarUrlOf(interaction),
+    );
   },
 
   async modal(interaction, ctx) {
@@ -321,7 +381,13 @@ export const storyCommand: Command = {
       if (interaction.isFromMessage())
         await interaction.update({ components: [] });
       if (player.story)
-        await deliverScene(ctx, user, player, dmFrom(interaction));
+        await deliverScene(
+          ctx,
+          user,
+          player,
+          dmFrom(interaction),
+          avatarUrlOf(interaction),
+        );
       else
         await interaction.reply({
           content: "Speak `/story` to begin.",
@@ -341,7 +407,13 @@ export const storyCommand: Command = {
     // (which may still be ask_name with a notice when the name was rejected).
     if (interaction.isFromMessage())
       await interaction.update({ components: [] });
-    await deliverScene(ctx, user, player, dmFrom(interaction));
+    await deliverScene(
+      ctx,
+      user,
+      player,
+      dmFrom(interaction),
+      avatarUrlOf(interaction),
+    );
   },
 };
 
@@ -350,6 +422,18 @@ function dmFrom(
   interaction: MessageComponentInteraction | ModalSubmitInteraction,
 ): DmChannel {
   return interaction.channel as unknown as DmChannel;
+}
+
+/** The interaction user's avatar URL, or null when it is unavailable (e.g. a bare test user). */
+function avatarUrlOf(
+  interaction: MessageComponentInteraction | ModalSubmitInteraction,
+): string | null {
+  const user = interaction.user as {
+    displayAvatarURL?: (opts?: unknown) => string;
+  };
+  return typeof user.displayAvatarURL === "function"
+    ? user.displayAvatarURL({ extension: "png", size: 128 })
+    : null;
 }
 
 /** Handles the ready/resume gate. begin/resume re-derive from live progress; decline persists nothing. */
@@ -372,6 +456,17 @@ async function handleGate(
     return;
   }
 
+  if (kind === "ask") {
+    // Answer the "what's this about?" question, then re-pose the same three choices. Persists nothing;
+    // loops indefinitely because every re-posed gate still carries the ask button.
+    const dm = dmFrom(interaction);
+    await dm.send({ content: GATE.askAnswer, allowedMentions: { parse: [] } });
+    const player = ctx.repo.get(user.id);
+    const g = buildGate(player);
+    await dm.send(gateMessage(g.line, g.yesLabel, g.yesId, g.noLabel));
+    return;
+  }
+
   // begin and resume both re-derive from the live player.story, so the action is correct even if the
   // gate's label was for the other case (e.g. an /invite began before the player made progress).
   const player = ctx.repo.get(user.id);
@@ -380,5 +475,12 @@ async function handleGate(
     await ctx.repo.save(player);
     logEvents(ctx, user, events);
   }
-  await deliverScene(ctx, user, player, dmFrom(interaction));
+  // A resumed player may be sitting on cave_battle, so thread the resumer's avatar for the duel render.
+  await deliverScene(
+    ctx,
+    user,
+    player,
+    dmFrom(interaction),
+    avatarUrlOf(interaction),
+  );
 }

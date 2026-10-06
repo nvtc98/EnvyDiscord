@@ -15,9 +15,11 @@ import {
 } from "../engine/types";
 import type { MapView } from "../story/types";
 import { ArtLibrary } from "./art";
+import type { AvatarImage } from "./avatar";
 import {
   COMPACT,
   drawArena,
+  drawAvatar,
   drawCompactCard,
   drawEmptyCell,
   drawFullCard,
@@ -47,6 +49,10 @@ export interface BattleView {
   selectedUid?: number | null;
   /** Active variant of each card the viewer owns, by card id. Anything else is drawn as metal. */
   variants?: Record<string, VariantId>;
+  /** The viewer's avatar, already decoded. Null/omitted -> generated placeholder. */
+  playerAvatar?: AvatarImage | null;
+  /** The opponent's portrait, already decoded. Null/omitted -> generated placeholder. */
+  opponentAvatar?: AvatarImage | null;
 }
 
 export interface ImageRenderer {
@@ -86,6 +92,9 @@ const BOARD_Y = 108;
 const BOARD_H = CELLS * COMPACT.h + (CELLS - 1) * CELL_GAP;
 const HAND_SCALE = 0.74;
 const HAND_COLS = 4;
+// Battle HUD avatars: a circle at the left of each HUD strip. Tune layout here in one place.
+const AVATAR_SIZE = 44;
+const AVATAR_GAP = 12;
 
 /** Throws if the native canvas module or the bundled fonts cannot be loaded; callers fall back to text. */
 export async function createImageRenderer({
@@ -152,7 +161,14 @@ export async function createImageRenderer({
       return canvas.toBuffer("image/png");
     },
 
-    async battle({ state, viewer, selectedUid = null, variants }) {
+    async battle({
+      state,
+      viewer,
+      selectedUid = null,
+      variants,
+      playerAvatar = null,
+      opponentAvatar = null,
+    }) {
       const me = state.players[viewer];
       const foeSeat = opponentOf(viewer);
       const foe = state.players[foeSeat];
@@ -184,9 +200,20 @@ export async function createImageRenderer({
 
       const yourTurn = state.active === viewer && !state.winner;
       const boardWidth = LANES * LANE_W + (LANES - 1) * LANE_GAP;
+      // The HUD text block shifts right to make room for the avatar in the left margin gutter.
+      const hudShift = AVATAR_SIZE + AVATAR_GAP;
+      const hudWidth = boardWidth - hudShift;
 
+      drawAvatar(
+        ctx,
+        MARGIN + AVATAR_SIZE / 2,
+        14 + AVATAR_SIZE / 2,
+        AVATAR_SIZE,
+        opponentAvatar,
+        PALETTE.theirs,
+      );
       ctx.save();
-      ctx.translate(MARGIN, 14);
+      ctx.translate(MARGIN + hudShift, 14);
       drawHud(
         ctx,
         {
@@ -197,7 +224,7 @@ export async function createImageRenderer({
           hand: foe.hand.length,
           deck: foe.deck.length,
         },
-        boardWidth,
+        hudWidth,
       );
       ctx.restore();
 
@@ -253,8 +280,16 @@ export async function createImageRenderer({
         }
       }
 
+      drawAvatar(
+        ctx,
+        MARGIN + AVATAR_SIZE / 2,
+        myHudY + AVATAR_SIZE / 2,
+        AVATAR_SIZE,
+        playerAvatar,
+        PALETTE.mine,
+      );
       ctx.save();
-      ctx.translate(MARGIN, myHudY);
+      ctx.translate(MARGIN + hudShift, myHudY);
       drawHud(
         ctx,
         {
@@ -269,7 +304,7 @@ export async function createImageRenderer({
             max: Math.min(Math.max(me.turns, 1), 9),
           },
         },
-        boardWidth,
+        hudWidth,
       );
       ctx.restore();
 
