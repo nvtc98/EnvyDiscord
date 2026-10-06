@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { battleCommand } from "../src/discord/commands/battle";
-import { setStorySleep, storyCommand } from "../src/discord/commands/story";
+import {
+  resetLiveGateMessages,
+  setStorySleep,
+  storyCommand,
+} from "../src/discord/commands/story";
 import { GATE } from "../src/story/prologue";
 import { setFetchAvatar } from "../src/render/avatar";
 import {
@@ -34,7 +38,14 @@ const liveBattle = (dm: Dm): any =>
 async function pressGate(ctx: Ctx, dm: Dm, label: string, userId = "u") {
   const gate = dm.sent.at(-1);
   const button = buttons(gate).find((b: any) => b.label === label);
-  const press = dmButtonInteraction(userId, button.custom_id, "gate-msg", dm);
+  // Press the gate on the message the handler recorded as live, or the handleGate stale guard treats
+  // it as an old gate and refuses to begin/resume (strips buttons without delivering the scene).
+  const press = dmButtonInteraction(
+    userId,
+    button.custom_id,
+    dm.idOf(gate),
+    dm,
+  );
   await storyCommand.component!(press as never, ctx);
 }
 
@@ -144,6 +155,8 @@ async function battlePress(
 }
 
 beforeEach(() => {
+  // The live-message tracker is process-local; clear it so ids from one test can't leak into another.
+  resetLiveGateMessages();
   setStorySleep(async () => {});
   setFetchAvatar(async () => null); // no network; player avatar -> placeholder
 });
@@ -162,7 +175,7 @@ describe("story -> cave battle integration", () => {
     // The board carries battle: components and is backed by a saved snapshot for resume.
     expect(ctx.repo.get("launch").story!.battle).not.toBeNull();
     expect(ctx.repo.get("launch").story!.battle!.opponentPortrait).toBe(
-      "enemy1",
+      "boss-spd-battle",
     );
     expect(
       ctx.log.entries.find((e) => e.type === "battle_started")?.data,

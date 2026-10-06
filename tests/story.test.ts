@@ -97,17 +97,17 @@ describe("names", () => {
 
 describe("starter pack", () => {
   const rarityCounts = (pack: CardDef[]) => ({
-    epic: pack.filter((c) => c.rarity === "epic").length,
-    rare: pack.filter((c) => c.rarity === "rare").length,
+    eternal: pack.filter((c) => c.rarity === "eternal").length,
+    bargain: pack.filter((c) => c.rarity === "bargain").length,
     common: pack.filter((c) => c.rarity === "common").length,
   });
 
-  it("is always 12 different cards: 2 epic, 2 rare and 8 common", () => {
+  it("is always 12 different cards: 2 eternal, 2 bargain and 8 common", () => {
     for (let seed = 1; seed <= 100; seed++) {
       const pack = drawStarterPack(CARDS, mulberry32(seed));
       expect(pack).toHaveLength(STARTER_SIZE);
       expect(new Set(pack.map((c) => c.id)).size).toBe(12);
-      expect(rarityCounts(pack)).toEqual({ epic: 2, rare: 2, common: 8 });
+      expect(rarityCounts(pack)).toEqual({ eternal: 2, bargain: 2, common: 8 });
     }
   });
 
@@ -127,17 +127,18 @@ describe("starter pack", () => {
   it("fails loudly when the card list cannot supply the mix", () => {
     expect(() =>
       drawStarterPack(
-        CARDS.filter((c) => c.rarity !== "epic"),
+        CARDS.filter((c) => c.rarity !== "eternal"),
         mulberry32(1),
       ),
-    ).toThrow(/epic/);
+    ).toThrow(/eternal/);
   });
 
   it("every card in the list has a rarity, a cost and a power", () => {
     for (const c of CARDS) {
-      expect(["common", "rare", "epic"]).toContain(c.rarity);
+      expect(["common", "bargain", "eternal"]).toContain(c.rarity);
       expect(c.cost).toBeGreaterThanOrEqual(1);
-      expect(c.power).toBeGreaterThanOrEqual(1);
+      // Stella Eyes is intentionally a 0-power body (power equals the destroyed-power tally when played).
+      expect(c.power).toBeGreaterThanOrEqual(0);
     }
     expect(new Set(CARDS.map((c) => c.id)).size).toBe(CARDS.length);
   });
@@ -474,8 +475,8 @@ describe("story: the prologue", () => {
         expect(idsOf(player).join()).not.toBe(previous);
         previous = idsOf(player).join();
         const pack = idsOf(player).map((id) => CARD_INDEX.get(id)!);
-        expect(pack.filter((x) => x.rarity === "epic")).toHaveLength(2);
-        expect(pack.filter((x) => x.rarity === "rare")).toHaveLength(2);
+        expect(pack.filter((x) => x.rarity === "eternal")).toHaveLength(2);
+        expect(pack.filter((x) => x.rarity === "bargain")).toHaveLength(2);
         expect(pack.filter((x) => x.rarity === "common")).toHaveLength(8);
         const first = currentView(player, c).lines[0];
         expect(first.speaker).toBe(STRANGER);
@@ -524,7 +525,7 @@ describe("story: the prologue", () => {
       applyAction(player, "book", { type: "choice", index: 0 }, c);
       const owned = Object.keys(player.cards).map((id) => CARD_INDEX.get(id)!);
       expect(owned).toHaveLength(12);
-      expect(owned.filter((x) => x.rarity === "epic")).toHaveLength(2);
+      expect(owned.filter((x) => x.rarity === "eternal")).toHaveLength(2);
       expect(player.story!.pack!.rerolls).toBe(10);
     });
   });
@@ -573,8 +574,8 @@ describe("story: the prologue", () => {
       );
       expect(player.story!.node).toBe("reveal_face");
       expect(currentView(player, ctx()).portrait).toEqual({
-        assetKey: "enemy1",
-        alt: "The man on the inside",
+        assetKey: "boss-spd-story",
+        alt: "Bò SPD",
       });
     });
 
@@ -602,7 +603,7 @@ describe("story: the prologue", () => {
         selectedUid: null,
         log: [],
         difficulty: "normal",
-        opponentPortrait: "enemy1",
+        opponentPortrait: "boss-spd-battle",
       };
       const result = resolveStoryBattle(player, "won", ctx());
       expect(result.ok).toBe(true);
@@ -620,7 +621,7 @@ describe("story: the prologue", () => {
         selectedUid: null,
         log: [],
         difficulty: "normal",
-        opponentPortrait: "enemy1",
+        opponentPortrait: "boss-spd-battle",
       };
       const result = resolveStoryBattle(player, "lost", ctx());
       expect(result.ok).toBe(true);

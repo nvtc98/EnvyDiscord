@@ -95,6 +95,8 @@ export async function launchStoryBattle(
   if (live && live.origin === "story") {
     live.onStoryEnd = onStoryEnd;
     live.playerAvatarUrl = avatarUrl;
+    live.playerName = player.story?.name ?? undefined;
+    live.opponentName ??= "Bò SPD";
     const sent = await dm.send(renderBattle(await withImage(ctx, live)));
     recordLive(user.id, sent.id, player);
     await ctx.repo.save(player);
@@ -121,8 +123,10 @@ export async function launchStoryBattle(
       variants: variantsOf(player),
       guests: deck.guests,
       origin: "story",
-      opponentPortrait: "enemy1",
+      opponentPortrait: "boss-spd-battle",
       playerAvatarUrl: avatarUrl,
+      playerName: player.story?.name ?? undefined,
+      opponentName: "Bò SPD",
     });
     session.onStoryEnd = onStoryEnd;
     // Mirror the live session into the DB so a resume can rebuild.
@@ -162,6 +166,8 @@ function rebuildSession(
     opponentPortrait: snap.opponentPortrait,
     playerAvatarUrl: avatarUrl,
     playerAvatarImage: undefined,
+    playerName: player.story?.name ?? undefined,
+    opponentName: "Bò SPD",
     onStoryEnd,
   };
 }
