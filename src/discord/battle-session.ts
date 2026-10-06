@@ -1,6 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { fileURLToPath } from "node:url";
-import { join } from "node:path";
 import { MessageFlags, type MessageComponentInteraction } from "discord.js";
 import { type Difficulty } from "../engine/ai";
 import { advanceAiBeats } from "../engine/ai-playback";
@@ -15,9 +13,6 @@ import type {
 } from "../engine/types";
 import type { VariantId } from "../data/variants";
 import { applyBattleResult, type Outcome } from "../game/rewards";
-import type { StoryBattleState } from "../story/types";
-import { ArtLibrary } from "../render/art";
-import { loadPlayerAvatar, type AvatarImage } from "../render/avatar";
 import {
   renderBattle,
   renderBattleEnd,
@@ -36,21 +31,7 @@ export interface Session {
   variants: Record<string, VariantId>;
   log: string[];
   touched: number;
-  /** Where this battle came from. Only the game-over branch differs by origin. */
-  origin: "practice" | "story";
   userId: string;
-  /** Portrait asset key, e.g. "enemy1"; null = placeholder. */
-  opponentPortrait: string | null;
-  /** The viewer's Discord avatar URL (source for the decode); null = no avatar. */
-  playerAvatarUrl: string | null;
-  /** Decoded-once cache: undefined = not yet fetched, null = fetch failed. */
-  playerAvatarImage?: AvatarImage | null;
-  /** For story battles: the sole owner of the story-side end work (set at launch). */
-  onStoryEnd?: (
-    session: Session,
-    outcome: Outcome,
-    interaction: MessageComponentInteraction,
-  ) => Promise<void>;
 }
 
 /** Battles live in memory only, one per user. A restart drops unfinished battles. */
@@ -68,10 +49,6 @@ export const setBattleStepDelay = (ms: number): void => {
 };
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
-
-// The opponent portrait library (mtime-cached, downscaled to 640), pointed at assets/portraits.
-const assetsDir = fileURLToPath(new URL("../../assets", import.meta.url));
-const portraitLib = new ArtLibrary(join(assetsDir, "portraits"));
 
 export function purgeIdle(now: number): void {
   for (const [userId, session] of sessions) {
@@ -136,28 +113,21 @@ export const screenOf = (
 });
 
 /**
- * The single decode site: resolves both avatars and bakes them into the battle image. The player
- * avatar is decoded once and cached on the session (undefined = not yet fetched, null = fetch failed,
- * so a failed fetch is not retried every render). The opponent portrait is mtime-cached by ArtLibrary.
+ * Bakes the board image for a given state into a BattleScreen. Defaults to the session's current
+ * state; the animation passes an intermediate beat state so each frame renders its own board. When
+ * the renderer is absent `tryRender` returns null and `renderBattle` falls back to the text board.
  */
 export async function withImage(
   ctx: AppContext,
   session: Session,
   state: GameState = session.state,
 ): Promise<BattleScreen> {
-  if (session.playerAvatarImage === undefined)
-    session.playerAvatarImage = await loadPlayerAvatar(session.playerAvatarUrl);
-  const opponentAvatar = session.opponentPortrait
-    ? await portraitLib.get(session.opponentPortrait)
-    : null;
   const image = await tryRender(ctx, (r) =>
     r.battle({
       state,
       viewer: "bottom",
       selectedUid: session.selectedUid,
       variants: session.variants,
-      playerAvatar: session.playerAvatarImage ?? null,
-      opponentAvatar,
     }),
   );
   return { ...screenOf(session, state), image: image ?? undefined };
@@ -176,16 +146,11 @@ export interface StartBattleOpts {
   difficulty: Difficulty;
   variants: Record<string, VariantId>;
   guests?: CardDef[];
-  origin: "practice" | "story";
-  opponentPortrait: string | null;
-  playerAvatarUrl: string | null;
   first?: Seat;
 }
 
 /**
- * Builds the GameState, runs the opening AI, stores the session and logs `battle_started`. Synchronous:
- * it does NO async work. The one-time avatar decode is deferred to `withImage` on the first render,
- * so `playerAvatarImage` is left undefined (meaning "not yet fetched").
+ * Builds the GameState, runs the opening AI instantly, stores the session and logs `battle_started`.
  */
 export function startBattle(opts: StartBattleOpts): Session {
   const { ctx } = opts;
@@ -206,11 +171,7 @@ export function startBattle(opts: StartBattleOpts): Session {
     variants: opts.variants,
     log: [],
     touched: now,
-    origin: opts.origin,
     userId: opts.userId,
-    opponentPortrait: opts.opponentPortrait,
-    playerAvatarUrl: opts.playerAvatarUrl,
-    playerAvatarImage: undefined,
   };
   const opening = [
     first === "bottom" ? "Thou goest first." : "The enemy goes first.",
@@ -233,17 +194,15 @@ export function startBattle(opts: StartBattleOpts): Session {
     deck: opts.deck.map((c) => c.id),
     guests: guests.map((c) => c.id),
     enemyDeck: opts.opponentDeck.map((c) => c.id),
-    origin: opts.origin,
   });
   logEvents(ctx, session, opts.userId, aiEvents);
   return session;
 }
 
 /**
- * The shared battle component handler, serving both owner /battle (practice) and story battles. The
- * mid-battle turn rendering is identical for both origins (interaction.update in place); only the
- * game-over branch differs: practice awards + ends in place; story deletes the session and calls the
- * injected onStoryEnd callback (which owns applyBattleResult + resolveStoryBattle + deliverScene).
+ * The shared battle component handler. Picking and playing a card update in place instantly; ending
+ * the turn hands over to `animateEndOfTurn`; forfeiting ends the battle. The game-over branch awards
+ * rewards and shows the end screen.
  */
 export async function handleBattleComponent(
   interaction: MessageComponentInteraction,
@@ -314,14 +273,6 @@ export async function handleBattleComponent(
   logEvents(ctx, session, userId, events);
 
   if (!session.state.winner) {
-    // Mirror the live session into the DB for a story battle, so a resume can rebuild the board.
-    if (session.origin === "story") {
-      const player = ctx.repo.get(userId);
-      if (player.story?.battle) {
-        player.story.battle = toStoryBattleState(session);
-        await ctx.repo.save(player);
-      }
-    }
     // `attachments: []` drops the previous image so only the new one stays.
     await interaction.update({
       ...renderBattle(await withImage(ctx, session)),
@@ -337,9 +288,9 @@ export async function handleBattleComponent(
 
 /**
  * Resolves a finished battle: deletes the session (so a repeat press hits the "battle ended" path and
- * rewards are awarded once), runs rewards + logging (or the story end callback), and sends the end
- * screen through `send` (`interaction.update` for the instant path, `interaction.editReply` for the
- * animated end-of-turn path). The caller must only invoke this when `session.state.winner` is set.
+ * rewards are awarded once), runs rewards + logging, and sends the end screen through `send`
+ * (`interaction.update` for the instant path, `interaction.editReply` for the animated end-of-turn
+ * path). The caller must only invoke this when `session.state.winner` is set.
  */
 async function finishBattle(
   interaction: MessageComponentInteraction,
@@ -358,11 +309,6 @@ async function finishBattle(
       : session.state.winner === "top"
         ? "lost"
         : "draw";
-
-  if (session.origin === "story" && session.onStoryEnd) {
-    await session.onStoryEnd(session, outcome, interaction);
-    return;
-  }
 
   const player = ctx.repo.get(userId);
   const coins = applyBattleResult(player, session.difficulty, outcome);
@@ -508,13 +454,6 @@ async function finalRender(
 ): Promise<void> {
   try {
     if (!session.state.winner) {
-      if (session.origin === "story") {
-        const player = ctx.repo.get(userId);
-        if (player.story?.battle) {
-          player.story.battle = toStoryBattleState(session);
-          await ctx.repo.save(player);
-        }
-      }
       await send({
         ...renderBattle(await withImage(ctx, session)),
         attachments: [],
@@ -525,16 +464,4 @@ async function finalRender(
   } catch {
     // Last-ditch: never leave the player stuck without controls.
   }
-}
-
-/** Serialise the live session into the persisted StoryBattleState (variants/avatar are not stored). */
-export function toStoryBattleState(session: Session): StoryBattleState {
-  return {
-    kind: "cave",
-    state: structuredClone(session.state),
-    selectedUid: session.selectedUid,
-    log: [...session.log],
-    difficulty: session.difficulty,
-    opponentPortrait: session.opponentPortrait,
-  };
 }
