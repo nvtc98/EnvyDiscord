@@ -202,7 +202,7 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `${story(p).name}. Yes... I know that name. 'Tis written in the old records. I should have known thee at once.`,
+          `**${story(p).name}**. Yes... I know that name. 'Tis written in the old records. I should have known thee at once.`,
         ),
       ],
       choices: go("Continue"),
@@ -263,7 +263,7 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `Very well, ${story(p).name}. A name is but what its bearer makes of it.`,
+          `Very well, **${story(p).name}**. A name is but what its bearer makes of it.`,
         ),
       ],
       choices: go("Continue"),
@@ -309,7 +309,7 @@ export const NODES: Record<string, NodeDef> = {
       title: ROAD,
       lines: [
         stranger(
-          `${who(p)}. A fine name, and one I have not met upon this road. 'Tis thine alone, and that is no small thing.`,
+          `**${who(p)}**. A fine name, and one I have not met upon this road. 'Tis thine alone, and that is no small thing.`,
         ),
       ],
       choices: go("Continue"),
@@ -497,7 +497,9 @@ export const NODES: Record<string, NodeDef> = {
         .map((id) => ctx.cardIndex.get(id))
         .filter((c) => c !== undefined);
       const lines: StoryLine[] = [
-        stranger(`Twelve pages, twelve cards. Do they suit thee, ${who(p)}?`),
+        stranger(
+          `Twelve pages, twelve cards. Do they suit thee, **${who(p)}**?`,
+        ),
       ];
       return {
         title: PLACE_WISDOM,
@@ -549,7 +551,7 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         stranger(
-          `These twelve... a fortunate draw, ${who(p)}. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
+          `These twelve... a fortunate draw, **${who(p)}**. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
         ),
         narration("Turn the last page shut with a touch, and it seals itself."),
       ],

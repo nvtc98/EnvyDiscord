@@ -55,10 +55,36 @@ const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {
   danger: ButtonStyle.Danger,
 };
 
+// Proper nouns bolded wherever they appear in story text. "The Eyes Of Wisdom" must come before any
+// shorter overlap; "The Eyes" is deliberately NOT bolded (too common). Player names are bolded at the
+// source (the prologue wraps ${name} in ** itself), so they are not listed here.
+const BOLD_NAMES = ["The Eyes Of Wisdom", "Stranger Eyes", "Bò Tuôi"];
+
+/** Bold the known proper nouns in a line, without double-bolding ones already wrapped in **. */
+function boldNames(text: string): string {
+  let out = text;
+  for (const name of BOLD_NAMES) {
+    // Replace each occurrence not already immediately wrapped by ** on both sides.
+    out = out.replace(
+      new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+      (match, offset: number, full: string) => {
+        const before = full.slice(Math.max(0, offset - 2), offset);
+        const after = full.slice(
+          offset + match.length,
+          offset + match.length + 2,
+        );
+        return before === "**" && after === "**" ? match : `**${match}**`;
+      },
+    );
+  }
+  return out;
+}
+
 function formatPlain(line: StoryLine): string {
   // A single stranger speaks throughout the prologue, so his name is never printed:
   // a spoken line (with a speaker) renders as plain text, a gesture/narration line stays italic.
-  return line.speaker ? line.text : `*${line.text}*`;
+  const text = boldNames(line.text);
+  return line.speaker ? text : `*${text}*`;
 }
 
 /** A text drawing of the map, used when images are unavailable. */

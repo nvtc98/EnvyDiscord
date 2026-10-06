@@ -26,6 +26,7 @@ Rule of thumb: if the player is READING THE STORY, full voice; if the player is 
 
 - **Slash-command names** stay plain modern English (`/story`, `/shop`, `/daily`, …) — players type them and Discord constrains naming.
 - **Proper nouns stay exactly as-is:** the Vietnamese names (e.g. `Bò Tuôi`) and the setting's names (`The Eyes`, `Stranger Eyes`, `The Eyes Of Wisdom`).
+- **Bold the special proper nouns in story text:** `Bò Tuôi`, `Stranger Eyes`, `The Eyes Of Wisdom`, and the player's own name are shown **bold**. This is applied automatically for the three fixed names in `formatPlain` (story-view.ts, `BOLD_NAMES`); the player's name is wrapped in `**` at the source where `${name}` is interpolated. Do NOT bold the bare `The Eyes` — it is too common and bolding it everywhere is noisy.
 - Keep the established single-stranger direct-address voice in the story (the bot speaks to the player as "thou/you"); the hidden speaker label stays.
 
 ## One voice only — never third-person for the speaker

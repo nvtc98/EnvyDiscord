@@ -64,7 +64,15 @@ async function pressGate(ctx: Ctx, dm: Dm, label: string, userId = "u") {
     throw new Error(
       `No gate button "${label}" among: ${labels(gate).join(", ")}`,
     );
-  const press = dmButtonInteraction(userId, button.custom_id, "gate-msg", dm);
+  // The gate press must land on the message the handler recorded as live, or the new stale guard in
+  // handleGate treats it as an old gate and refuses to begin. The gate is the last send, so its id is
+  // the id send() returned for that payload.
+  const press = dmButtonInteraction(
+    userId,
+    button.custom_id,
+    dm.idOf(gate),
+    dm,
+  );
   await storyCommand.component!(press as never, ctx);
   return press;
 }
@@ -207,7 +215,7 @@ describe("/story", () => {
       max_length: 40,
       required: true,
     });
-    expect(content(update)).toMatch(/Abyss Eyes\. Yes/);
+    expect(content(update)).toMatch(/\*\*Abyss Eyes\*\*\. Yes/);
     expect(ctx.repo.get("u").story).toMatchObject({
       name: "Abyss Eyes",
       isEye: true,
@@ -250,7 +258,7 @@ describe("/story", () => {
     ]);
 
     const { payload: kept } = await click(ctx, dm, "Yes, I am Zzzzzzzz Eyes");
-    expect(content(kept)).toMatch(/Very well, Zzzzzzzz Eyes/);
+    expect(content(kept)).toMatch(/Very well, \*\*Zzzzzzzz Eyes\*\*/);
     expect(ctx.repo.get("u").story).toMatchObject({
       name: "Zzzzzzzz Eyes",
       nameAttempts: [
@@ -390,8 +398,8 @@ describe("/story", () => {
     const cardsText = embedOf(p).fields.find((f: any) => f.name === "The cards")
       .value as string;
     expect(cardsText.split("\n")).toHaveLength(12);
-    expect(cardsText.match(/epic/g)).toHaveLength(2);
-    expect(cardsText.match(/rare/g)).toHaveLength(2);
+    expect(cardsText.match(/eternal/g)).toHaveLength(2);
+    expect(cardsText.match(/bargain/g)).toHaveLength(2);
     expect(cardsText.match(/common/g)).toHaveLength(8);
     expect(labels(p)).toEqual([
       "Take these cards",
@@ -714,5 +722,101 @@ describe("/story no duplicate live buttons", () => {
     expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
     expect(dm.sent.length).toBe(sentBefore); // nothing new sent
     expect(liveCount(dm)).toBe(1); // still exactly one live-button message
+  });
+});
+
+describe("/story no double delivery / no bleed-through", () => {
+  /** Count DM messages whose content matches a pattern (how many times a scene line was delivered). */
+  const countContent = (dm: Dm, re: RegExp): number =>
+    dm.sent.filter((p) => content(p) !== undefined && re.test(content(p)))
+      .length;
+
+  it("gate pressed twice (redelivery) delivers the greeting exactly once", async () => {
+    const ctx = makeCtx();
+    const { dm, gate } = await openGate(ctx);
+    const gateId = dm.idOf(gate);
+    const beginBtn = buttons(gate).find((b: any) => b.label === GATE.readyYes);
+
+    // First begin: delivers the greeting (two lines).
+    const first = dmButtonInteraction("u", beginBtn.custom_id, gateId, dm);
+    await storyCommand.component!(first as never, ctx);
+    expect(countContent(dm, /are you one of The Eyes\?/)).toBe(1);
+
+    // A redelivered gate press on the SAME (now consumed) gate message must NOT re-run the greeting:
+    // the gate stale guard sees it is no longer the live message and only strips its own buttons.
+    const replay = dmButtonInteraction("u", beginBtn.custom_id, gateId, dm);
+    await storyCommand.component!(replay as never, ctx);
+    expect(replay.update).toHaveBeenCalledWith({ components: [] });
+    expect(countContent(dm, /are you one of The Eyes\?/)).toBe(1); // still once
+    expect(liveCount(dm)).toBe(1);
+  });
+
+  it("a redelivered choice press, overlapping the first delivery, advances once and sends once", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    const greeting = live(dm);
+    const choice = buttons(greeting).find(
+      (b: any) => b.label === "No, I am not",
+    );
+    const liveId = ctx.repo.get("u").story!.liveMessageId!;
+    const sentBefore = dm.sent.length;
+    const sendCallsBefore = dm.send.mock.calls.length;
+
+    // Model a redelivery handled while the first deliverScene is still mid paced-send: pause sends,
+    // start the first handling (it advances the node, saves, then blocks on its first send), then run
+    // a second handling of the SAME press before flushing.
+    dm.pauseSends();
+    const firstPromise = storyCommand.component!(
+      dmButtonInteraction("u", choice.custom_id, liveId, dm) as never,
+      ctx,
+    );
+    // The advance was claimed (node persisted) before the paced send blocked.
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
+
+    const second = dmButtonInteraction("u", choice.custom_id, liveId, dm);
+    const secondPromise = storyCommand.component!(second as never, ctx);
+
+    dm.flushSends();
+    await Promise.all([firstPromise, secondPromise]);
+
+    // The second press read the advanced node and short-circuited: it neither advanced again nor sent.
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
+    expect(second.update).toHaveBeenCalledWith({ components: [] });
+    // ask_name_free is a two-line scene: exactly two new messages / sends — delivered ONCE, not twice.
+    expect(dm.sent.length - sentBefore).toBe(2);
+    expect(dm.send.mock.calls.length - sendCallsBefore).toBe(2);
+    expect(countContent(dm, /No matter/)).toBe(1);
+    expect(liveCount(dm)).toBe(1);
+  });
+
+  it("after advancing to confirm-name, only the newest message is live and no greeting bleeds in", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    const greetingButtonId = ctx.repo.get("u").story!.liveMessageId!;
+
+    // Yes -> ask_name (form), then submit a near-miss name -> confirm scene with its own buttons.
+    await click(ctx, dm, "Yes, I am one of The Eyes");
+    const { payload: confirm } = await submitName(ctx, dm, "abiss");
+
+    // The greeting's "Dost thou hear that wind?" / "are you one of The Eyes?" line is NOT re-sent into
+    // the confirm scene, and the greeting's old Yes/No buttons were cleared.
+    expect(countContent(dm, /are you one of The Eyes\?/)).toBe(1);
+    expect(dm.componentsOf(greetingButtonId)).toEqual([]);
+    // Exactly one live message: the newest confirm scene.
+    expect(liveCount(dm)).toBe(1);
+    expect(buttons(confirm).length).toBeGreaterThan(0);
+    const confirmId = ctx.repo.get("u").story!.liveMessageId!;
+    expect(dm.idOf(live(dm))).toBe(confirmId);
+  });
+
+  it("a single choice press delivers its scene exactly once (one delivery per action)", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    const sendCallsBefore = dm.send.mock.calls.length;
+    // ask_name_free is a two-line scene; a single press delivers exactly those two lines once.
+    await click(ctx, dm, "No, I am not");
+    expect(dm.send.mock.calls.length - sendCallsBefore).toBe(2);
+    expect(countContent(dm, /No matter/)).toBe(1);
+    expect(liveCount(dm)).toBe(1);
   });
 });
