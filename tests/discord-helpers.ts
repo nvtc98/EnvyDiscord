@@ -130,13 +130,31 @@ export function slashInteraction(
   userId: string,
   options: Record<string, string | boolean | null> = {},
   ownerId: string = userId,
-  opts: { dm?: ReturnType<typeof dmChannel> | null } = {},
+  opts: {
+    dm?: ReturnType<typeof dmChannel> | null;
+    failDefer?: number;
+  } = {},
 ) {
-  const reply = vi.fn(async (_payload: unknown) => undefined);
+  // `replied`/`deferred` track the real discord.js acknowledgement flags so the top-level catch can
+  // decide whether to reply or followUp. A successful deferReply flips `deferred`; a failed one leaves
+  // both false (as real discord.js does when the callback POST throws).
+  const flags = { replied: false, deferred: false };
+  const reply = vi.fn(async (_payload: unknown) => {
+    flags.replied = true;
+    return undefined;
+  });
   // Commands may defer first and then editReply (needed when work exceeds Discord's 3s window).
   // editReply shares the `reply` spy so assertions on the bot's response work whichever path a command takes.
-  const deferReply = vi.fn(async (_payload?: unknown) => undefined);
+  const deferReply = vi.fn(async (_payload?: unknown) => {
+    if (opts.failDefer !== undefined) throw discordApiError(opts.failDefer);
+    flags.deferred = true;
+    return undefined;
+  });
   const editReply = reply;
+  const followUp = vi.fn(async (_payload: unknown) => {
+    flags.replied = true;
+    return undefined;
+  });
   // `dm` is the channel user.createDM() resolves to; pass dm: null to simulate closed DMs.
   const dm = opts.dm === undefined ? dmChannel() : opts.dm;
   const createDM = vi.fn(async () => {
@@ -187,22 +205,51 @@ export function slashInteraction(
     client: {
       application: { fetch: async () => ({ owner: { id: ownerId } }) },
     },
+    isRepliable: () => true,
+    get replied() {
+      return flags.replied;
+    },
+    get deferred() {
+      return flags.deferred;
+    },
     reply,
     deferReply,
     editReply,
+    followUp,
   };
 }
 
-export function buttonInteraction(userId: string, customId: string) {
+export function buttonInteraction(
+  userId: string,
+  customId: string,
+  opts: { failUpdate?: number } = {},
+) {
+  // `replied`/`deferred` mirror discord.js: a successful `update` acknowledges the component
+  // interaction (sets `replied`); a failed one leaves both false.
+  const flags = { replied: false, deferred: false };
+  const update = vi.fn(async (_payload: unknown) => {
+    if (opts.failUpdate !== undefined) throw discordApiError(opts.failUpdate);
+    flags.replied = true;
+    return undefined;
+  });
+  const followUp = vi.fn(async (_payload: unknown) => undefined);
   return {
     user: { id: userId, username: `user${userId}` },
     customId,
     isButton: () => true,
     isStringSelectMenu: () => false,
-    update: vi.fn(async (_payload: unknown) => undefined),
+    isRepliable: () => true,
+    get replied() {
+      return flags.replied;
+    },
+    get deferred() {
+      return flags.deferred;
+    },
+    update,
     // The animated end-of-turn path acknowledges with `update`, then edits in place with `editReply`.
     editReply: vi.fn(async (_payload: unknown) => undefined),
     reply: vi.fn(async (_payload: unknown) => undefined),
+    followUp,
   };
 }
 
@@ -263,6 +310,21 @@ export function selectInteraction(
     isStringSelectMenu: () => true,
     values,
   };
+}
+
+/** Builds a DiscordAPIError with the given code, mirroring the construction used in createDM. */
+export function discordApiError(
+  code: number,
+  message = "test",
+): DiscordAPIError {
+  return new DiscordAPIError(
+    { code, message } as never,
+    code as never,
+    code === RESTJSONErrorCodes.UnknownInteraction ? 404 : 400,
+    "POST",
+    "",
+    {},
+  );
 }
 
 type Json = Record<string, any>;

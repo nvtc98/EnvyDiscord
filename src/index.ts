@@ -12,6 +12,7 @@ import { JsonPlayerRepo } from "./db/json-repo";
 import { loadConfig } from "./config";
 import type { AppContext } from "./discord/command";
 import { commandMap } from "./discord/commands";
+import { notifyInteractionError } from "./discord/interaction-errors";
 import { describeInteraction, instrument } from "./log/instrument";
 import { logDirectMessages } from "./log/inbound";
 import { JsonlLogger } from "./log/logger";
@@ -87,11 +88,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: "⚠️ Something hath gone amiss. I bid thee try once more.",
         flags: MessageFlags.Ephemeral,
       } as const;
-      await (
-        interaction.replied || interaction.deferred
-          ? interaction.followUp(message)
-          : interaction.reply(message)
-      ).catch(() => undefined);
+      // notifyInteractionError acknowledges at most once and swallows benign ack errors
+      // (10062/40060), so a primary ack failure is never amplified into a second blind reply.
+      await notifyInteractionError(interaction, message, log).catch(
+        () => undefined,
+      );
     }
   }
 });
