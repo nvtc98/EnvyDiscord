@@ -335,7 +335,7 @@ export const NODES: Record<string, NodeDef> = {
       const s = story(p);
       if (index === 2) {
         s.notice = stranger(
-          `I seek the Bo Tuoi Khan — the chieftain of the ${TRIBE}. There is a thing in his keeping, a thing of great worth, and I must beg its loan. But first I must find the tribe. So — do you know where they live?`,
+          `I seek their chieftain — the one who leads the ${TRIBE}. There is a thing in his keeping, a thing of great worth, and I must beg its loan. But first I must find the tribe. So — do you know where they live?`,
         );
         return "tribe";
       }
