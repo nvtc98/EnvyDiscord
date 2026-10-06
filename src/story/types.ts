@@ -60,7 +60,7 @@ export interface StoryBattleState {
   log: string[];
   /** Difficulty, for reward wording / future tuning. */
   difficulty: Difficulty;
-  /** Opponent portrait asset key for the renderer (e.g. "enemy1"). */
+  /** Opponent portrait asset key for the renderer (e.g. "boss-spd-battle"). */
   opponentPortrait: string | null;
 }
 
