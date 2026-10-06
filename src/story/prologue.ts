@@ -391,7 +391,7 @@ export const NODES: Record<string, NodeDef> = {
       lines: [
         narration("Draw my hood lower against the colder wind."),
         stranger(
-          `Yet I must warn thee. The ${TRIBE} — Bò Tuôi — bear a strange curse. No outsider may walk up to them in the common way. The road bends, and the path forgets thee.`,
+          `Yet I must warn thee. The ${TRIBE} bear a strange curse. No outsider may walk up to them in the common way. The road bends, and the path forgets thee.`,
         ),
         stranger(
           "But there is one who can lead us in — a man on the inside, who knows the ways beneath. He owes me a reckoning of old.",
@@ -560,7 +560,9 @@ export const NODES: Record<string, NodeDef> = {
         stranger(
           `These twelve... a fortunate draw, **${who(p)}**. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
         ),
-        narration("Turn the last page shut with a touch, and it seals itself."),
+        stranger(
+          `Now come. The deck is thine — let us make for the land of the ${TRIBE} before the hour grows late.`,
+        ),
       ],
       choices: go("Continue"),
     }),
