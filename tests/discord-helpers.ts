@@ -35,22 +35,36 @@ export class MemoryRepo implements PlayerRepo {
 export function dmChannel() {
   const sent: any[] = [];
   const events: any[] = [];
+  // Each sent payload keyed by the id send() returned, so clearComponents can strip buttons off the
+  // SAME object instances the `sent` array (and the live()/buttons() helpers) read from.
+  const byId = new Map<string, any>();
   let typingCount = 0;
   let next = 1;
-  const send = vi.fn(async (payload: unknown) => {
+  const send = vi.fn(async (payload: any) => {
+    const id = `dm-${next++}`;
     sent.push(payload);
     events.push(payload);
-    return { id: `dm-${next++}` };
+    byId.set(id, payload);
+    return { id };
   });
   const sendTyping = vi.fn(async () => {
     typingCount++;
     events.push("typing");
   });
+  // Mirrors production: editing a prior message to { components: [] }. Mutates the stored payload so a
+  // later live()/buttons() scan sees the buttons gone. A missing id is a no-op (benign in production).
+  const clearComponents = vi.fn(async (id: string) => {
+    const m = byId.get(id);
+    if (m) m.components = [];
+  });
   return {
     send,
     sendTyping,
+    clearComponents,
     sent,
     events,
+    /** The current components of the message with this id (as sent/edited), or undefined if unknown. */
+    componentsOf: (id: string) => byId.get(id)?.components,
     get typingCount() {
       return typingCount;
     },

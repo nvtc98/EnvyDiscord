@@ -26,6 +26,8 @@ import type {
 } from "../../story/types";
 import { slash, type AppContext, type Command } from "../command";
 import { tryRender } from "../images";
+import { isBenignEditError } from "../interaction-errors";
+import type { Logger } from "../../log/logger";
 import { isOwner } from "../owner";
 import {
   isPlainConversation,
@@ -50,6 +52,100 @@ export const storyContext = (ctx: AppContext): StoryContext => ({
 export interface DmChannel {
   send(payload: StoryMessage | object): Promise<{ id: string }>;
   sendTyping(): Promise<void>;
+  /**
+   * Strip the components (buttons) off a previously-sent message, leaving its text intact. Used to
+   * disable the buttons on an older gate/scene before posting a new interactive one, so only ONE live
+   * interaction point remains in the DM. Best-effort: a missing/too-old/gone message is swallowed.
+   */
+  clearComponents(messageId: string): Promise<void>;
+}
+
+/**
+ * The raw discord.js channel we wrap: it exposes `messages.edit(id, payload)`. Both `user.createDM()`
+ * and a component/modal interaction's `channel` are real DM channels that expose this.
+ */
+interface RawDmChannel {
+  send(payload: StoryMessage | object): Promise<{ id: string }>;
+  sendTyping(): Promise<void>;
+  messages: { edit(messageId: string, payload: object): Promise<unknown> };
+  /** Present when the channel already implements the DmChannel seam directly (e.g. a test mock). */
+  clearComponents?(messageId: string): Promise<void>;
+}
+
+/**
+ * Wraps a raw discord.js DM channel as a {@link DmChannel}, adding a best-effort `clearComponents`
+ * that edits a previous message to `{ components: [] }`. A benign edit failure (message deleted / too
+ * old / channel gone / no access) is logged and swallowed so stripping stale buttons never breaks the
+ * send of the new scene; any other error is rethrown.
+ */
+function asDmChannel(raw: RawDmChannel, log: Logger): DmChannel {
+  // When the raw channel already provides clearComponents (e.g. the test mock), use it as-is rather
+  // than reaching for messages.edit, which it may not expose.
+  const edit = raw.clearComponents
+    ? (id: string) => raw.clearComponents!(id)
+    : (id: string) => raw.messages.edit(id, { components: [] }).then(() => {});
+  return {
+    send: (payload) => raw.send(payload),
+    sendTyping: () => raw.sendTyping(),
+    async clearComponents(messageId: string): Promise<void> {
+      try {
+        await edit(messageId);
+      } catch (error) {
+        if (isBenignEditError(error)) {
+          log.message("error", {
+            messageId,
+            error: `benign edit error swallowed while clearing stale buttons: ${
+              (error as { code?: unknown }).code ?? "unknown"
+            }`,
+          });
+          return;
+        }
+        throw error;
+      }
+    },
+  };
+}
+
+/**
+ * The last interactive message id posted into a user's DM (gate or scene), keyed by userId. Process-
+ * local: it lets a fresh gate clear the PREVIOUS gate's buttons even before `player.story` exists
+ * (a brand-new player has no persisted `liveMessageId`). For scenes the persisted `liveMessageId` is
+ * the durable record; this map mirrors it so one call site clears whichever currently holds buttons.
+ */
+const liveGateMessages = new Map<string, string>();
+
+/** Test seam: clear the process-local live-message tracker so one test's ids don't leak into another. */
+export function resetLiveGateMessages(): void {
+  liveGateMessages.clear();
+}
+
+/**
+ * Edit whichever previously-posted interactive message still carries live buttons (the in-memory
+ * gate/scene id, falling back to the persisted scene `liveMessageId`) to strip its components, so
+ * posting a new gate/scene leaves only ONE live interaction point. Best-effort (the edit itself
+ * swallows benign failures). The caller records the new id afterwards via {@link recordLive}.
+ */
+export async function clearLiveButtons(
+  dm: DmChannel,
+  userId: string,
+  player: Player | null,
+): Promise<void> {
+  const id =
+    liveGateMessages.get(userId) ?? player?.story?.liveMessageId ?? null;
+  if (id) await dm.clearComponents(id);
+}
+
+/**
+ * Record the id of the message that now holds the live buttons for this user: always in the in-memory
+ * tracker, and (when the player has a story) in the persisted `liveMessageId` stale-button guard.
+ */
+export function recordLive(
+  userId: string,
+  messageId: string,
+  player: Player | null = null,
+): void {
+  liveGateMessages.set(userId, messageId);
+  if (player?.story) player.story.liveMessageId = messageId;
 }
 
 /** Tunable pacing for the story's "typing one line at a time" effect. */
@@ -141,8 +237,11 @@ export async function deliverScene(
   avatarUrl: string | null = null,
 ): Promise<void> {
   const screen = await screenFor(ctx, player);
+  // Strip the buttons off whatever interactive message is currently live in this DM (the prior scene
+  // or a still-open gate) BEFORE posting the new scene, so only one live interaction point remains.
+  await clearLiveButtons(dm, user.id, player);
   // BATTLE branch first: a battle node renders no story text; hand off to the launcher/resumer, which
-  // sends the battle message and sets liveMessageId itself.
+  // sends the battle message and records the new live id itself.
   if (screen.view.battle) {
     await launchStoryBattle(ctx, user, player, dm, avatarUrl);
     return;
@@ -164,7 +263,7 @@ export async function deliverScene(
     const sent = await dm.send(renderRich(screen));
     liveId = sent.id;
   }
-  player.story!.liveMessageId = liveId;
+  recordLive(user.id, liveId, player);
   await ctx.repo.save(player);
 }
 
@@ -223,9 +322,12 @@ function buildGate(player: Player): {
 }
 
 /** Opens the user's DM channel, mapping a closed-DM refusal to null (reusing the dm.ts error pattern). */
-export async function resolveDm(user: User): Promise<DmChannel | null> {
+export async function resolveDm(
+  user: User,
+  log: Logger,
+): Promise<DmChannel | null> {
   try {
-    return (await user.createDM()) as unknown as DmChannel;
+    return asDmChannel((await user.createDM()) as unknown as RawDmChannel, log);
   } catch (error) {
     if (
       error instanceof DiscordAPIError &&
@@ -289,7 +391,7 @@ export const storyCommand: Command = {
       });
     }
 
-    const dm = await resolveDm(user);
+    const dm = await resolveDm(user, ctx.log);
     if (!dm) {
       await reply(CLOSED_DM);
       return;
@@ -298,7 +400,13 @@ export const storyCommand: Command = {
     // The ready/resume gate is a command-layer pre-scene: declining it persists nothing.
     const player = ctx.repo.get(user.id);
     const g = buildGate(player);
-    await dm.send(gateMessage(g.line, g.yesLabel, g.yesId, g.noLabel));
+    // A prior /story may have left a gate or scene with live buttons; strip them before the new gate
+    // so a repeated /story never stacks duplicate live-button messages in the DM.
+    await clearLiveButtons(dm, user.id, player);
+    const sentGate = await dm.send(
+      gateMessage(g.line, g.yesLabel, g.yesId, g.noLabel),
+    );
+    recordLive(user.id, sentGate.id);
     await reply(DM_POINTER);
   },
 
@@ -361,7 +469,7 @@ export const storyCommand: Command = {
       ctx,
       user,
       player,
-      dmFrom(interaction),
+      dmFrom(interaction, ctx.log),
       avatarUrlOf(interaction),
     );
   },
@@ -381,7 +489,7 @@ export const storyCommand: Command = {
           ctx,
           user,
           player,
-          dmFrom(interaction),
+          dmFrom(interaction, ctx.log),
           avatarUrlOf(interaction),
         );
       else
@@ -407,7 +515,7 @@ export const storyCommand: Command = {
       ctx,
       user,
       player,
-      dmFrom(interaction),
+      dmFrom(interaction, ctx.log),
       avatarUrlOf(interaction),
     );
   },
@@ -416,8 +524,9 @@ export const storyCommand: Command = {
 /** The DM channel a button/modal was sent on. Replies go back to the same DM. */
 function dmFrom(
   interaction: MessageComponentInteraction | ModalSubmitInteraction,
+  log: Logger,
 ): DmChannel {
-  return interaction.channel as unknown as DmChannel;
+  return asDmChannel(interaction.channel as unknown as RawDmChannel, log);
 }
 
 /** The interaction user's avatar URL, or null when it is unavailable (e.g. a bare test user). */
@@ -445,7 +554,7 @@ async function handleGate(
   if (kind === "decline") {
     const player = ctx.repo.get(user.id);
     // Decline persists NOTHING: a no-progress player keeps story === null; progress is left untouched.
-    await dmFrom(interaction).send({
+    await dmFrom(interaction, ctx.log).send({
       content: player.story ? GATE.resumeDeclineLine : GATE.declineLine,
       allowedMentions: { parse: [] },
     });
@@ -465,7 +574,7 @@ async function handleGate(
     ctx,
     user,
     player,
-    dmFrom(interaction),
+    dmFrom(interaction, ctx.log),
     avatarUrlOf(interaction),
   );
 }

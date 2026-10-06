@@ -1,7 +1,11 @@
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dailyCommand } from "../src/discord/commands/daily";
-import { setStorySleep, storyCommand } from "../src/discord/commands/story";
+import {
+  resetLiveGateMessages,
+  setStorySleep,
+  storyCommand,
+} from "../src/discord/commands/story";
 import { createImageRenderer } from "../src/render/renderer";
 import { GATE } from "../src/story/prologue";
 import {
@@ -29,14 +33,25 @@ const text = (payload: any) => embedOf(payload).description as string;
 const live = (dm: Dm): any =>
   [...dm.sent].reverse().find((p) => buttons(p).length > 0);
 
+/** How many DM messages currently carry live buttons. Should stay at 1 across repeated /story. */
+const liveCount = (dm: Dm): number =>
+  dm.sent.filter((p) => buttons(p).length > 0).length;
+
 /** Runs /story (or /invite-style resume) and returns the DM channel plus the gate message it sent. */
 async function openGate(
   ctx: Ctx,
   userId = "u",
   options: Record<string, string | boolean | null> = {},
   ownerId = userId,
+  reuseDm?: Dm,
 ) {
-  const call = slashInteraction(userId, options, ownerId);
+  // A second /story must land in the SAME DM, so pass the existing channel through when reusing it.
+  const call = slashInteraction(
+    userId,
+    options,
+    ownerId,
+    reuseDm ? { dm: reuseDm } : {},
+  );
   await storyCommand.execute(call as never, ctx);
   return { call, dm: call.dm as Dm, gate: (call.dm as Dm).sent.at(-1) };
 }
@@ -106,6 +121,8 @@ async function submitName(ctx: Ctx, dm: Dm, textValue: string, userId = "u") {
 const sleptMs: number[] = [];
 beforeEach(() => {
   sleptMs.length = 0;
+  // The live-message tracker is process-local; clear it so ids from one test can't leak into another.
+  resetLiveGateMessages();
   setStorySleep(async (ms: number) => {
     sleptMs.push(ms);
   });
@@ -620,5 +637,82 @@ describe("/story restart", () => {
     expect(ctx.log.entries.some((e) => e.type === "story_restarted")).toBe(
       true,
     );
+  });
+});
+
+describe("/story no duplicate live buttons", () => {
+  it("a second /story before agreeing clears the first gate's buttons, leaving one live", async () => {
+    const ctx = makeCtx();
+    const { dm, gate: firstGate } = await openGate(ctx);
+    // The id send() returned for the first gate — the message we expect to be stripped.
+    const firstGateId = (await dm.send.mock.results[0]!.value).id;
+    expect(buttons(firstGate)).toHaveLength(2);
+
+    // Running /story again (same DM) must disable the first gate before posting the new one.
+    await openGate(ctx, "u", {}, "u", dm);
+    expect(dm.clearComponents).toHaveBeenCalledWith(firstGateId);
+    expect(buttons(firstGate)).toHaveLength(0); // the first gate's buttons were stripped
+    expect(liveCount(dm)).toBe(1); // only the new gate carries buttons
+  });
+
+  it("a second /story after agreeing clears the prior scene's buttons, leaving one live", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    const sceneId = ctx.repo.get("u").story!.liveMessageId!;
+    expect(liveCount(dm)).toBe(1);
+
+    // A second /story offers the resume gate; posting it must strip the live scene's buttons first.
+    await openGate(ctx, "u", {}, "u", dm);
+    expect(dm.clearComponents).toHaveBeenCalledWith(sceneId);
+    expect(liveCount(dm)).toBe(1); // only the resume gate carries buttons now
+
+    // Resuming re-sends the current scene; the gate it was pressed from is disabled, and resending
+    // the scene clears any other stale live message, so still exactly one live-button message.
+    await pressGate(ctx, dm, GATE.resumeYes);
+    expect(liveCount(dm)).toBe(1);
+  });
+
+  it("resuming a plain multi-message scene clears only the prior scene's last (button) message", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx); // greeting: 2 lines, buttons only on the last
+    const greetingButtonId = ctx.repo.get("u").story!.liveMessageId!;
+    const sceneMsgs = dm.sent.slice(1);
+    expect(buttons(sceneMsgs[0])).toHaveLength(0); // first line never had buttons
+    expect(buttons(sceneMsgs[1])).toHaveLength(2); // last line held them
+
+    // A resume re-delivers the greeting; the previous last-line's buttons must be cleared.
+    await openGate(ctx, "u", {}, "u", dm);
+    await pressGate(ctx, dm, GATE.resumeYes);
+    expect(dm.clearComponents).toHaveBeenCalledWith(greetingButtonId);
+    expect(buttons(sceneMsgs[1])).toHaveLength(0); // the old button-bearing line is now cleared
+    expect(liveCount(dm)).toBe(1);
+  });
+
+  it("a button pressed on a now-cleared old message does nothing and keeps one live message", async () => {
+    const ctx = makeCtx();
+    const { dm } = await begin(ctx);
+    const greeting = live(dm);
+    const greetingBtn = buttons(greeting).find(
+      (b: any) => b.label === "No, I am not",
+    );
+    const greetingMsgId = ctx.repo.get("u").story!.liveMessageId!;
+
+    // Advance so the greeting is no longer the live message.
+    await click(ctx, dm, "No, I am not");
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
+    const sentBefore = dm.sent.length;
+
+    // Press the stale greeting button: it should strip its own buttons and NOT advance or re-send.
+    const stale = dmButtonInteraction(
+      "u",
+      greetingBtn.custom_id,
+      greetingMsgId,
+      dm,
+    );
+    await storyCommand.component!(stale as never, ctx);
+    expect(stale.update).toHaveBeenCalledWith({ components: [] });
+    expect(ctx.repo.get("u").story!.node).toBe("ask_name_free");
+    expect(dm.sent.length).toBe(sentBefore); // nothing new sent
+    expect(liveCount(dm)).toBe(1); // still exactly one live-button message
   });
 });

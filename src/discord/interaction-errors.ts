@@ -18,7 +18,28 @@ export const BENIGN_ACK_CODES: readonly number[] = [
 /** True when the error is a DiscordAPIError whose code is one of the benign ack codes above. */
 export function isBenignAckError(error: unknown): boolean {
   return (
-    error instanceof DiscordAPIError && BENIGN_ACK_CODES.includes(error.code as number)
+    error instanceof DiscordAPIError &&
+    BENIGN_ACK_CODES.includes(error.code as number)
+  );
+}
+
+/**
+ * Message-edit errors that are safe to swallow when we strip the buttons off a PREVIOUS message: the
+ * message is already gone (deleted / too old to resolve), its channel is gone, or we lack access to
+ * it. Stripping stale buttons is best-effort cleanup, so none of these should bubble up and break the
+ * send of the new scene/gate that follows.
+ */
+export const BENIGN_EDIT_CODES: readonly number[] = [
+  RESTJSONErrorCodes.UnknownMessage,
+  RESTJSONErrorCodes.UnknownChannel,
+  RESTJSONErrorCodes.MissingAccess,
+];
+
+/** True when the error is a DiscordAPIError whose code is one of the benign edit codes above. */
+export function isBenignEditError(error: unknown): boolean {
+  return (
+    error instanceof DiscordAPIError &&
+    BENIGN_EDIT_CODES.includes(error.code as number)
   );
 }
 

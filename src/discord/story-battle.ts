@@ -14,7 +14,12 @@ import {
   type Session,
 } from "./battle-session";
 import type { AppContext } from "./command";
-import { deliverScene, storyContext, type DmChannel } from "./commands/story";
+import {
+  deliverScene,
+  recordLive,
+  storyContext,
+  type DmChannel,
+} from "./commands/story";
 
 /** The one-line caption on the finished board image (player-facing UI: archaic-but-plain, terse). */
 const END_SUMMARY: Record<"won" | "lost", string> = {
@@ -91,7 +96,7 @@ export async function launchStoryBattle(
     live.onStoryEnd = onStoryEnd;
     live.playerAvatarUrl = avatarUrl;
     const sent = await dm.send(renderBattle(await withImage(ctx, live)));
-    player.story!.liveMessageId = sent.id;
+    recordLive(user.id, sent.id, player);
     await ctx.repo.save(player);
     return;
   }
@@ -125,7 +130,7 @@ export async function launchStoryBattle(
   }
 
   const sent = await dm.send(renderBattle(await withImage(ctx, session)));
-  player.story!.liveMessageId = sent.id;
+  recordLive(user.id, sent.id, player);
   await ctx.repo.save(player);
 }
 

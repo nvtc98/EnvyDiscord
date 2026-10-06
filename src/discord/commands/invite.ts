@@ -2,7 +2,7 @@ import { MessageFlags } from "discord.js";
 import { GATE } from "../../story/prologue";
 import { sanitizeDisplay } from "../../story/names";
 import { slash, type Command } from "../command";
-import { gateMessage, resolveDm } from "./story";
+import { clearLiveButtons, gateMessage, recordLive, resolveDm } from "./story";
 
 const CLOSED_DM =
   "❌ I couldn't reach that player — their DMs are closed, or we don't share a server.";
@@ -35,7 +35,7 @@ export const inviteCommand: Command = {
       return;
     }
 
-    const dm = await resolveDm(target);
+    const dm = await resolveDm(target, ctx.log);
     if (!dm) {
       ctx.log.game("story_invite", {
         inviterId: inviter.id,
@@ -63,7 +63,14 @@ export const inviteCommand: Command = {
           "story:gate:begin",
           GATE.readyNo,
         );
-    await dm.send(gate);
+    // Clear any still-live gate/scene in the invitee's DM before posting this invite gate, then record
+    // the new one, so the invite participates in the single-live-interaction dedup just like /story.
+    await clearLiveButtons(dm, target.id, player);
+    const sentGate = await dm.send(gate);
+    // Track the gate id in the in-memory dedup map only (pass no player): the invite doesn't persist
+    // the player, so writing player.story.liveMessageId here would be a mutation that's never saved.
+    // The in-memory map covers in-process dedup; the invitee's resume flow re-derives from player.story.
+    recordLive(target.id, sentGate.id);
 
     ctx.log.game("story_invite", {
       inviterId: inviter.id,
