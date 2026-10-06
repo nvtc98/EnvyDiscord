@@ -4,7 +4,7 @@ import { activeVariant } from "../../game/player";
 import { normalize } from "../../util/text";
 import { slash, type Command } from "../command";
 import { attach, tryRender } from "../images";
-import { cardEmbed, variantLabel } from "../render";
+import { cardEmbed } from "../render";
 
 export const cardCommand: Command = {
   data: slash("card", "View a card's details").addStringOption((option) =>
@@ -41,9 +41,7 @@ export const cardCommand: Command = {
       return;
     }
     const active = activeVariant(ctx.repo.get(interaction.user.id), def.id);
-    const note = active
-      ? `You own this card · ${variantLabel(active)} variant`
-      : "You don't own this card yet";
+    const note = active ? "You own this card" : "You don't own this card yet";
     const variant = active ?? DEFAULT_VARIANT;
 
     const image = await tryRender(ctx, (r) =>

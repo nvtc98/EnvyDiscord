@@ -46,7 +46,7 @@ export function abilityText(ability: Ability | undefined): string {
     }
   }
   // onDestroy
-  return `When destroyed, return to your hand with +${effect.amount} power.`;
+  return `Passive: when destroyed, return to your hand with +${effect.amount} power.`;
 }
 
 export const cardText = (card: CardDef): string =>

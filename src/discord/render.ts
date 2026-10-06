@@ -25,8 +25,7 @@ export function cardEmbed(
     .setTitle(def.name)
     .setDescription(
       `**Cost ${def.cost}** · **Power ${def.power}**\n${cardText(def) || "No ability."}`,
-    )
-    .addFields({ name: "Frame", value: variantLabel(variant), inline: true });
+    );
   if (footer) embed.setFooter({ text: footer });
   return embed;
 }

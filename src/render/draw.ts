@@ -190,19 +190,44 @@ function drawParagraph(ctx: Ctx, f: TextField, text: string): void {
     )
       break;
   }
-  ctx.textAlign = f.align;
   ctx.textBaseline = "middle";
   const total = lines.length * size * lineHeight;
   const top = f.y + f.height / 2 - total / 2 + (size * lineHeight) / 2;
+  // A leading "Active:" / "Passive:" is drawn in bold; the rest of the text stays regular.
+  // The prefix only ever sits on the first wrapped line, so bold just the matching leading
+  // span of line 0 and keep every other line plain.
+  const prefixMatch = /^(Active:|Passive:)(\s*)(.*)$/.exec(lines[0] ?? "");
+  const regular = cardFont(400)(size);
+  const bold = cardFont(700)(size);
   lines.forEach((line, i) => {
-    ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(0.8, size * 0.1);
-    ctx.strokeStyle = "rgba(0,0,0,0.5)";
-    const x = anchorX(f);
     const y = top + i * size * lineHeight;
-    ctx.strokeText(line, x, y);
+    if (i === 0 && prefixMatch) {
+      // Measure the bold prefix and the regular remainder so the whole line stays centred.
+      const [, prefix, gap, rest] = prefixMatch;
+      const head = prefix + gap;
+      ctx.font = bold;
+      const headW = ctx.measureText(head).width;
+      ctx.font = regular;
+      const restW = ctx.measureText(rest).width;
+      const lineW = headW + restW;
+      let x =
+        f.align === "center"
+          ? anchorX(f) - lineW / 2
+          : f.align === "right"
+            ? anchorX(f) - lineW
+            : anchorX(f);
+      ctx.textAlign = "left";
+      ctx.fillStyle = f.color;
+      ctx.font = bold;
+      ctx.fillText(head, x, y);
+      ctx.font = regular;
+      ctx.fillText(rest, x + headW, y);
+      return;
+    }
+    ctx.textAlign = f.align;
+    ctx.font = regular;
     ctx.fillStyle = f.color;
-    ctx.fillText(line, x, y);
+    ctx.fillText(line, anchorX(f), y);
   });
 }
 

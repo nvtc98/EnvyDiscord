@@ -77,8 +77,7 @@ export interface RendererOptions {
 
 const GAP = 14;
 const FONT_FILES: [file: string, family: string][] = [
-  ["Inter-Regular.woff2", FONT_FAMILY],
-  ["Inter-Bold.woff2", FONT_FAMILY],
+  ["Alegreya-Variable.ttf", FONT_FAMILY],
   ["Cinzel-Bold.woff2", TITLE_FONT],
   ["Aleo-Regular.woff2", CARD_FONT],
   ["Aleo-Bold.woff2", CARD_FONT],
@@ -334,7 +333,6 @@ export async function createImageRenderer({
           drawCompactCard(
             ctx,
             compactFace(card, card.def.power, viewer, variants, {
-              index: i + 1,
               selected: card.uid === selectedUid,
               dim: yourTurn && card.def.cost > me.energy,
             }),
