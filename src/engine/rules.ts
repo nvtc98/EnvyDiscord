@@ -8,6 +8,7 @@ import {
   CELLS,
   LANES,
   MAX_ENERGY,
+  MAX_HAND,
   MAX_TURNS,
   OPENING_HAND,
   opponentOf,
@@ -108,6 +109,11 @@ function draw(
   const player = state.players[seat];
   for (let i = 0; i < count && player.deck.length > 0; i++) {
     const card = player.deck.shift()!;
+    if (handFull(state, seat)) {
+      // Over the cap: the drawn card leaves the deck but never enters the hand.
+      events.push({ type: "burned", seat, card });
+      continue;
+    }
     const instance: CardInstance = {
       uid: state.nextUid++,
       def: card,
@@ -118,6 +124,10 @@ function draw(
     events.push({ type: "drew", seat, uid: instance.uid, card });
   }
 }
+
+/** True once a seat's hand is at the cap, so a further draw (or revival) must burn instead of enter. */
+const handFull = (state: GameState, seat: Seat): boolean =>
+  state.players[seat].hand.length >= MAX_HAND;
 
 function startTurn(state: GameState, events: GameEvent[]): void {
   const player = state.players[state.active];
@@ -207,6 +217,17 @@ function destroyCard(
   const ability = card.def.ability;
   if (ability?.timing === "onDestroy" && ability.effect.kind === "rebirth") {
     const amount = ability.effect.amount;
+    if (handFull(state, card.owner)) {
+      // A revival into a full hand is burned (not tallied) — same early return as a normal rebirth.
+      events.push({ type: "burned", seat: card.owner, card: card.def });
+      events.push({
+        type: "ability",
+        seat: card.owner,
+        card: card.def,
+        text: "could not return — hand was full",
+      });
+      return; // NOT counted into destroyedPower or destroyedCount
+    }
     const revived: CardInstance = {
       uid: state.nextUid++,
       def: card.def,

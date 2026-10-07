@@ -9,6 +9,8 @@ export const BALANCE_MAX = 100;
 export const DECK_SIZE = 12;
 /** Cards drawn before the first turn; every turn then starts with one more draw. */
 export const OPENING_HAND = { first: 2, second: 3 } as const;
+/** Maximum hand size. A draw past this burns the drawn card (it leaves the deck, never enters the hand). */
+export const MAX_HAND = 6;
 
 /** Where a player sits. `bottom` is the human at the bottom of the board, `top` is the opponent. */
 export type Seat = "bottom" | "top";
@@ -116,6 +118,7 @@ export interface Play {
 
 export type GameEvent =
   | { type: "drew"; seat: Seat; uid: number; card: CardDef }
+  | { type: "burned"; seat: Seat; card: CardDef }
   | { type: "turn_started"; seat: Seat; round: number; energy: number }
   | {
       type: "played";

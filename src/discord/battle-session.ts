@@ -218,6 +218,7 @@ export function logEvents(
 ): void {
   for (const event of events) {
     if (event.type === "drew" && event.seat === "top") continue; // the enemy's draws carry no information worth keeping
+    if (event.type === "burned" && event.seat === "top") continue; // likewise the enemy's overflow burns
     ctx.log.game("battle_event", {
       userId,
       battleId: session.id,

@@ -11,6 +11,8 @@ export function describeEvent(event: GameEvent, viewer: Seat): string | null {
   switch (event.type) {
     case "drew":
       return event.seat === viewer ? `You drew ${event.card.name}.` : null;
+    case "burned":
+      return null;
     case "turn_started":
       return null;
     case "played": {

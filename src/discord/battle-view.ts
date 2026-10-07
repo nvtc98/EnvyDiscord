@@ -178,7 +178,7 @@ function infoLine(state: GameState, viewer: Seat): string {
   // Same rule as the renderer TURN counter (Part 4.5): in-progress turn while playing,
   // turns-actually-resolved once over, both clamped to MAX_TURNS.
   const turn = Math.min(state.turnsPlayed + (state.winner ? 0 : 1), MAX_TURNS);
-  return `Tide ${state.balance}-${100 - state.balance} · Turn ${turn}/${MAX_TURNS} · You H${me.hand.length} D${me.deck.length} · Enemy H${foe.hand.length} D${foe.deck.length} · E${me.energy}`;
+  return `The Eye Privilege ${state.balance}-${100 - state.balance} · Turn ${turn}/${MAX_TURNS} · You H${me.hand.length} D${me.deck.length} · Enemy H${foe.hand.length} D${foe.deck.length} · E${me.energy}`;
 }
 
 function embed(

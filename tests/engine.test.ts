@@ -20,9 +20,12 @@ import {
 } from "../src/engine/rules";
 import {
   MAX_TURNS,
+  MAX_HAND,
+  OPENING_HAND,
   BALANCE_START,
   type CardInstance,
   type Cell,
+  type GameState,
 } from "../src/engine/types";
 import { mulberry32 } from "../src/util/rng";
 import {
@@ -559,6 +562,114 @@ describe("AI", () => {
     expect(evaluate(leaning, "bottom")).toBeGreaterThan(withBoard);
     // The same higher balance is worse for top (seat-fixed direction).
     expect(evaluate(leaning, "top")).toBeLessThan(evaluate(state, "top"));
+  });
+});
+
+describe("hand cap (MAX_HAND) and the burned event", () => {
+  const fill = (state: GameState, seat: "bottom" | "top", n: number) => {
+    for (let i = 0; i < n; i++)
+      state.players[seat].hand.push(instance(def(`h${i}`, 1, 1), seat));
+  };
+
+  it("burns a start-of-turn draw into a full hand instead of a 7th card", () => {
+    const state = emptyGame("bottom");
+    fill(state, "top", MAX_HAND);
+    expect(state.players.top.deck.length).toBeGreaterThan(0);
+    state.active = "bottom";
+    const deckBefore = state.players.top.deck.length;
+
+    // Control passes to top, whose startTurn draws 1 — into a hand already at the cap.
+    const { state: next, events } = endTurn(state, mulberry32(0));
+
+    expect(next.players.top.hand.length).toBe(MAX_HAND);
+    expect(next.players.top.deck.length).toBe(deckBefore - 1);
+    expect(events.some((e) => e.type === "burned" && e.seat === "top")).toBe(
+      true,
+    );
+  });
+
+  it("burns a Phoenix revival into a full hand (no tally, hand stays at the cap)", () => {
+    const state = emptyGame();
+    const phoenix = def("PHX", 4, 4, {
+      timing: "onDestroy",
+      effect: { kind: "rebirth", amount: 4 },
+    });
+    fill(state, "top", MAX_HAND);
+    // A full lane with the Phoenix on the top edge, so a bottom push shoves it off and destroys it.
+    setLane(state, 0, [
+      instance(phoenix, "top"),
+      instance(def("E2", 1, 1), "top"),
+      instance(def("P1", 1, 1), "bottom"),
+    ]);
+    const x = give(state, "bottom", def("X", 1, 1));
+    const powerBefore = state.destroyedPower;
+    const countBefore = state.destroyedCount;
+
+    const { state: after, events } = playCard(state, x.uid, 0);
+
+    expect(after.players.top.hand.length).toBe(MAX_HAND);
+    expect(after.players.top.hand.some((c) => c.def.id === "PHX")).toBe(false);
+    expect(after.destroyedPower).toBe(powerBefore);
+    expect(after.destroyedCount).toBe(countBefore);
+    expect(events.some((e) => e.type === "burned" && e.seat === "top")).toBe(
+      true,
+    );
+  });
+
+  it("still returns a Phoenix to a hand with room (regression)", () => {
+    const state = emptyGame();
+    const phoenix = def("PHX", 4, 4, {
+      timing: "onDestroy",
+      effect: { kind: "rebirth", amount: 4 },
+    });
+    fill(state, "top", MAX_HAND - 1); // one free slot
+    setLane(state, 0, [
+      instance(phoenix, "top"),
+      instance(def("E2", 1, 1), "top"),
+      instance(def("P1", 1, 1), "bottom"),
+    ]);
+    const x = give(state, "bottom", def("X", 1, 1));
+
+    const { state: after, events } = playCard(state, x.uid, 0);
+
+    expect(after.players.top.hand.length).toBe(MAX_HAND);
+    const revived = after.players.top.hand.find((c) => c.def.id === "PHX");
+    expect(revived).toBeDefined();
+    expect(revived!.bonus).toBe(4);
+    expect(events.some((e) => e.type === "burned")).toBe(false);
+  });
+
+  it("gives both seats a legal opening hand within the cap", () => {
+    const { state } = newGame(
+      { bottom: realDeck(), top: realDeck() },
+      "bottom",
+      mulberry32(7),
+    );
+    // The first (active) seat draws its opening hand plus the one start-of-turn draw.
+    expect(state.players.bottom.hand.length).toBe(OPENING_HAND.first + 1);
+    expect(state.players.top.hand.length).toBe(OPENING_HAND.second);
+    expect(state.players.bottom.hand.length).toBeLessThanOrEqual(MAX_HAND);
+    expect(state.players.top.hand.length).toBeLessThanOrEqual(MAX_HAND);
+  });
+
+  it("burns the overflow when a draw-ability draws past the cap", () => {
+    const state = emptyGame();
+    const drawCard = def("DRAW", 1, 1, {
+      timing: "active",
+      effect: { kind: "draw", count: 2 },
+    });
+    fill(state, "bottom", MAX_HAND - 1); // one free slot plus the card we play below leaves room for exactly one draw
+    // Playing DRAW removes it from hand first, so the hand sits at MAX_HAND-1 when the ability draws 2.
+    const card = give(state, "bottom", drawCard);
+    const deckBefore = state.players.bottom.deck.length;
+
+    const { state: after, events } = playCard(state, card.uid, 0);
+
+    expect(after.players.bottom.hand.length).toBe(MAX_HAND);
+    expect(after.players.bottom.deck.length).toBe(deckBefore - 2);
+    expect(
+      events.filter((e) => e.type === "burned" && e.seat === "bottom").length,
+    ).toBe(1);
   });
 });
 
