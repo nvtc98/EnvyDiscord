@@ -1,4 +1,4 @@
-import type { Ability, CardDef } from "./types";
+import { assertNever, type Ability, type CardDef, type Faction } from "./types";
 
 /** Plain-English description of an ability, used as the card's rules text unless the card sets its own. */
 export function abilityText(ability: Ability | undefined): string {
@@ -31,6 +31,12 @@ export function abilityText(ability: Ability | undefined): string {
         return "Passive: this lane cannot be pushed.";
       case "drainStartOfTurn":
         return `Passive: at the start of each turn, every other card loses ${effect.amount} power.`;
+      case "transformAt":
+        return `Passive: when ${s(effect.count, "card")} ${effect.count === 1 ? "has" : "have"} been destroyed this match, transform.`;
+      case "balanceCoefficient":
+        return `Passive: tide coefficient ${effect.k}.`;
+      default:
+        return assertNever(effect);
     }
   }
   if (timing === "endOfRound") {
@@ -45,6 +51,9 @@ export function abilityText(ability: Ability | undefined): string {
 
 export const cardText = (card: CardDef): string =>
   card.text ?? abilityText(card.ability);
+
+/** A card's faction, defaulting to "the-eyes" for hand-built literals that omit it (§1). */
+export const cardFaction = (def: CardDef): Faction => def.faction ?? "the-eyes";
 
 export const hasContinuous = (
   card: CardDef,

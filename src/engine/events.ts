@@ -22,6 +22,8 @@ export function describeEvent(event: GameEvent, viewer: Seat): string | null {
     }
     case "ability":
       return `${event.card.name} ${event.text}.`;
+    case "transformed":
+      return `${event.from.name} became ${event.into.name}.`;
     case "tide_shifted": {
       if (event.delta === 0) return "The tide holds.";
       // A bottom-favouring shift (delta > 0) is "toward you" for the bottom viewer.

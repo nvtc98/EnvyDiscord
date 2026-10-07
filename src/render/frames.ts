@@ -5,6 +5,7 @@ import {
   variantOrder,
   type VariantId,
 } from "../data/variants";
+import type { Faction } from "../engine/types";
 import { ArtLibrary } from "./art";
 
 /**
@@ -17,6 +18,12 @@ export class FrameLibrary {
 
   constructor(framesDir: string) {
     this.files = new ArtLibrary(join(framesDir), 760); // keep the full resolution of a 750 px export
+  }
+
+  /** The frame for a card: Bò Tuôi has a single frame (variant ignored); The Eyes uses the variant path. */
+  async forCard(faction: Faction, variant: VariantId): Promise<Canvas | null> {
+    if (faction === "botuoi") return this.files.get("botuoi/frame");
+    return this.forVariant(variant);
   }
 
   async forVariant(id: VariantId): Promise<Canvas | null> {

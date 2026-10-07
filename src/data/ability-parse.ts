@@ -9,8 +9,10 @@ type Timing = Ability["timing"];
 interface TokenSpec {
   timing: Timing;
   kind: string;
-  /** Which field the amount is written to; absent means the token takes no amount. */
-  amountField?: "amount" | "count";
+  /** Which field a single numeric amount is written to. Mutually exclusive with `args`. */
+  amountField?: "amount" | "count" | "k";
+  /** Multi-arg form, e.g. ["count:int", "into:id"]. Mutually exclusive with `amountField`. */
+  args?: ReadonlyArray<"count:int" | "into:id">;
 }
 
 const TOKENS: Record<string, TokenSpec> = {
@@ -27,6 +29,16 @@ const TOKENS: Record<string, TokenSpec> = {
     timing: "continuous",
     kind: "drainStartOfTurn",
     amountField: "amount",
+  },
+  transformAt: {
+    timing: "continuous",
+    kind: "transformAt",
+    args: ["count:int", "into:id"],
+  },
+  balanceCoefficient: {
+    timing: "continuous",
+    kind: "balanceCoefficient",
+    amountField: "k",
   },
   oceanReturn: {
     timing: "endOfRound",
@@ -48,7 +60,25 @@ export function parseAbility(shorthand: string, cardName: string): Ability {
 
   const effect: Record<string, unknown> = { kind: spec.kind };
 
-  if (spec.amountField) {
+  if (spec.args) {
+    // Multi-arg form, e.g. transformAt <count> <into> — exactly args.length + 1 parts.
+    if (parts.length !== spec.args.length + 1)
+      throw new Error(
+        `cards.json: card "${cardName}" ability "${token}" requires ${spec.args.length} arguments`,
+      );
+    const count = Number(parts[1]);
+    if (!Number.isInteger(count) || count <= 0)
+      throw new Error(
+        `cards.json: card "${cardName}" ability "${token}" needs a positive integer count, got "${parts[1]}"`,
+      );
+    const into = parts[2];
+    if (!into)
+      throw new Error(
+        `cards.json: card "${cardName}" ability "${token}" needs a non-empty target id`,
+      );
+    effect.count = count;
+    effect.into = into;
+  } else if (spec.amountField) {
     if (parts.length !== 2)
       throw new Error(
         `cards.json: card "${cardName}" ability "${token}" requires exactly one integer amount`,

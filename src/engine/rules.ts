@@ -3,6 +3,7 @@ import { shuffle } from "../util/rng";
 import { hasContinuous } from "./abilities";
 import { entryCell, pushInto, pushMovers, wouldPush } from "./push";
 import {
+  assertNever,
   BALANCE_START,
   CELLS,
   LANES,
@@ -19,6 +20,7 @@ import {
   type Play,
   type Seat,
 } from "./types";
+import { CARD_INDEX } from "../data/cards";
 
 export interface Step {
   state: GameState;
@@ -27,15 +29,34 @@ export interface Step {
 
 const laneIndexes = Array.from({ length: LANES }, (_, i) => i as LaneIndex);
 
-export const BALANCE_K = 1;
+export const BASE_COEFFICIENT = 1;
+
+/** A card's balance coefficient, read from either carrier: the `balanceCoefficient` ability or the `coefficient` field (§6). */
+const coefficientOf = (card: CardInstance): number => {
+  const ab = card.def.ability;
+  if (ab?.timing === "continuous" && ab.effect.kind === "balanceCoefficient")
+    return ab.effect.k;
+  return card.def.coefficient ?? 0;
+};
+
+/** Sum of every coefficient card on the board, BOTH seats combined (ownership-independent, §6). */
+const sumCoefficients = (state: GameState): number => {
+  let total = 0;
+  for (let lane = 0; lane < LANES; lane++)
+    for (let i = 0; i < CELLS; i++) {
+      const card = state.lanes[lane][i];
+      if (card) total += coefficientOf(card);
+    }
+  return total;
+};
 
 /**
- * The multiplier applied to this turn's raw power difference before it moves the balance.
- * Today it is always BALANCE_K. A future ability can scale it (e.g. a card that doubles the
- * tide swing) by contributing a factor here; no such ability exists yet.
+ * The single global multiplier applied to this turn's signed board-power difference before it moves
+ * the balance: `k = BASE_COEFFICIENT + Σ coefficientOf(card)` over every card on the board, both seats
+ * (the "super reactionary" rule, §6). With no coefficient cards, `k = BASE_COEFFICIENT = 1`.
  */
-function balanceFactor(_state: GameState, _activeSeat: Seat): number {
-  return BALANCE_K;
+function balanceFactor(state: GameState): number {
+  return BASE_COEFFICIENT + sumCoefficients(state);
 }
 
 /** Shuffles both decks, deals the opening hands, and starts the first player's first turn. */
@@ -69,6 +90,7 @@ export function newGame(
     winner: null,
     nextUid: 1,
     destroyedPower: 0,
+    destroyedCount: 0,
   };
   const events: GameEvent[] = [];
   draw(state, first, OPENING_HAND.first, events);
@@ -168,10 +190,6 @@ function pushHitsShieldedEnemy(
   });
 }
 
-function assertNever(x: never): never {
-  throw new Error(`Unhandled active effect: ${JSON.stringify(x)}`);
-}
-
 type DestroyCause = "push" | "siren" | "laser";
 
 /**
@@ -202,9 +220,45 @@ function destroyCard(
       card: card.def,
       text: `returned to its owner's hand with +${amount} power`,
     });
-    return; // NOT counted into destroyedPower
+    return; // NOT counted into destroyedPower or destroyedCount
   }
   state.destroyedPower += Math.max(0, card.def.power + card.bonus);
+  state.destroyedCount += 1;
+}
+
+/**
+ * Transforms every eligible `transformAt` card on the board in place: once the match-wide `destroyedCount`
+ * reaches a card's threshold it becomes its target def (position/lane/owner/uid preserved, `bonus` reset to
+ * 0). A single sweep (lanes L→R, cells top→bottom); a cell swapped this pass is not revisited, so a chain
+ * (Cấp 1 → Cấp 2 → Cấp 3) advances one level per triggering action, not all at once (§5).
+ */
+function applyTransforms(state: GameState, events: GameEvent[]): void {
+  for (let lane = 0; lane < LANES; lane++) {
+    const cells = state.lanes[lane];
+    for (let i = 0; i < CELLS; i++) {
+      const card = cells[i];
+      const ab = card?.def.ability;
+      if (
+        !card ||
+        ab?.timing !== "continuous" ||
+        ab.effect.kind !== "transformAt"
+      )
+        continue;
+      if (state.destroyedCount < ab.effect.count) continue;
+      const target = CARD_INDEX.get(ab.effect.into);
+      if (!target) continue; // unknown target id: skip, no event (defended; caught by the self-test)
+      const from = card.def;
+      card.def = target;
+      card.bonus = 0;
+      events.push({
+        type: "transformed",
+        seat: card.owner,
+        uid: card.uid,
+        from,
+        into: target,
+      });
+    }
+  }
 }
 
 /**
@@ -418,6 +472,10 @@ export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
 
   const ability = card.def.ability;
   if (ability?.timing === "active") applyActive(state, card, lane, events);
+
+  // After every destroy this action could cause (entry push + any active destroys), sweep the board
+  // once so Bò SPD cards transform the instant the match tally crosses their threshold (§5).
+  applyTransforms(state, events);
   return { state, events };
 }
 
@@ -527,7 +585,7 @@ export function endTurn(prev: GameState, rng: Rng): Step {
 function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   // 1. Read board power -> 2. apply tide shift -> 3. bump turnsPlayed -> 4. knockout
   // -> 5. cap -> 6. Ocean pass (only if the game continues).
-  const k = balanceFactor(state, state.active);
+  const k = balanceFactor(state);
   const delta = (totalPower(state, "bottom") - totalPower(state, "top")) * k;
   const before = state.balance;
   state.balance = Math.max(0, Math.min(100, before + delta));

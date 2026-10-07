@@ -25,7 +25,9 @@ export type ActiveEffect =
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
-  | { kind: "drainStartOfTurn"; amount: number }; // Venom: -amount power to every other card each turn start
+  | { kind: "drainStartOfTurn"; amount: number } // Venom: -amount power to every other card each turn start
+  | { kind: "transformAt"; count: number; into: string } // Bò SPD: transform into `into` once `count` cards have been destroyed this match
+  | { kind: "balanceCoefficient"; k: number }; // Bò SPD: contributes `k` to the single global tide coefficient (§6)
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
 export type EndOfRoundEffect = { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
 export type OnDestroyEffect = { kind: "rebirth"; amount: number }; // Phoenix: return to hand with +amount
@@ -39,6 +41,9 @@ export type Ability =
 
 export type Rarity = "common" | "bargain" | "eternal";
 
+/** Which deck/visual family a card belongs to. Absent on a CardDef → "the-eyes" (see cardFaction). */
+export type Faction = "the-eyes" | "botuoi";
+
 export interface CardDef {
   id: string;
   name: string;
@@ -49,6 +54,15 @@ export interface CardDef {
   ability?: Ability;
   /** Rules text shown on the card. Defaults to a description generated from the ability. */
   text?: string;
+  /** Which deck/visual family the card belongs to. Absent → "the-eyes" (see cardFaction). */
+  faction?: Faction;
+  /** Per-card balance-meter coefficient (§6). Absent → 0 (no contribution). */
+  coefficient?: number;
+}
+
+/** Narrows an exhaustive switch: a reachable call means a union member has no case. */
+export function assertNever(x: never): never {
+  throw new Error(`Unhandled effect: ${JSON.stringify(x)}`);
 }
 
 export interface CardInstance {
@@ -91,6 +105,8 @@ export interface GameState {
   nextUid: number;
   /** Running sum of the actual power of every card destroyed this match, both seats. Read by Stella Eyes. */
   destroyedPower: number;
+  /** Number of cards destroyed this match, both seats. Read by transformAt (§5). */
+  destroyedCount: number;
 }
 
 export interface Play {
@@ -110,6 +126,13 @@ export type GameEvent =
       destroyed: { card: CardDef; owner: Seat } | null;
     }
   | { type: "ability"; seat: Seat; card: CardDef; text: string }
+  | {
+      type: "transformed";
+      seat: Seat;
+      uid: number;
+      from: CardDef;
+      into: CardDef;
+    }
   | {
       type: "tide_shifted";
       /** The applied, clamped shift this turn: new balance minus old balance. */

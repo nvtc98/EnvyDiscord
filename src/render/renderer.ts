@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { GlobalFonts, createCanvas } from "@napi-rs/canvas";
-import { hasContinuous } from "../engine/abilities";
+import { cardFaction, hasContinuous } from "../engine/abilities";
 import { effectivePower, isAnchored } from "../engine/rules";
 import {
   CELLS,
@@ -10,6 +10,7 @@ import {
   opponentOf,
   type CardDef,
   type CardInstance,
+  type Faction,
   type GameState,
   type Seat,
 } from "../engine/types";
@@ -79,8 +80,8 @@ const GAP = 14;
 const FONT_FILES: [file: string, family: string][] = [
   ["Alegreya-Variable.ttf", FONT_FAMILY],
   ["Cinzel-Bold.woff2", TITLE_FONT],
-  ["Aleo-Regular.woff2", CARD_FONT],
-  ["Aleo-Bold.woff2", CARD_FONT],
+  ["Aleo-Regular.ttf", CARD_FONT],
+  ["Aleo-Bold.ttf", CARD_FONT],
 ];
 
 // Battle scene geometry, in CSS pixels. The image is drawn at a scale times this for sharpness.
@@ -153,12 +154,28 @@ export async function createImageRenderer({
       throw new Error(`Could not load font ${path}`);
   }
 
-  let layout: CardLayout = DEFAULT_LAYOUT;
-  try {
-    layout = await loadLayout(join(assetsDir, "frames", "layout.json"));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
+  const loadLayoutOrDefault = async (
+    path: string,
+    fallback: CardLayout,
+  ): Promise<CardLayout> => {
+    try {
+      return await loadLayout(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return fallback;
+    }
+  };
+
+  const eyesLayout = await loadLayoutOrDefault(
+    join(assetsDir, "frames", "layout.json"),
+    DEFAULT_LAYOUT,
+  );
+  const botuoiLayout = await loadLayoutOrDefault(
+    join(assetsDir, "frames", "botuoi", "layout.json"),
+    eyesLayout,
+  );
+  const layoutFor = (faction: Faction): CardLayout =>
+    faction === "botuoi" ? botuoiLayout : eyesLayout;
 
   const art = new ArtLibrary(join(assetsDir, "cards"));
   const frames = new FrameLibrary(join(assetsDir, "frames"));
@@ -185,14 +202,18 @@ export async function createImageRenderer({
 
   return {
     async cards(views, { scale = 1.5 } = {}) {
-      const cw = Math.round(layout.card.width * scale);
-      const ch = Math.round(layout.card.height * scale);
+      // Every card shares the same output cell size, computed from The Eyes layout so a row of mixed
+      // factions still lines up; each card is then scaled from its own layout's base card size.
+      const cw = Math.round(eyesLayout.card.width * scale);
+      const ch = Math.round(eyesLayout.card.height * scale);
       const canvas = createCanvas(
         views.length * cw + (views.length + 1) * GAP,
         ch + GAP * 2,
       );
       const ctx = canvas.getContext("2d");
       for (const [i, view] of views.entries()) {
+        const faction = cardFaction(view.def);
+        const layout = layoutFor(faction);
         ctx.save();
         ctx.translate(GAP + i * (cw + GAP), GAP);
         ctx.scale(cw / layout.card.width, ch / layout.card.height);
@@ -201,7 +222,7 @@ export async function createImageRenderer({
           layout,
           view,
           await art.get(view.def.id),
-          await frames.forVariant(view.variant),
+          await frames.forCard(faction, view.variant),
         );
         ctx.restore();
       }
@@ -223,8 +244,9 @@ export async function createImageRenderer({
       const foe = state.players[foeSeat];
       const hand = me.hand;
       const handRows = Math.ceil(hand.length / HAND_COLS);
-      const handCardW = Math.round(layout.card.width * HAND_CARD_SCALE);
-      const handCardH = Math.round(layout.card.height * HAND_CARD_SCALE);
+      // Hand grid cells use The Eyes base card size (uniform grid; botuoi shares the same 240×336 base).
+      const handCardW = Math.round(eyesLayout.card.width * HAND_CARD_SCALE);
+      const handCardH = Math.round(eyesLayout.card.height * HAND_CARD_SCALE);
       const boardBottom = BOARD_Y + BOARD_H;
       // Player identity row sits below the board; its avatar is centered here.
       const playerRowY = boardBottom + 12;
@@ -377,6 +399,8 @@ export async function createImageRenderer({
             card.owner === viewer
               ? (variants?.[card.def.id] ?? DEFAULT_VARIANT)
               : DEFAULT_VARIANT;
+          const faction = cardFaction(card.def);
+          const cardLayout = layoutFor(faction);
 
           ctx.save();
           ctx.translate(cx, cy);
@@ -384,16 +408,16 @@ export async function createImageRenderer({
           if (isDim) ctx.globalAlpha = 0.4;
           drawFullCard(
             ctx,
-            layout,
+            cardLayout,
             { def: card.def, variant },
             await art.get(card.def.id),
-            await frames.forVariant(variant),
+            await frames.forCard(faction, variant),
           );
           ctx.restore();
 
           if (isSelected) {
             const r =
-              Math.round(layout.card.cornerRadius * HAND_CARD_SCALE) + 1;
+              Math.round(eyesLayout.card.cornerRadius * HAND_CARD_SCALE) + 1;
             ctx.save();
             ctx.beginPath();
             ctx.roundRect(cx - 1, cy - 1, handCardW + 2, handCardH + 2, r);

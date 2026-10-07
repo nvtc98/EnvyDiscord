@@ -49,6 +49,94 @@ describe("tide shift sign and magnitude", () => {
   });
 });
 
+describe("single global balance coefficient (super reactionary)", () => {
+  // A coefficient card via the balanceCoefficient ability (Card D's carrier).
+  const coeffAbility = (k: number) =>
+    def(`k${k}`, 1, 0, {
+      timing: "continuous",
+      effect: { kind: "balanceCoefficient", k },
+    });
+  // A coefficient card via the CardDef.coefficient field (Cards B/C's carrier).
+  const coeffField = (k: number) => ({ ...def(`f${k}`, 1, 0), coefficient: k });
+
+  it("the worked example: balance 40, A 10 / B 5, one k=2 card → k=3, delta +15 → 55", () => {
+    const state = emptyGame();
+    state.balance = 40;
+    setLane(state, 0, [
+      instance(def("E", 1, 5), "top"),
+      instance(coeffAbility(2), "bottom"),
+      instance(def("P", 1, 10), "bottom"),
+    ]);
+    // bottom total = 10 (the k-card has 0 power); top total = 5; diff = +5; k = 1 + 2 = 3.
+    expect(totalPower(state, "bottom") - totalPower(state, "top")).toBe(5);
+    const { state: after, events } = endTurn(state, mulberry32(0));
+    expect(after.balance).toBe(55);
+    expect(tide(events)).toMatchObject({ delta: 15, balance: 55 });
+  });
+
+  it("no coefficient cards keeps the baseline k=1 (delta = Pb - Pt)", () => {
+    const state = emptyGame();
+    setLane(state, 0, [
+      instance(def("E", 1, 3), "top"),
+      null,
+      instance(def("P", 1, 8), "bottom"),
+    ]);
+    const { events } = endTurn(state, mulberry32(0));
+    expect(tide(events)).toMatchObject({ delta: 5 });
+  });
+
+  it("a k=2 card gives the identical delta whichever seat owns it (ownership-independent)", () => {
+    const build = (owner: "bottom" | "top") => {
+      const state = emptyGame();
+      state.balance = 40;
+      setLane(state, 0, [
+        instance(def("E", 1, 5), "top"),
+        instance(coeffAbility(2), owner),
+        instance(def("P", 1, 10), "bottom"),
+      ]);
+      return endTurn(state, mulberry32(0));
+    };
+    expect(tide(build("bottom").events)).toMatchObject({ delta: 15 });
+    expect(tide(build("top").events)).toMatchObject({ delta: 15 });
+  });
+
+  it("coefficients from both seats add into one k (additive)", () => {
+    const state = emptyGame();
+    // bottom has a k=1 field-carrier, top has a k=2 ability-carrier → k = 1 + 1 + 2 = 4.
+    setLane(state, 0, [
+      instance(coeffAbility(2), "top"),
+      instance(coeffField(1), "bottom"),
+      instance(def("P", 1, 5), "bottom"),
+    ]);
+    // bottom total = 5, top total = 0 → diff +5, k = 4 → delta +20.
+    expect(totalPower(state, "bottom") - totalPower(state, "top")).toBe(5);
+    const { events } = endTurn(state, mulberry32(0));
+    expect(tide(events)).toMatchObject({ delta: 20 });
+  });
+
+  it("removing a coefficient card from the board drops its contribution next resolution", () => {
+    const state = emptyGame();
+    setLane(state, 0, [
+      instance(def("E", 1, 5), "top"),
+      instance(coeffField(2), "bottom"),
+      instance(def("P", 1, 10), "bottom"),
+    ]);
+    // With the k=2 card: diff +5, k=3 → delta +15.
+    expect(tide(endTurn(state, mulberry32(0)).events)).toMatchObject({
+      delta: 15,
+    });
+    // Remove it: diff +5, k=1 → delta +5.
+    setLane(state, 0, [
+      instance(def("E", 1, 5), "top"),
+      null,
+      instance(def("P", 1, 10), "bottom"),
+    ]);
+    expect(tide(endTurn(state, mulberry32(0)).events)).toMatchObject({
+      delta: 5,
+    });
+  });
+});
+
 describe("clamp", () => {
   it("reports only the applied shift when the balance hits 100", () => {
     const state = emptyGame();

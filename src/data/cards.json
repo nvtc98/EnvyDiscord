@@ -1386,5 +1386,42 @@
     "rarity": "bargain",
     "cost": 2,
     "power": 2
+  },
+  {
+    "name": "Bò Tuôi",
+    "faction": "botuoi",
+    "cost": 2,
+    "power": 4,
+    "text": "We are Bò Tuôi",
+    "note": "Thẻ bò gốc của phe Bò Tuôi. Không có chiêu — chỉ có khí chất. Text hiển thị đúng câu 'We are Bò Tuôi'."
+  },
+  {
+    "name": "Bò Siêu Phản Động Cấp 1",
+    "faction": "botuoi",
+    "cost": 1,
+    "power": 2,
+    "ability": "transformAt 1 bo-sieu-phan-ong-cap-2",
+    "coefficient": 1,
+    "text": "Hệ số cán cân 1. Khi 1 lá bất kỳ bị hủy, hóa thành Bò Siêu Phản Động Cấp 2.",
+    "note": "Dạng cấp 1 của Bò SPD. Hệ số cán cân = 1 (field coefficient:1). Hóa thành Cấp 2 khi tổng số lá bị hủy trong trận chạm 1. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-2' (slugify bỏ chữ đ)."
+  },
+  {
+    "name": "Bò Siêu Phản Động Cấp 2",
+    "faction": "botuoi",
+    "cost": 1,
+    "power": 4,
+    "ability": "transformAt 2 bo-sieu-phan-ong-cap-3",
+    "coefficient": 2,
+    "text": "Hệ số cán cân 2. Khi 2 lá bị hủy, hóa thành Bò Siêu Phản Động Cấp 3.",
+    "note": "Dạng cấp 2. Hệ số cán cân = 2 (field coefficient:2). Hóa thành Cấp 3 khi tổng số lá bị hủy trong trận chạm 2. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-3'."
+  },
+  {
+    "name": "Bò Siêu Phản Động Cấp 3",
+    "faction": "botuoi",
+    "cost": 1,
+    "power": 6,
+    "ability": "balanceCoefficient 3",
+    "text": "Hệ số cán cân 3.",
+    "note": "Dạng cuối. Hệ số cán cân = 3 (ability balanceCoefficient 3). Không hóa thêm."
   }
 ]

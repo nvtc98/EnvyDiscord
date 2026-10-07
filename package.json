@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "tsx scripts/preview.ts",
     "frame:cutout": "tsx scripts/frame-cutout.ts",
-    "frames:variants": "tsx scripts/make-variant-frames.ts"
+    "frames:variants": "tsx scripts/make-variant-frames.ts",
+    "frames:botuoi": "tsx scripts/make-botuoi-frame.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",
