@@ -7,10 +7,6 @@ export function abilityText(ability: Ability | undefined): string {
   const s = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   if (timing === "active") {
     switch (effect.kind) {
-      case "heal":
-        return `Active: heal ${effect.amount} HP.`;
-      case "damage":
-        return `Active: deal ${effect.amount} damage to the opponent.`;
       case "draw":
         return `Active: draw ${s(effect.count, "card")}.`;
       case "energy":
@@ -39,8 +35,6 @@ export function abilityText(ability: Ability | undefined): string {
   }
   if (timing === "endOfRound") {
     switch (effect.kind) {
-      case "heal":
-        return `Passive: at the end of each round, heal ${effect.amount} HP.`;
       case "oceanReturn":
         return `Passive: at the end of the round, give allies +${effect.amount} power, then shuffle back into your deck.`;
     }

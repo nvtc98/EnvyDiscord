@@ -54,7 +54,7 @@ export function advanceAiBeats(
       }
     }
     if (turnOver) break;
-    // Round resolution (end-of-round heals, damage, a possible game over) is its own beat.
+    // Per-turn resolution (the tide shift, end-of-turn Ocean passives, a possible game over) is its own beat.
     const ended = endTurn(state, rng);
     state = ended.state;
     events.push(...ended.events);

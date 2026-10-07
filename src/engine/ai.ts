@@ -11,8 +11,8 @@ import {
 export type Difficulty = "easy" | "normal" | "hard";
 
 /**
- * How good a position is for `me`. Board power counts triple because it keeps dealing damage every round;
- * a board that can already kill (or that would kill us) dominates everything else.
+ * How good a position is for `me`. Board power counts triple because it is exactly what moves the
+ * tide every turn; the tide position itself is a mild positional bias on top of that.
  */
 export function evaluate(state: GameState, me: Seat): number {
   if (state.winner)
@@ -20,11 +20,11 @@ export function evaluate(state: GameState, me: Seat): number {
   const foe = opponentOf(me);
   const mine = totalPower(state, me);
   const theirs = totalPower(state, foe);
-  let value =
-    (mine - theirs) * 3 + (state.players[me].hp - state.players[foe].hp);
-  if (mine >= state.players[foe].hp) value += 200;
-  if (theirs >= state.players[me].hp) value -= 200;
-  return value;
+  // Board power advantage is what moves the tide every turn, so weight it heavily.
+  // Then nudge toward the tide already favouring `me`: higher balance helps bottom, lower helps top.
+  const powerEdge = (mine - theirs) * 3;
+  const tideEdge = me === "bottom" ? state.balance - 50 : 50 - state.balance;
+  return powerEdge + tideEdge;
 }
 
 const costOf = (state: GameState, play: Play): number =>

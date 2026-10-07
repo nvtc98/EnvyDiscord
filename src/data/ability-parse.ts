@@ -14,8 +14,6 @@ interface TokenSpec {
 }
 
 const TOKENS: Record<string, TokenSpec> = {
-  heal: { timing: "active", kind: "heal", amountField: "amount" },
-  damage: { timing: "active", kind: "damage", amountField: "amount" },
   draw: { timing: "active", kind: "draw", amountField: "count" },
   energy: { timing: "active", kind: "energy", amountField: "amount" },
   buffLane: { timing: "active", kind: "buffLane", amountField: "amount" },
@@ -30,7 +28,6 @@ const TOKENS: Record<string, TokenSpec> = {
     kind: "drainStartOfTurn",
     amountField: "amount",
   },
-  healRound: { timing: "endOfRound", kind: "heal", amountField: "amount" },
   oceanReturn: {
     timing: "endOfRound",
     kind: "oceanReturn",

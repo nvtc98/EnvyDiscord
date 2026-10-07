@@ -1,9 +1,11 @@
 /** Rules constants. See docs/superpowers/specs/2026-10-04-lane-battle-design.md. */
 export const LANES = 3;
 export const CELLS = 3;
-export const MAX_HP = 20;
 export const MAX_ENERGY = 9;
-export const MAX_ROUNDS = 30;
+export const MAX_TURNS = 18;
+export const BALANCE_START = 50;
+export const BALANCE_MIN = 0;
+export const BALANCE_MAX = 100;
 export const DECK_SIZE = 12;
 /** Cards drawn before the first turn; every turn then starts with one more draw. */
 export const OPENING_HAND = { first: 2, second: 3 } as const;
@@ -13,8 +15,6 @@ export type Seat = "bottom" | "top";
 export type LaneIndex = 0 | 1 | 2;
 
 export type ActiveEffect =
-  | { kind: "heal"; amount: number }
-  | { kind: "damage"; amount: number }
   | { kind: "draw"; count: number }
   | { kind: "energy"; amount: number }
   | { kind: "buffLane"; amount: number }
@@ -26,9 +26,8 @@ export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
   | { kind: "drainStartOfTurn"; amount: number }; // Venom: -amount power to every other card each turn start
-export type EndOfRoundEffect =
-  | { kind: "heal"; amount: number }
-  | { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
+// "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
+export type EndOfRoundEffect = { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
 export type OnDestroyEffect = { kind: "rebirth"; amount: number }; // Phoenix: return to hand with +amount
 
 /** Active: once, when the card is played. Passive: while on the board, either always or at the end of each round. */
@@ -67,7 +66,6 @@ export interface CardInstance {
 }
 
 export interface PlayerState {
-  hp: number;
   energy: number;
   /** Turns this player has started, counting the current one. */
   turns: number;
@@ -85,6 +83,10 @@ export interface GameState {
   first: Seat;
   active: Seat;
   round: number;
+  /** Tug-of-war meter, 0..100. Higher = bottom (human) winning; 50 = even. */
+  balance: number;
+  /** Count of turns that have ended and resolved so far (the cap source of truth). */
+  turnsPlayed: number;
   winner: Seat | "draw" | null;
   nextUid: number;
   /** Running sum of the actual power of every card destroyed this match, both seats. Read by Stella Eyes. */
@@ -109,15 +111,18 @@ export type GameEvent =
     }
   | { type: "ability"; seat: Seat; card: CardDef; text: string }
   | {
-      type: "round_resolved";
-      round: number;
-      damage: Record<Seat, number>;
-      hp: Record<Seat, number>;
+      type: "tide_shifted";
+      /** The applied, clamped shift this turn: new balance minus old balance. */
+      delta: number;
+      /** The balance after this shift, 0..100. */
+      balance: number;
+      /** turnsPlayed after this resolution (1..18). */
+      turn: number;
     }
   | {
       type: "game_over";
       winner: Seat | "draw";
-      reason: "hp" | "rounds" | "forfeit";
+      reason: "balance" | "turns" | "forfeit";
     };
 
 export const opponentOf = (seat: Seat): Seat =>

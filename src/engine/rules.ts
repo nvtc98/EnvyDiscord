@@ -3,11 +3,11 @@ import { shuffle } from "../util/rng";
 import { hasContinuous } from "./abilities";
 import { entryCell, pushInto, pushMovers, wouldPush } from "./push";
 import {
+  BALANCE_START,
   CELLS,
   LANES,
   MAX_ENERGY,
-  MAX_HP,
-  MAX_ROUNDS,
+  MAX_TURNS,
   OPENING_HAND,
   opponentOf,
   type CardDef,
@@ -27,6 +27,17 @@ export interface Step {
 
 const laneIndexes = Array.from({ length: LANES }, (_, i) => i as LaneIndex);
 
+export const BALANCE_K = 1;
+
+/**
+ * The multiplier applied to this turn's raw power difference before it moves the balance.
+ * Today it is always BALANCE_K. A future ability can scale it (e.g. a card that doubles the
+ * tide swing) by contributing a factor here; no such ability exists yet.
+ */
+function balanceFactor(_state: GameState, _activeSeat: Seat): number {
+  return BALANCE_K;
+}
+
 /** Shuffles both decks, deals the opening hands, and starts the first player's first turn. */
 export function newGame(
   decks: Record<Seat, CardDef[]>,
@@ -38,14 +49,12 @@ export function newGame(
     lanes: Array.from({ length: LANES }, () => Array<Cell>(CELLS).fill(null)),
     players: {
       bottom: {
-        hp: MAX_HP,
         energy: 0,
         turns: 0,
         deck: shuffle(decks.bottom, rng),
         hand: [],
       },
       top: {
-        hp: MAX_HP,
         energy: 0,
         turns: 0,
         deck: shuffle(decks.top, rng),
@@ -55,6 +64,8 @@ export function newGame(
     first,
     active: first,
     round: 1,
+    balance: BALANCE_START,
+    turnsPlayed: 0,
     winner: null,
     nextUid: 1,
     destroyedPower: 0,
@@ -89,6 +100,9 @@ function draw(
 function startTurn(state: GameState, events: GameEvent[]): void {
   const player = state.players[state.active];
   player.turns += 1;
+  // `round` bumps once per pair of turns: when the first player starts a NEW turn
+  // (their 2nd onward). The opening turn (turns === 1) keeps round at 1.
+  if (state.active === state.first && player.turns > 1) state.round += 1;
   player.energy = Math.min(player.turns, MAX_ENERGY);
   draw(state, state.active, 1, events);
   applyStartOfTurnDrains(state, events);
@@ -415,7 +429,6 @@ function applyActive(
 ): void {
   const seat = card.owner;
   const me = state.players[seat];
-  const foe = state.players[opponentOf(seat)];
   const ability = card.def.ability!;
   if (ability.timing !== "active") return; // only called for active abilities; narrows `effect`
   const effect = ability.effect;
@@ -423,17 +436,6 @@ function applyActive(
     events.push({ type: "ability", seat, card: card.def, text });
 
   switch (effect.kind) {
-    case "heal": {
-      const before = me.hp;
-      me.hp = Math.min(MAX_HP, me.hp + effect.amount);
-      say(`healed ${me.hp - before} HP`);
-      break;
-    }
-    case "damage":
-      foe.hp -= effect.amount;
-      say(`dealt ${effect.amount} damage`);
-      if (foe.hp <= 0) finish(state, seat, "hp", events);
-      break;
     case "draw": {
       const before = me.hand.length;
       draw(state, seat, effect.count, events);
@@ -497,7 +499,7 @@ function applyActive(
 function finish(
   state: GameState,
   winner: Seat | "draw",
-  reason: "hp" | "rounds" | "forfeit",
+  reason: "balance" | "turns" | "forfeit",
   events: GameEvent[],
 ): void {
   state.winner = winner;
@@ -505,83 +507,53 @@ function finish(
 }
 
 /**
- * Ends the active player's turn. After the first player this starts the second player's turn; after the second
- * player it resolves the round (end-of-round passives, then damage) and starts the next round.
+ * Ends the active player's turn. Every turn resolves: the board power difference shifts the balance
+ * meter, the turn counter advances, win/draw conditions are checked, then end-of-turn passives (Ocean)
+ * run before control passes to the other player.
  */
 export function endTurn(prev: GameState, rng: Rng): Step {
   if (prev.winner) throw new Error("The game is already over");
   const state = structuredClone(prev);
   const events: GameEvent[] = [];
 
-  if (state.active === state.first) {
-    state.active = opponentOf(state.first);
-    startTurn(state, events);
-    return { state, events };
-  }
-
-  resolveRound(state, events, rng);
+  resolveTurn(state, events, rng);
   if (!state.winner) {
-    state.round += 1;
-    state.active = state.first;
+    state.active = opponentOf(state.active);
     startTurn(state, events);
   }
   return { state, events };
 }
 
-function resolveRound(state: GameState, events: GameEvent[], rng: Rng): void {
-  // Phase A: pre-damage end-of-round heals, lane by lane (Left to Right), each lane top to bottom.
-  for (const lane of state.lanes) {
-    for (const card of lane) {
-      const ability = card?.def.ability;
-      if (
-        !card ||
-        ability?.timing !== "endOfRound" ||
-        ability.effect.kind !== "heal"
-      )
-        continue;
-      const owner = state.players[card.owner];
-      const before = owner.hp;
-      owner.hp = Math.min(MAX_HP, owner.hp + ability.effect.amount);
-      events.push({
-        type: "ability",
-        seat: card.owner,
-        card: card.def,
-        text: `healed ${owner.hp - before} HP at the end of the round`,
-      });
-    }
-  }
+function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
+  // 1. Read board power -> 2. apply tide shift -> 3. bump turnsPlayed -> 4. knockout
+  // -> 5. cap -> 6. Ocean pass (only if the game continues).
+  const k = balanceFactor(state, state.active);
+  const delta = (totalPower(state, "bottom") - totalPower(state, "top")) * k;
+  const before = state.balance;
+  state.balance = Math.max(0, Math.min(100, before + delta));
+  events.push({
+    type: "tide_shifted",
+    delta: state.balance - before,
+    balance: state.balance,
+    turn: state.turnsPlayed + 1,
+  });
+  state.turnsPlayed += 1;
 
-  const damage: Record<Seat, number> = {
-    bottom: totalPower(state, "top"),
-    top: totalPower(state, "bottom"),
-  };
-  state.players.bottom.hp -= damage.bottom;
-  state.players.top.hp -= damage.top;
-  const hp: Record<Seat, number> = {
-    bottom: state.players.bottom.hp,
-    top: state.players.top.hp,
-  };
-  events.push({ type: "round_resolved", round: state.round, damage, hp });
+  // Knockout: balance hits an edge.
+  if (state.balance >= 100) finish(state, "bottom", "balance", events);
+  else if (state.balance <= 0) finish(state, "top", "balance", events);
 
-  const bottomDown = hp.bottom <= 0;
-  const topDown = hp.top <= 0;
-  if (bottomDown || topDown) {
+  // Cap: run out of turns with no knockout -> whoever leads the tide wins.
+  if (!state.winner && state.turnsPlayed >= MAX_TURNS) {
     finish(
       state,
-      bottomDown && topDown ? "draw" : bottomDown ? "top" : "bottom",
-      "hp",
-      events,
-    );
-  } else if (state.round >= MAX_ROUNDS) {
-    finish(
-      state,
-      hp.bottom === hp.top ? "draw" : hp.bottom > hp.top ? "bottom" : "top",
-      "rounds",
+      state.balance > 50 ? "bottom" : state.balance < 50 ? "top" : "draw",
+      "turns",
       events,
     );
   }
 
-  // Phase B: post-damage end-of-round effects (Ocean), only if the game is not finished.
+  // Phase B: post-resolution end-of-turn effects (Ocean), only if the game continues.
   if (!state.winner) {
     const oceans = collectOceanReturns(state); // Pass 1: snapshot
     for (const o of oceans) applyOceanReturn(state, o, events, rng); // Pass 2: process live
