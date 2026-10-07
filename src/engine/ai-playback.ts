@@ -13,6 +13,11 @@ import type { GameEvent, GameState, Seat } from "./types";
 export interface Beat {
   state: GameState;
   lines: string[];
+  /**
+   * The engine events applied in THIS beat, in order. Populated by advanceAiBeats from the
+   * step/end-turn events it already holds. Lets a consumer react per-beat (e.g. after-push).
+   */
+  events: readonly GameEvent[];
 }
 
 export interface AiPlayback {
@@ -47,7 +52,11 @@ export function advanceAiBeats(
       const step = playCard(state, play.uid, play.lane);
       state = step.state;
       events.push(...step.events);
-      beats.push({ state, lines: describeEvents(step.events, viewer) });
+      beats.push({
+        state,
+        lines: describeEvents(step.events, viewer),
+        events: step.events,
+      });
       if (state.winner) {
         turnOver = true;
         break;
@@ -58,7 +67,11 @@ export function advanceAiBeats(
     const ended = endTurn(state, rng);
     state = ended.state;
     events.push(...ended.events);
-    beats.push({ state, lines: describeEvents(ended.events, viewer) });
+    beats.push({
+      state,
+      lines: describeEvents(ended.events, viewer),
+      events: ended.events,
+    });
   }
 
   return { finalState: state, beats, events };

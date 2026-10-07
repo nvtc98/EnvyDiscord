@@ -64,7 +64,13 @@ Nói theo cảm nhận người chơi, KHÔNG nói con số kỹ thuật và KH�
   xóa power của địch khỏi sân.
 - Lane đầy mà đặt thêm → đẩy dây chuyền → quân ở mép xa rớt ra (hủy).
 
-### 1.5 Chiêu thức (ability) — dạy khi gặp lá có chiêu
+### 1.5 Lợi thế người đi sau (nên nhắc khéo, không bắt buộc)
+
+- Trong một lượt, người đi sau thấy đối thủ vừa đặt gì rồi mới quyết → có lợi thế thông tin.
+- Luật cán cân + tính mỗi lượt làm điều này công bằng hơn: mỗi người lần lượt được "ra đòn với
+  thông tin mới nhất", và cán cân dịch sau MỖI lượt chứ không gộp.
+
+### 1.6 Chiêu thức (ability) — dạy khi gặp lá có chiêu
 
 - Lá có chiêu hiện dòng mô tả (đậm "Active:" hoặc "Passive:").
   - **Active**: kích một lần khi đánh ra.
@@ -83,9 +89,15 @@ Nói theo cảm nhận người chơi, KHÔNG nói con số kỹ thuật và KH�
 ### 1.7 Kết thúc lượt + Reset
 
 - Đánh xong các lá muốn đánh → bấm **End the turn**. Lúc đó cán cân dịch, rồi tới lượt đối thủ.
-- **Reset turn**: trước khi End, có thể hoàn tác MỌI nước đi trong lượt (trả lá về tay, hoàn energy)
-  — dạy người chơi cứ thử thoải mái, sai thì reset.
-- **Yield** (đầu hàng): thua ngay — chỉ nhắc, không cần dạy sâu.
+
+## 2. Các mốc (beat) để chèn lời bot — khớp với hook onBeat
+
+> Tên phase cuối cùng, chữ ký `onBeat`, và hợp đồng `reanchor` đã chốt — xem `docs/onbeat-hook.md`
+> (API reference phía battle). Bảng dưới là CATALOGUE "dạy gì ở mỗi mốc"; `docs/onbeat-hook.md` là
+> nguồn chuẩn cho cơ chế/tên phase. Lưu ý: hook thực tế dùng dạng một-đối-tượng
+> `onBeat(ev: BattleBeat)` (không phải `onBeat(session, phase, interaction)` như mô tả cũ bên dưới).
+
+Battle sẽ expose `onBeat(session, phase, interaction)` gọi tại các mốc dưới.
 
 ---
 

@@ -75,10 +75,16 @@ export function dmChannel() {
     const m = byId.get(id);
     if (m) m.components = [];
   });
+  // Mirrors channel.messages.delete(id): the re-anchor delete. Observable via deleteMessage.mock.calls;
+  // byId.delete only makes a later componentsOf(id) return undefined for the removed id.
+  const deleteMessage = vi.fn(async (id: string) => {
+    byId.delete(id);
+  });
   return {
     send,
     sendTyping,
     clearComponents,
+    deleteMessage,
     sent,
     events,
     /** The current components of the message with this id (as sent/edited), or undefined if unknown. */
@@ -283,6 +289,12 @@ export function buttonInteraction(
     return undefined;
   });
   const followUp = vi.fn(async (_payload: unknown) => undefined);
+  // A body-less component ack (used on a re-anchor cycle instead of update). Mirrors discord.js: it
+  // acknowledges the component interaction, setting `replied`.
+  const deferUpdate = vi.fn(async () => {
+    flags.replied = true;
+    return undefined;
+  });
   return {
     user: { id: userId, username: `user${userId}` },
     customId,
@@ -296,6 +308,7 @@ export function buttonInteraction(
       return flags.deferred;
     },
     update,
+    deferUpdate,
     // The animated end-of-turn path acknowledges with `update`, then edits in place with `editReply`.
     editReply: vi.fn(async (_payload: unknown) => undefined),
     reply: vi.fn(async (_payload: unknown) => undefined),

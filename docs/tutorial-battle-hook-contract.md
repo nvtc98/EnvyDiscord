@@ -10,6 +10,11 @@ Everything here is additive and OPTIONAL: a session without the hook (every `/ba
 and story battles once the tutorial is done) behaves exactly as today. Design background and the
 teaching beats live in `docs/tutorial-design.md`.
 
+> **Status: implemented (battle side).** The hook described below is built. The finalized battle-side
+> API reference — exact signature, phase catalogue, re-anchor ordering, fast-path rule, ack-once
+> scheme, error guarantees, and a usage sketch — is in `docs/onbeat-hook.md`. The two docs agree;
+> this file remains the authoritative API request, and where any detail differs, this contract wins.
+
 ---
 
 ## What battle must provide
@@ -37,18 +42,18 @@ export interface Session {
 
 ```ts
 export type BattlePhase =
-  | "battle-start"          // board just built, BEFORE the opening AI move is shown / before first player action
-  | "after-player-play"     // player placed one card (per play)
-  | "after-push"            // a push happened this action (a unit was shoved and/or destroyed)
+  | "battle-start" // board just built, BEFORE the opening AI move is shown / before first player action
+  | "after-player-play" // player placed one card (per play)
+  | "after-push" // a push happened this action (a unit was shoved and/or destroyed)
   | "after-player-end-turn" // player pressed End, BEFORE the enemy animates
-  | "after-enemy-turn"      // enemy finished its animated turn
-  | "tide-shifted"          // the balance moved noticeably (optional; emit if cheap)
+  | "after-enemy-turn" // enemy finished its animated turn
+  | "tide-shifted" // the balance moved noticeably (optional; emit if cheap)
   | "near-win"
   | "near-defeat"
-  | "before-finish";        // just before the end screen
+  | "before-finish"; // just before the end screen
 
 export interface BattleBeat {
-  session: Session;         // the live session (read-only for the callback's purposes)
+  session: Session; // the live session (read-only for the callback's purposes)
   phase: BattlePhase;
   /** The component interaction that triggered this beat, when there is one (null at battle-start). */
   interaction: import("discord.js").MessageComponentInteraction | null;
@@ -90,6 +95,7 @@ tutorial needs the bot to drop one or more plain DM messages, then have the boar
 Discord cannot insert a message above an existing one, so the board must be re-posted at the bottom.
 
 `reanchor()` must, in this order:
+
 1. Send the CURRENT board (`renderBattle(await withImage(...))`, with its live components) as a **new
    message** at the bottom of the DM channel.
 2. Record that new message's id as the session's live board message (so the next

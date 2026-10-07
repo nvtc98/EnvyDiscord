@@ -28,6 +28,80 @@ import {
 import type { AppContext } from "./command";
 import { tryRender } from "./images";
 
+/**
+ * The beats a battle fires `onBeat` at, before rendering the board for that beat. Spelling is fixed
+ * by the consumer contract (docs/tutorial-battle-hook-contract.md §2). Exported for the story side.
+ *
+ * REQUIRED (always fire at their beat): "battle-start", "after-player-play", "after-push",
+ * "after-player-end-turn", "after-enemy-turn", "before-finish". OPTIONAL (emitted here because they
+ * are cheap, but a consumer must not depend on them): "tide-shifted", "near-win", "near-defeat".
+ */
+export type BattlePhase =
+  | "battle-start" // board just built, before the opening AI move is shown / before first player action
+  | "after-player-play" // player placed ONE card (fires once per card played)
+  | "after-push" // a push happened this action (a unit was shoved and/or destroyed)
+  | "after-player-end-turn" // player pressed End, before the enemy animates
+  | "after-enemy-turn" // the enemy finished its animated turn
+  | "tide-shifted" // the balance moved materially this beat (an engine tide_shifted event)
+  | "near-win" // post-shift balance is close to the human's winning edge
+  | "near-defeat" // post-shift balance is close to the human's losing edge
+  | "before-finish"; // just before the end screen, fired at the top of finishBattle
+
+/**
+ * The single argument every beat callback receives. Shape fixed by the consumer contract
+ * (docs/tutorial-battle-hook-contract.md §2). Exported for the story side to import.
+ */
+export interface BattleBeat {
+  /**
+   * The live session this beat belongs to. Read-only for the callback's purposes — the callback
+   * inspects `session.state` (board/balance/hands) and `session.id` and MUST NOT mutate engine state.
+   */
+  session: Session;
+  /** Which beat this is. */
+  phase: BattlePhase;
+  /**
+   * The component interaction that triggered this beat, or `null` when there is none (null at
+   * `battle-start`, and at any beat not driven by a component press). The callback MUST NOT ack or
+   * otherwise touch this interaction — battle owns the single ack for it. Read-only context only.
+   */
+  interaction: MessageComponentInteraction | null;
+  /**
+   * Re-anchor the board to the bottom of the DM. The callback calls this AFTER it has sent its own
+   * message(s), and ONLY when it actually spoke this beat (the fast path). Zero args. Behavior: send
+   * the CURRENT board (this beat's state) as a NEW message at the bottom of the DM, record that new
+   * message id as the live board, THEN delete the PREVIOUS board message — send-new-then-delete-old,
+   * never the reverse (no boardless gap). Awaitable. No-op (resolves) when the battle has no DM to
+   * re-anchor into (`session.dm` undefined — ordinary `/battle`).
+   *
+   * The re-anchored board renders the board for THIS beat (the beat `state` threaded into the closure
+   * by `runBeat`), NOT necessarily `session.state` — which may have advanced past this beat.
+   */
+  reanchor: () => Promise<void>;
+}
+
+/** The beat callback type, fixed by the consumer contract. */
+export type OnBeat = (ev: BattleBeat) => Promise<void>;
+
+/**
+ * The payload shape a board `send`/re-anchor posts: exactly what `renderBattle` returns
+ * (`{ embeds, components, files }`). Typing `send` to this (not `object`) makes a malformed re-anchor
+ * payload a compile error.
+ */
+export type BattleBoardPayload = ReturnType<typeof renderBattle>;
+
+/** The minimal DM surface re-anchor needs: send a board payload, delete the old board message. */
+export interface BattleDm {
+  /** Post a fresh board; the returned id becomes the new tracked board id. */
+  send(payload: BattleBoardPayload): Promise<{ id: string }>;
+  /** Delete a previously-sent message by id. Best-effort; benign "already gone" errors are swallowed. */
+  deleteMessage(messageId: string): Promise<void>;
+}
+
+/** The smallest shift magnitude that fires `tide-shifted` (any non-zero shift). */
+const TIDE_SHIFT_MIN = 1;
+/** How close to a balance edge (0 or 100) counts as near-win / near-defeat. */
+const NEAR_EDGE = 15;
+
 export interface Session {
   id: string;
   state: GameState;
@@ -60,6 +134,25 @@ export interface Session {
   turnSnapshot: GameState | null;
   /** The log as it stood when control last returned to the human, restored on Reset turn. */
   turnStartLog: string[] | null;
+  /**
+   * OPTIONAL per-battle beat hook. Ordinary battles leave this unset and are completely unaffected.
+   * The battle `await`s it at each beat BEFORE rendering the next board. A consumer sends its OWN DM,
+   * then calls `ev.reanchor()` to pull the board back to the bottom — but ONLY when it spoke (fast
+   * path). A throw/rejection is caught, logged, and swallowed — the battle continues. Set by the
+   * story layer at launch; see docs/onbeat-hook.md.
+   */
+  onBeat?: OnBeat;
+  /**
+   * The id of the board message currently live in the DM, for re-anchor to delete when it posts a
+   * fresh one. Set by the story launcher after its first board send, and kept current by `reanchor`.
+   * null/undefined = no tracked board (e.g. non-DM /battle), so re-anchor's delete step is skipped.
+   */
+  boardMessageId?: string | null;
+  /**
+   * The DM channel the board lives in, so re-anchor can send/delete without an interaction token.
+   * Set by the story launcher. undefined = no re-anchor target (ordinary /battle); re-anchor no-ops.
+   */
+  dm?: BattleDm;
 }
 
 /**
@@ -202,6 +295,126 @@ export async function withImage(
 export const pushLog = (session: Session, lines: string[]): void => {
   session.log = lines.slice(-MAX_LOG_LINES);
 };
+
+/**
+ * Fires one beat: assembles the contract's single-object `BattleBeat`, awaits `session.onBeat`, and
+ * reports whether the callback re-anchored the board this beat. INTERNAL — not exported, not part of
+ * the contract surface (which fixes only `Session.onBeat`'s type); its multi-arg shape is free.
+ *
+ * - Zero-work fast path for ordinary battles: `if (!session.onBeat) return false;`.
+ * - `reanchor` renders THIS beat's `state` (threaded into the closure), not necessarily
+ *   `session.state`, which may already have advanced past the beat.
+ * - send-new (step 3) → record-new-as-live (step 4) → delete-old (step 5): DELIBERATE ordering, never
+ *   reversed (delete-first would flash a boardless gap). The `reanchored` flag is set right after the
+ *   send resolves, so a later delete failure still reports a successful re-anchor.
+ * - Error isolation: a throw/rejection from the callback is logged and swallowed; the battle
+ *   continues.
+ */
+async function runBeat(
+  ctx: AppContext,
+  session: Session,
+  phase: BattlePhase,
+  state: GameState,
+  _events: readonly GameEvent[],
+  interaction: MessageComponentInteraction | null,
+): Promise<boolean> {
+  if (!session.onBeat) return false; // zero-work fast path for ordinary battles
+  let reanchored = false;
+  const beat: BattleBeat = {
+    session,
+    phase,
+    interaction,
+    reanchor: async () => {
+      if (!session.dm) return; // no DM target (ordinary /battle) → no-op
+      const prevId = session.boardMessageId ?? null; // capture BEFORE record (ordering)
+      const payload = renderBattle(await withImage(ctx, session, state)); // beat state, not session.state
+      const sent = await session.dm.send(payload); // 1. send new
+      session.boardMessageId = sent.id; // 2. record new as live (fast-path edits now target it)
+      reanchored = true; // marked true as soon as the new board exists (even if delete fails)
+      if (prevId) await session.dm.deleteMessage(prevId); // 3. then delete old (benign codes swallowed)
+    },
+  };
+  try {
+    await session.onBeat(beat);
+  } catch (error) {
+    ctx.log.message("error", { battleId: session.id, phase, error }); // isolate: log + swallow
+  }
+  return reanchored; // true iff a reanchor's send succeeded this beat
+}
+
+/**
+ * Fire the `battle-start` beat for a story battle. The story launcher calls this ONCE, after it has
+ * posted the first board and set `session.dm` + `session.boardMessageId`, so a `battle-start`
+ * re-anchor has a previous board to delete. Returns whether the beat re-anchored (the launcher may
+ * ignore it today). A pure no-op when `session.onBeat` is unset (via runBeat's guard).
+ *
+ * PRECONDITION — the caller MUST set `session.dm` AND `session.boardMessageId` BEFORE invoking this.
+ * If `onBeat` is set and its `battle-start` callback calls `reanchor()` while `boardMessageId` is
+ * still unset, re-anchor will `send` a fresh board but, with no previous id, SKIP the delete —
+ * leaving BOTH the launcher's just-posted board AND the re-anchored board live in the DM, with only
+ * the re-anchored one tracked (a leaked, orphaned board). This ordering lives in the story task and
+ * this task cannot enforce it, so it is documented as the helper's contract.
+ */
+export function runBattleStartBeat(
+  ctx: AppContext,
+  session: Session,
+): Promise<boolean> {
+  return runBeat(ctx, session, "battle-start", session.state, [], null);
+}
+
+/** True when this beat's events include a placement that shoved/destroyed a unit (after-push). */
+function hasPush(events: readonly GameEvent[]): boolean {
+  return events.some((e) => e.type === "played" && e.destroyed !== null);
+}
+
+/** True when this beat's events carry a tide shift of at least TIDE_SHIFT_MIN magnitude. */
+function hasTideShift(events: readonly GameEvent[]): boolean {
+  return events.some(
+    (e) => e.type === "tide_shifted" && Math.abs(e.delta) >= TIDE_SHIFT_MIN,
+  );
+}
+
+/**
+ * The near-* phase for a post-shift state, or null when the game is decided or the balance is not
+ * near an edge. `near-*` is suppressed once `winner !== null` (a knockout clamps balance to 100/0 and
+ * is reported by `before-finish`, not near-*).
+ */
+function nearPhase(state: GameState): BattlePhase | null {
+  if (state.winner !== null) return null;
+  if (state.balance >= 100 - NEAR_EDGE) return "near-win";
+  if (state.balance <= NEAR_EDGE) return "near-defeat";
+  return null;
+}
+
+/**
+ * Fire the end-turn-sourced beats for one resolved beat (`tide-shifted` then `near-*`), accumulating
+ * re-anchors. The near-* check uses the post-shift balance and is skipped once the game is decided.
+ */
+async function runTideBeats(
+  ctx: AppContext,
+  session: Session,
+  state: GameState,
+  events: readonly GameEvent[],
+  interaction: MessageComponentInteraction | null,
+): Promise<boolean> {
+  let didReanchor = false;
+  if (hasTideShift(events))
+    didReanchor =
+      (await runBeat(
+        ctx,
+        session,
+        "tide-shifted",
+        state,
+        events,
+        interaction,
+      )) || didReanchor;
+  const near = nearPhase(state);
+  if (near)
+    didReanchor =
+      (await runBeat(ctx, session, near, state, events, interaction)) ||
+      didReanchor;
+  return didReanchor;
+}
 
 /** For a story battle, mirror the live session into the DB so a resume can rebuild the board. */
 async function mirrorStoryBattle(
@@ -369,6 +582,10 @@ export async function handleBattleComponent(
     interaction.reply({ content, flags: MessageFlags.Ephemeral });
 
   let events: GameEvent[] = [];
+  // Whether a beat re-anchored the board this cycle (lane branch only). When true, the fresh board is
+  // already at the DM bottom, so the shared tail acks the component with deferUpdate instead of
+  // rendering again (§4.1). Always false for ordinary battles (onBeat unset ⇒ runBeat returns false).
+  let didReanchor = false;
   if (kind === "lane") {
     const lane = Number(arg) as LaneIndex;
     const uid = session.selectedUid;
@@ -381,6 +598,27 @@ export async function handleBattleComponent(
     session.selectedUid = null;
     events = step.events;
     pushLog(session, describeEvents(events, "bottom"));
+    // Fire the human-play beats BEFORE the board render for this cycle. after-player-play always;
+    // after-push only when this placement shoved/destroyed a unit (fire push after play).
+    didReanchor =
+      (await runBeat(
+        ctx,
+        session,
+        "after-player-play",
+        session.state,
+        events,
+        interaction,
+      )) || didReanchor;
+    if (hasPush(events))
+      didReanchor =
+        (await runBeat(
+          ctx,
+          session,
+          "after-push",
+          session.state,
+          events,
+          interaction,
+        )) || didReanchor;
   } else if (kind === "end") {
     if (session.state.active !== "bottom" || session.state.winner) {
       await reject("It's not your turn.");
@@ -419,11 +657,17 @@ export async function handleBattleComponent(
 
   if (!session.state.winner) {
     await mirrorStoryBattle(ctx, session);
-    // `attachments: []` drops the previous image so only the new one stays.
-    await interaction.update({
-      ...renderBattle(await withImage(ctx, session)),
-      attachments: [],
-    });
+    // A re-anchor this cycle already posted the fresh board at the DM bottom and deleted the clicked
+    // message, so there is nothing to edit — just ack the component cheaply (§4.1). Otherwise behave
+    // exactly as today. `attachments: []` drops the previous image so only the new one stays.
+    if (didReanchor) {
+      await interaction.deferUpdate();
+    } else {
+      await interaction.update({
+        ...renderBattle(await withImage(ctx, session)),
+        attachments: [],
+      });
+    }
     return;
   }
 
@@ -449,6 +693,10 @@ async function finishBattle(
 ): Promise<void> {
   // Game over. Delete the session first so a repeat press hits the "battle ended" path (award-once).
   sessions.delete(userId);
+  // before-finish fires once per game-over on EVERY ending path (human-terminal endTurn, AI knockout/
+  // cap, forfeit), BEFORE rewards/onStoryEnd/end screen. A dedicated beat (NOT folded into onStoryEnd),
+  // so practice/forfeit battles get it too and it precedes the end screen. It does not re-anchor.
+  await runBeat(ctx, session, "before-finish", session.state, [], interaction);
   const outcome: Outcome =
     session.state.winner === "bottom"
       ? "won"
@@ -528,6 +776,26 @@ async function animateEndOfTurn(
   const events = [...own.events, ...playback.events];
   logEvents(ctx, session, userId, events);
 
+  // Whether any end-of-turn beat re-anchored this cycle. Threaded into finalRender so it skips its own
+  // board render when the board is already re-anchored at the DM bottom (§4.1). Always false for
+  // ordinary battles (onBeat unset ⇒ runBeat returns false), so the path is byte-identical to today.
+  let didReanchor = false;
+
+  // The human's own endTurn resolves BEFORE the AI animates: fire its beats on `own.state`/`own.events`
+  // (the human's post-shift board), never interleaved with per-frame edits.
+  didReanchor =
+    (await runBeat(
+      ctx,
+      session,
+      "after-player-end-turn",
+      own.state,
+      own.events,
+      interaction,
+    )) || didReanchor;
+  didReanchor =
+    (await runTideBeats(ctx, session, own.state, own.events, interaction)) ||
+    didReanchor;
+
   // The human's own end-turn now shifts the tide, so it always carries a visible line; it becomes
   // beat 0 (the human's own post-shift board). The AI's beats follow, filtered to drop empty ones.
   const ownLines = describeEvents(own.events, "bottom");
@@ -548,9 +816,17 @@ async function animateEndOfTurn(
   // No visible beats now means the human's own endTurn finished the game (knockout/cap): skip
   // animation, do one final render — the end screen covers the board.
   if (visibleBeats.length === 0) {
+    // The human's own endTurn ended the game: NO AI beats run and after-enemy-turn does NOT fire.
     pushLog(session, [...preTurnLog, ...allLines]);
-    await finalRender(interaction, ctx, session, battleId, userId, kind, (p) =>
-      interaction.update(p),
+    await finalRender(
+      interaction,
+      ctx,
+      session,
+      battleId,
+      userId,
+      kind,
+      (p) => interaction.update(p),
+      didReanchor,
     );
     return;
   }
@@ -596,8 +872,49 @@ async function animateEndOfTurn(
   // Settle the log on exactly what the non-animated path would show.
   pushLog(session, [...preTurnLog, ...allLines]);
   if (!stillMine()) return;
-  await finalRender(interaction, ctx, session, battleId, userId, kind, (p) =>
-    interaction.editReply(p),
+
+  // AI-turn beats run AFTER the animation loop (never interleaved with per-frame edits), from each
+  // beat's own state/events (the readonly `events` field added to the engine Beat): after-push per
+  // destroying placement, and tide/near-* per end-turn-resolution beat. Then after-enemy-turn once.
+  for (const beat of playback.beats) {
+    if (hasPush(beat.events))
+      didReanchor =
+        (await runBeat(
+          ctx,
+          session,
+          "after-push",
+          beat.state,
+          beat.events,
+          interaction,
+        )) || didReanchor;
+    didReanchor =
+      (await runTideBeats(
+        ctx,
+        session,
+        beat.state,
+        beat.events,
+        interaction,
+      )) || didReanchor;
+  }
+  didReanchor =
+    (await runBeat(
+      ctx,
+      session,
+      "after-enemy-turn",
+      playback.finalState,
+      [],
+      interaction,
+    )) || didReanchor;
+
+  await finalRender(
+    interaction,
+    ctx,
+    session,
+    battleId,
+    userId,
+    kind,
+    (p) => interaction.editReply(p),
+    didReanchor,
   );
 }
 
@@ -614,6 +931,7 @@ async function finalRender(
   userId: string,
   kind: string,
   send: (payload: Record<string, unknown>) => Promise<unknown>,
+  didReanchor = false,
 ): Promise<void> {
   try {
     if (!session.state.winner) {
@@ -625,10 +943,14 @@ async function finalRender(
       session.turnStartLog =
         session.state.active === "bottom" ? [...session.log] : null;
       await mirrorStoryBattle(ctx, session);
-      await send({
-        ...renderBattle(await withImage(ctx, session)),
-        attachments: [],
-      });
+      // A re-anchor this cycle already posted the final board (with live controls) at the DM bottom,
+      // so skip the own render (§4.1); the bookkeeping/mirror above still runs. Otherwise render as
+      // today. (The game-over branch below always renders the end screen normally.)
+      if (!didReanchor)
+        await send({
+          ...renderBattle(await withImage(ctx, session)),
+          attachments: [],
+        });
       return;
     }
     await finishBattle(interaction, ctx, session, battleId, userId, kind, send);
