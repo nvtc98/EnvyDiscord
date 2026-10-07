@@ -177,9 +177,19 @@ describe("story -> cave battle integration", () => {
     expect(ctx.repo.get("launch").story!.battle!.opponentPortrait).toBe(
       "boss-spd-battle",
     );
+    const started = ctx.log.entries.find(
+      (e) => e.type === "battle_started",
+    )?.data;
+    expect(started).toMatchObject({ origin: "story" });
+    // Bò SPD plays its fixed deck (11 bo-tuoi + 1 cap-1), not a random 12 — order-independent.
+    const enemyDeck = started!.enemyDeck as string[];
+    expect(enemyDeck).toHaveLength(12);
+    expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
     expect(
-      ctx.log.entries.find((e) => e.type === "battle_started")?.data,
-    ).toMatchObject({ origin: "story" });
+      enemyDeck.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
+    ).toHaveLength(1);
+    // Bò SPD moves first in the story duel.
+    expect(started!.first).toBe("top");
   });
 
   it("losing the battle (forfeit) delivers cave_loss and offers a retry that starts a fresh game", async () => {

@@ -6,6 +6,7 @@ import { type Difficulty } from "../engine/ai";
 import { advanceAiBeats } from "../engine/ai-playback";
 import { describeEvents } from "../engine/events";
 import { canPlay, endTurn, forfeit, newGame, playCard } from "../engine/rules";
+import { seedGuaranteedOpening } from "../engine/opening";
 import type {
   CardDef,
   GameEvent,
@@ -224,6 +225,10 @@ export interface StartBattleOpts {
   variants: Record<string, VariantId>;
   guests?: CardDef[];
   first?: Seat;
+  /** Card ids to force into the opponent's (top seat) opening hand. Omitted = none. GENERAL per-NPC. */
+  opponentGuaranteedOpening?: readonly string[];
+  /** true = the opponent (top seat) takes the first turn, unless an explicit `first` overrides it. GENERAL per-NPC. */
+  opponentGoesFirst?: boolean;
   /** Where this battle came from. Defaults to "practice" (owner /battle). */
   origin?: "practice" | "story";
   /** Opponent portrait asset key (e.g. "enemy1"); null/omitted = placeholder. */
@@ -241,7 +246,12 @@ export interface StartBattleOpts {
  */
 export function startBattle(opts: StartBattleOpts): Session {
   const { ctx } = opts;
-  const first = opts.first ?? (ctx.rng() < 0.5 ? "bottom" : "top");
+  // An explicit `first` always wins; else `opponentGoesFirst` forces "top"; else the random default.
+  // When `opponentGoesFirst` resolves the seat, ctx.rng() is NOT consumed (preserves the stream for
+  // callers that do not opt in; /battle never sets it, so its random first-mover is unchanged).
+  const first: Seat =
+    opts.first ??
+    (opts.opponentGoesFirst ? "top" : ctx.rng() < 0.5 ? "bottom" : "top");
   const now = Date.now();
   purgeIdle(now);
   const game = newGame(
@@ -249,6 +259,10 @@ export function startBattle(opts: StartBattleOpts): Session {
     first,
     ctx.rng,
   );
+  // Seed the opponent's guaranteed opening cards AFTER the deal and BEFORE advanceAi runs below, so if
+  // the NPC moves first it already holds the guaranteed card when its opening turn plays. HOLD only.
+  if (opts.opponentGuaranteedOpening?.length)
+    seedGuaranteedOpening(game.state, "top", opts.opponentGuaranteedOpening);
   const guests = opts.guests ?? [];
   const session: Session = {
     id: randomBytes(3).toString("hex"),

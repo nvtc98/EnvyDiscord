@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { MessageComponentInteraction } from "discord.js";
 import type { Player } from "../game/player";
-import { opponentDeck, resolveDeck } from "../game/deck";
+import { resolveDeck } from "../game/deck";
+import { NPC_INDEX, npcDeck } from "../data/npcs";
 import { applyBattleResult, type Outcome } from "../game/rewards";
 import { resolveStoryBattle } from "../story/engine";
 import type { StoryBattleState } from "../story/types";
@@ -90,6 +91,8 @@ export async function launchStoryBattle(
   avatarUrl: string | null,
 ): Promise<void> {
   const onStoryEnd = makeOnStoryEnd(ctx, dm);
+  const boSpd = NPC_INDEX.get("bo-spd");
+  if (!boSpd) throw new Error('story cave battle: NPC "bo-spd" is not defined');
 
   // Already battling in memory — just re-send the current board.
   const live = sessions.get(user.id);
@@ -97,7 +100,7 @@ export async function launchStoryBattle(
     live.onStoryEnd = onStoryEnd;
     live.playerAvatarUrl = avatarUrl;
     live.playerName = player.story?.name ?? undefined;
-    live.opponentName ??= "Bò SPD";
+    live.opponentName ??= boSpd.name;
     const sent = await dm.send(renderBattle(await withImage(ctx, live)));
     recordLive(user.id, sent.id, player);
     await ctx.repo.save(player);
@@ -109,7 +112,14 @@ export async function launchStoryBattle(
 
   let session: Session;
   if (canResume) {
-    session = rebuildSession(snap, user, player, avatarUrl, onStoryEnd);
+    session = rebuildSession(
+      snap,
+      user,
+      player,
+      avatarUrl,
+      onStoryEnd,
+      boSpd.name,
+    );
     sessions.set(user.id, session);
   } else {
     const deck = resolveDeck(
@@ -118,21 +128,23 @@ export async function launchStoryBattle(
       ctx.cardIndex,
       ctx.rng,
     );
-    const enemyDeck = opponentDeck(ctx.cards, ctx.rng);
+    const enemyDeck = npcDeck(boSpd, ctx.cardIndex);
     session = startBattle({
       ctx,
       userId: user.id,
       username: user.username,
       deck: deck.cards,
       opponentDeck: enemyDeck,
+      opponentGuaranteedOpening: boSpd.guaranteedOpening,
+      opponentGoesFirst: boSpd.goesFirst,
       difficulty: "normal",
       variants: variantsOf(player),
       guests: deck.guests,
       origin: "story",
-      opponentPortrait: "boss-spd-battle",
+      opponentPortrait: boSpd.portrait,
       playerAvatarUrl: avatarUrl,
       playerName: player.story?.name ?? undefined,
-      opponentName: "Bò SPD",
+      opponentName: boSpd.name,
     });
     session.onStoryEnd = onStoryEnd;
     // Mirror the live session into the DB so a resume can rebuild.
@@ -158,6 +170,7 @@ function rebuildSession(
   player: Player,
   avatarUrl: string | null,
   onStoryEnd: Session["onStoryEnd"],
+  opponentName: string,
 ): Session {
   return {
     id: randomBytes(3).toString("hex"),
@@ -173,7 +186,7 @@ function rebuildSession(
     playerAvatarUrl: avatarUrl,
     playerAvatarImage: undefined,
     playerName: player.story?.name ?? undefined,
-    opponentName: "Bò SPD",
+    opponentName,
     onStoryEnd,
     turnSnapshot: null,
     turnStartLog: null,

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "bo-spd",
+    "name": "Bò SPD",
+    "deck": [
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-tuoi",
+      "bo-sieu-phan-ong-cap-1"
+    ],
+    "portrait": "boss-spd-battle",
+    "guaranteedOpening": ["bo-sieu-phan-ong-cap-1"],
+    "goesFirst": true
+  }
+]
