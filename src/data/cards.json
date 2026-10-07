@@ -1402,7 +1402,7 @@
     "power": 2,
     "ability": "transformAt 1 bo-sieu-phan-ong-cap-2",
     "coefficient": 1,
-    "text": "Passive: Swings The Tide normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
+    "text": "Passive: Pulls The Eye Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
     "note": "Dạng cấp 1 của Bò SPD. The Tide coefficient +1 (field coefficient:1). Hóa thành Cấp 2 khi tổng số lá bị hủy trong trận chạm 1. Text player-facing tiếng Anh, prefix Passive. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-2' (slugify bỏ chữ đ)."
   },
   {
@@ -1412,7 +1412,7 @@
     "power": 4,
     "ability": "transformAt 2 bo-sieu-phan-ong-cap-3",
     "coefficient": 2,
-    "text": "Passive: Swings The Tide 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
+    "text": "Passive: Pulls The Eye Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
     "note": "Dạng cấp 2. Hệ số cán cân = 2 (field coefficient:2). Hóa thành Cấp 3 khi tổng số lá bị hủy trong trận chạm 2. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-3'."
   },
   {
@@ -1421,7 +1421,7 @@
     "cost": 1,
     "power": 6,
     "ability": "balanceCoefficient 3",
-    "text": "Passive: Swings The Tide 3 times harder.",
+    "text": "Passive: Pulls The Eye Privilege 3 times harder.",
     "note": "Dạng cuối. Hệ số cán cân = 3 (ability balanceCoefficient 3). Không hóa thêm."
   }
 ]

@@ -91,7 +91,7 @@ describe("advanceAiBeats", () => {
       "bottom",
     );
     const hasTideBeat = playback.beats.some((b) =>
-      b.lines.some((l) => /tide (shifts|holds)/i.test(l)),
+      b.lines.some((l) => /eye privilege (pulls|holds)/i.test(l)),
     );
     expect(hasTideBeat).toBe(true);
   });

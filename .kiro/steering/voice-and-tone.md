@@ -56,7 +56,7 @@ Buttons / UI / errors (plain, clear — dialed down):
 Rules text printed on a card (the description panel) follows a fixed shape:
 
 - Every ability line begins with a bold prefix **`Active:`** (one-shot, on play) or **`Passive:`** (while on the board / on a trigger). Flavor-only cards with no real effect may still use `Passive:` as a label (e.g. a card whose text is pure flavor).
-- **Capitalize the first word after the `Active:` / `Passive:` prefix.** Example: `Passive: Swings The Tide 3 times harder.` — not `Passive: swings...`. The renderer bolds the prefix and leaves the rest regular; the capital starts the sentence after the colon.
+- **Capitalize the first word after the `Active:` / `Passive:` prefix.** Example: `Passive: Pulls The Eye Privilege 3 times harder.` — not `Passive: pulls...`. The renderer bolds the prefix and leaves the rest regular; the capital starts the sentence after the colon.
 - Ability text is **English**, plain and readable (it is player-facing UI, not story narration — keep the archaic voice out of it).
-- The balance meter is named **The Tide** (capitalized) in all player-facing text. Refer to it by that name, not "balance", "coefficient", or raw numbers.
+- The balance meter is named **The Eye Privilege** (capitalized; "EP" for short) in all player-facing text. Refer to it by that name, not "balance", "tide", "coefficient", or raw numbers. The Eye Privilege is framed as a BURDEN: in the battle log it is "pulled toward" whichever side had the WEAKER board that turn (the losing side draws the burden), so a turn where your board was stronger pulls it toward the enemy. The number shown is the full pre-clamp pull — (your board power − enemy board power) × the EP multiplier — so a card's stated pull reads true even when the meter is pinned at an edge.
 - Proper nouns stay as-is (e.g. the Vietnamese card names like `Bò Siêu Phản Động Cấp 2`).

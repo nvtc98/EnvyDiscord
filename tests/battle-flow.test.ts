@@ -196,7 +196,7 @@ describe("/battle", () => {
     expect(lastPayload(click.update).components).toEqual([]);
     const update = finalFrame(click);
     expect(embedOf(update).title).toMatch(/Turn \d+\/\d+ · Your turn/);
-    expect(embedOf(update).description).toMatch(/tide (shifts|holds)/i);
+    expect(embedOf(update).description).toMatch(/eye privilege (pulls|holds)/i);
     // End turn and Forfeit are enabled on the player's fresh turn; Reset stays
     // disabled until the human plays a card.
     const action = rows(update)[2].components;

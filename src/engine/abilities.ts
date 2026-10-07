@@ -35,8 +35,8 @@ export function abilityText(ability: Ability | undefined): string {
         return `Passive: When ${s(effect.count, "card")} ${effect.count === 1 ? "has" : "have"} been destroyed this match, transform.`;
       case "balanceCoefficient":
         return effect.k === 1
-          ? "Passive: Swings The Tide normally."
-          : `Passive: Swings The Tide ${effect.k} times harder.`;
+          ? "Passive: Pulls The Eye Privilege normally."
+          : `Passive: Pulls The Eye Privilege ${effect.k} times harder.`;
       default:
         return assertNever(effect);
     }

@@ -135,8 +135,14 @@ export type GameEvent =
     }
   | {
       type: "tide_shifted";
-      /** The applied, clamped shift this turn: new balance minus old balance. */
+      /** The applied, clamped shift this turn: new balance minus old balance (what the meter actually moved). */
       delta: number;
+      /**
+       * The full shift this turn before clamping to 0..100: (bottom power - top power) * k. The battle log
+       * shows this so a card's stated pull reads true even when the meter is pinned at an edge. Sign matches
+       * `delta`: positive = bottom's board was stronger this turn, negative = top's.
+       */
+      rawDelta: number;
       /** The balance after this shift, 0..100. */
       balance: number;
       /** turnsPlayed after this resolution (1..18). */

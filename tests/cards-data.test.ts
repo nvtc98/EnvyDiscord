@@ -165,7 +165,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 2,
       coefficient: 1,
-      text: "Passive: Swings The Tide normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
+      text: "Passive: Pulls The Eye Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
     });
     expect(c1?.ability).toEqual({
       timing: "continuous",
@@ -182,7 +182,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 4,
       coefficient: 2,
-      text: "Passive: Swings The Tide 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
+      text: "Passive: Pulls The Eye Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
     });
     expect(c2?.ability).toEqual({
       timing: "continuous",
@@ -198,7 +198,7 @@ describe("the four Bò Tuôi cards", () => {
       faction: "botuoi",
       cost: 1,
       power: 6,
-      text: "Passive: Swings The Tide 3 times harder.",
+      text: "Passive: Pulls The Eye Privilege 3 times harder.",
     });
     expect(c3?.ability).toEqual({
       timing: "continuous",

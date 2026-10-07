@@ -592,6 +592,7 @@ function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   events.push({
     type: "tide_shifted",
     delta: state.balance - before,
+    rawDelta: delta,
     balance: state.balance,
     turn: state.turnsPlayed + 1,
   });
