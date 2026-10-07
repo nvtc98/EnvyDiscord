@@ -655,14 +655,13 @@ export function drawArena(
   ctx.fillRect(0, 0, w, h);
 }
 
-/** Triangle marker height for the tide meter. */
-const TRI_H = 16;
-
 /**
- * The vertical tide meter: a tug-of-war needle in the left gutter. The bar spans {x,y,w,h}; its
- * gradient runs top (enemy red) -> middle (muted) -> bottom (player blue). A faint gold tick marks
- * the even point. A triangle marker slides to the current balance (higher balance = lower on
- * screen, since the human sits at the bottom). No number and no ENEMY/YOU text on the bar.
+ * The vertical tide meter, a tug-of-war FILL bar: the enemy's share (red) fills from the top, the player's share (blue)
+ * fills from the bottom, and the boundary between them sits at the current balance — so the side
+ * that owns more of the bar is the side winning. The player sits at the bottom of the screen, so a
+ * higher balance (player winning) means more blue rising from the bottom. The two fills keep a
+ * gradient (deep->light toward the boundary) rather than flat colour. A faint gold tick marks the
+ * even point; a gold seam highlights the boundary. No number and no ENEMY/YOU text on the bar.
  */
 export function drawTideMeter(
   ctx: Ctx,
@@ -672,19 +671,42 @@ export function drawTideMeter(
   h: number,
   balance: number,
 ): void {
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  grad.addColorStop(0, PALETTE.theirs);
-  grad.addColorStop(0.5, PALETTE.muted);
-  grad.addColorStop(1, PALETTE.mine);
+  const clamped = Math.max(0, Math.min(100, balance));
+  // Boundary between the two fills. balance 100 -> boundary at the top (all blue/player);
+  // balance 0 -> boundary at the bottom (all red/enemy). So the player's blue share grows from the
+  // bottom as balance rises.
+  const boundaryY = y + (1 - clamped / 100) * h;
+
+  // Clip everything to the rounded bar so both fills share the rounded ends.
+  ctx.save();
   roundRect(ctx, x, y, w, h, w / 2);
-  ctx.fillStyle = grad;
-  ctx.fill();
+  ctx.clip();
+
+  // Enemy (red) fill: from the top down to the boundary. Gradient deepens toward the top edge.
+  if (boundaryY > y) {
+    const topGrad = ctx.createLinearGradient(x, y, x, boundaryY);
+    topGrad.addColorStop(0, PALETTE.theirs);
+    topGrad.addColorStop(1, "rgba(196,72,90,0.55)");
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(x, y, w, boundaryY - y);
+  }
+  // Player (blue) fill: from the boundary down to the bottom. Gradient deepens toward the bottom edge.
+  if (boundaryY < y + h) {
+    const botGrad = ctx.createLinearGradient(x, boundaryY, x, y + h);
+    botGrad.addColorStop(0, "rgba(91,130,184,0.55)");
+    botGrad.addColorStop(1, PALETTE.mine);
+    ctx.fillStyle = botGrad;
+    ctx.fillRect(x, boundaryY, w, y + h - boundaryY);
+  }
+  ctx.restore();
+
+  // Bar outline.
   roundRect(ctx, x, y, w, h, w / 2);
   ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(201,151,58,0.3)";
   ctx.stroke();
 
-  // Center tick (even point): a short horizontal line slightly wider than the bar, faint gold.
+  // Center tick (even point): a short faint-gold line slightly wider than the bar.
   const midY = y + h / 2;
   ctx.save();
   ctx.globalAlpha = 0.4;
@@ -696,24 +718,21 @@ export function drawTideMeter(
   ctx.stroke();
   ctx.restore();
 
-  // Marker: a triangle on the right of the bar at the current balance. Clamp the drawn center so
-  // the whole glyph stays on the bar at the extremes.
-  const clamped = Math.max(0, Math.min(100, balance));
-  const markerY = y + (clamped / 100) * h;
-  const triHalf = TRI_H / 2;
-  const drawY = Math.max(y + triHalf, Math.min(y + h - triHalf, markerY));
+  // Boundary seam: a bright gold line (with glow) where the two fills meet, tinted toward whoever
+  // leads. Clamped so the glow stays on the bar at the extremes.
+  const seamY = Math.max(y + 1, Math.min(y + h - 1, boundaryY));
   const lean =
     clamped > 50 ? PALETTE.mine : clamped < 50 ? PALETTE.theirs : PALETTE.gold;
-  ctx.beginPath();
-  ctx.moveTo(x + w + 2, drawY);
-  ctx.lineTo(x + w + 2 + TRI_H * 0.7, drawY - triHalf);
-  ctx.lineTo(x + w + 2 + TRI_H * 0.7, drawY + triHalf);
-  ctx.closePath();
-  ctx.fillStyle = lean;
+  ctx.save();
+  ctx.strokeStyle = lean;
+  ctx.lineWidth = 2.5;
   ctx.shadowColor = lean;
   ctx.shadowBlur = 8;
-  ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.moveTo(x, seamY);
+  ctx.lineTo(x + w, seamY);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Small label above a lane, with optional modifier tags such as "x2" or "ANCHORED". */
