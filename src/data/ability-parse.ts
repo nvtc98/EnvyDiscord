@@ -1,8 +1,8 @@
 import type { Ability } from "../engine/types";
 
 // Ability shorthand: "<token> [amount]". The token carries both the timing and
-// the effect kind, so the two heal timings (active vs end-of-round) and draw's
-// `count` field never collide. The table below is the single source of truth.
+// the effect kind, so timings never collide and draw's `count` field stays
+// distinct from amount-bearing tokens. The table below is the single source of truth.
 
 type Timing = Ability["timing"];
 
