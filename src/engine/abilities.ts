@@ -8,33 +8,35 @@ export function abilityText(ability: Ability | undefined): string {
   if (timing === "active") {
     switch (effect.kind) {
       case "draw":
-        return `Active: draw ${s(effect.count, "card")}.`;
+        return `Active: Draw ${s(effect.count, "card")}.`;
       case "energy":
-        return `Active: gain ${effect.amount} energy this turn.`;
+        return `Active: Gain ${effect.amount} energy this turn.`;
       case "buffLane":
-        return `Active: your other cards in this lane get +${effect.amount} power.`;
+        return `Active: Your other cards in this lane get +${effect.amount} power.`;
       case "destroyedPower":
-        return "Active: gain power equal to the total power of all cards destroyed this match.";
+        return "Active: Gain power equal to the total power of all cards destroyed this match.";
       case "shield":
-        return "Active: cannot be pushed by the enemy until the end of their next turn.";
+        return "Active: Cannot be pushed by the enemy until the end of their next turn.";
       case "pushLane":
-        return "Active: push this lane one step away from you; cards forced off the edge are destroyed.";
+        return "Active: Push this lane one step away from you; cards forced off the edge are destroyed.";
       case "destroyLane":
-        return "Active: destroy every other card in this lane.";
+        return "Active: Destroy every other card in this lane.";
     }
   }
   if (timing === "continuous") {
     switch (effect.kind) {
       case "laneDouble":
-        return "Passive: your cards in this lane deal double damage.";
+        return "Passive: Your cards in this lane deal double damage.";
       case "anchor":
-        return "Passive: this lane cannot be pushed.";
+        return "Passive: This lane cannot be pushed.";
       case "drainStartOfTurn":
-        return `Passive: at the start of each turn, every other card loses ${effect.amount} power.`;
+        return `Passive: At the start of each turn, every other card loses ${effect.amount} power.`;
       case "transformAt":
-        return `Passive: when ${s(effect.count, "card")} ${effect.count === 1 ? "has" : "have"} been destroyed this match, transform.`;
+        return `Passive: When ${s(effect.count, "card")} ${effect.count === 1 ? "has" : "have"} been destroyed this match, transform.`;
       case "balanceCoefficient":
-        return `Passive: tide coefficient ${effect.k}.`;
+        return effect.k === 1
+          ? "Passive: Swings The Tide normally."
+          : `Passive: Swings The Tide ${effect.k} times harder.`;
       default:
         return assertNever(effect);
     }
@@ -42,11 +44,11 @@ export function abilityText(ability: Ability | undefined): string {
   if (timing === "endOfRound") {
     switch (effect.kind) {
       case "oceanReturn":
-        return `Passive: at the end of the round, give allies +${effect.amount} power, then shuffle back into your deck.`;
+        return `Passive: At the end of the round, give allies +${effect.amount} power, then shuffle back into your deck.`;
     }
   }
   // onDestroy
-  return `Passive: when destroyed, return to your hand with +${effect.amount} power.`;
+  return `Passive: When destroyed, return to your hand with +${effect.amount} power.`;
 }
 
 export const cardText = (card: CardDef): string =>

@@ -155,7 +155,7 @@ describe("the four Bò Tuôi cards", () => {
       faction: "botuoi",
       cost: 2,
       power: 4,
-      text: "We are Bò Tuôi",
+      text: "Passive: We are Bò Tuôi",
     });
     expect(tuoi?.ability).toBeUndefined();
 
@@ -165,7 +165,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 2,
       coefficient: 1,
-      text: "Hệ số cán cân 1. Khi 1 lá bất kỳ bị hủy, hóa thành Bò Siêu Phản Động Cấp 2.",
+      text: "Passive: Swings The Tide normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
     });
     expect(c1?.ability).toEqual({
       timing: "continuous",
@@ -182,7 +182,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 4,
       coefficient: 2,
-      text: "Hệ số cán cân 2. Khi 2 lá bị hủy, hóa thành Bò Siêu Phản Động Cấp 3.",
+      text: "Passive: Swings The Tide 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
     });
     expect(c2?.ability).toEqual({
       timing: "continuous",
@@ -198,7 +198,7 @@ describe("the four Bò Tuôi cards", () => {
       faction: "botuoi",
       cost: 1,
       power: 6,
-      text: "Hệ số cán cân 3.",
+      text: "Passive: Swings The Tide 3 times harder.",
     });
     expect(c3?.ability).toEqual({
       timing: "continuous",

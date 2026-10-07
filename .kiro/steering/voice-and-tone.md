@@ -50,3 +50,13 @@ Buttons / UI / errors (plain, clear — dialed down):
 - "Check your DMs" → "Check your DMs — we'll talk there." (plain)
 - "You don't have enough coins." → keep plain, e.g. "You need more coins for that."
 - "Card not found." → keep plain, e.g. "No card by that name."
+
+## Card ability text — conventions
+
+Rules text printed on a card (the description panel) follows a fixed shape:
+
+- Every ability line begins with a bold prefix **`Active:`** (one-shot, on play) or **`Passive:`** (while on the board / on a trigger). Flavor-only cards with no real effect may still use `Passive:` as a label (e.g. a card whose text is pure flavor).
+- **Capitalize the first word after the `Active:` / `Passive:` prefix.** Example: `Passive: Swings The Tide 3 times harder.` — not `Passive: swings...`. The renderer bolds the prefix and leaves the rest regular; the capital starts the sentence after the colon.
+- Ability text is **English**, plain and readable (it is player-facing UI, not story narration — keep the archaic voice out of it).
+- The balance meter is named **The Tide** (capitalized) in all player-facing text. Refer to it by that name, not "balance", "coefficient", or raw numbers.
+- Proper nouns stay as-is (e.g. the Vietnamese card names like `Bò Siêu Phản Động Cấp 2`).
