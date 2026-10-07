@@ -7,17 +7,23 @@ import {
   type MessageComponentInteraction,
   type ModalSubmitInteraction,
   type RESTPostAPIApplicationCommandsJSONBody,
-} from 'discord.js';
-import type { PlayerRepo } from '../db/repository';
-import type { CardDef } from '../engine/types';
-import type { Logger } from '../log/logger';
-import type { ImageRenderer } from '../render/renderer';
-import type { Rng } from '../util/rng';
+} from "discord.js";
+import type { PlayerRepo } from "../db/repository";
+import type { CardDef } from "../engine/types";
+import type { Logger } from "../log/logger";
+import type { ImageRenderer } from "../render/renderer";
+import type { Rng } from "../util/rng";
 
 export interface AppContext {
   repo: PlayerRepo;
+  /** The full card pool (all factions). Used by the engine/battle layer to assemble opponent decks. */
   cards: CardDef[];
+  /** The full card index (all factions), keyed by id. The engine resolves any card — including opponents' — here. */
   cardIndex: Map<string, CardDef>;
+  /** The player-collectible pool: The Eyes cards only. Every player-facing flow (gacha/daily/shop, starter pack, deck top-up, collection totals) draws from this, never `cards`. */
+  collectibleCards: CardDef[];
+  /** The player-collectible index: The Eyes cards only, keyed by id. */
+  collectibleCardIndex: Map<string, CardDef>;
   rng: Rng;
   timezone: string;
   /** Null when image rendering is unavailable; commands then fall back to text embeds. */
@@ -27,10 +33,19 @@ export interface AppContext {
 
 export interface Command {
   data: { name: string; toJSON(): RESTPostAPIApplicationCommandsJSONBody };
-  execute(interaction: ChatInputCommandInteraction, ctx: AppContext): Promise<void>;
-  autocomplete?(interaction: AutocompleteInteraction, ctx: AppContext): Promise<void>;
+  execute(
+    interaction: ChatInputCommandInteraction,
+    ctx: AppContext,
+  ): Promise<void>;
+  autocomplete?(
+    interaction: AutocompleteInteraction,
+    ctx: AppContext,
+  ): Promise<void>;
   /** Buttons / select menus whose customId starts with `<command name>:`. */
-  component?(interaction: MessageComponentInteraction, ctx: AppContext): Promise<void>;
+  component?(
+    interaction: MessageComponentInteraction,
+    ctx: AppContext,
+  ): Promise<void>;
   /** Forms (modals) whose customId starts with `<command name>:`. */
   modal?(interaction: ModalSubmitInteraction, ctx: AppContext): Promise<void>;
 }
@@ -40,7 +55,10 @@ export function slash(name: string, description: string): SlashCommandBuilder {
   return new SlashCommandBuilder()
     .setName(name)
     .setDescription(description)
-    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    .setIntegrationTypes(
+      ApplicationIntegrationType.GuildInstall,
+      ApplicationIntegrationType.UserInstall,
+    )
     .setContexts(
       InteractionContextType.Guild,
       InteractionContextType.BotDM,

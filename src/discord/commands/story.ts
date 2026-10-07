@@ -38,10 +38,12 @@ import {
 } from "../story-view";
 import { launchStoryBattle } from "../story-battle";
 
+// The story only ever shows/grants collectible cards (the starter book, name matching). It never
+// resolves opponent-faction cards through this context, so it is wired to the Eyes-only pool.
 export const storyContext = (ctx: AppContext): StoryContext => ({
   rng: ctx.rng,
-  cards: ctx.cards,
-  cardIndex: ctx.cardIndex,
+  cards: ctx.collectibleCards,
+  cardIndex: ctx.collectibleCardIndex,
 });
 
 /**

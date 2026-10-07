@@ -112,7 +112,12 @@ export async function launchStoryBattle(
     session = rebuildSession(snap, user, player, avatarUrl, onStoryEnd);
     sessions.set(user.id, session);
   } else {
-    const deck = resolveDeck(player, ctx.cards, ctx.cardIndex, ctx.rng);
+    const deck = resolveDeck(
+      player,
+      ctx.collectibleCards,
+      ctx.cardIndex,
+      ctx.rng,
+    );
     const enemyDeck = opponentDeck(ctx.cards, ctx.rng);
     session = startBattle({
       ctx,

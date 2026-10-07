@@ -28,7 +28,7 @@ async function view(
     .setColor(EMBED_COLOR.neutral)
     .setTitle("🎴 Your collection")
     .setFooter({
-      text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.cards.length} cards`,
+      text: `Page ${page + 1}/${pages} · Owned ${items.length}/${ctx.collectibleCards.length} cards`,
     });
   if (items.length === 0)
     embed.setDescription("No cards yet. Use `/daily` to get your first cards.");

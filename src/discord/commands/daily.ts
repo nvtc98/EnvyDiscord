@@ -34,7 +34,7 @@ export const dailyCommand: Command = {
     }
     const result = claimDaily(
       player,
-      ctx.cards,
+      ctx.collectibleCards,
       todayKey(new Date(), ctx.timezone),
       ctx.rng,
     );

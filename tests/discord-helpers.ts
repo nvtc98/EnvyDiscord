@@ -1,6 +1,11 @@
 import { DiscordAPIError, RESTJSONErrorCodes } from "discord.js";
 import { vi } from "vitest";
-import { CARDS, CARD_INDEX } from "../src/data/cards";
+import {
+  CARDS,
+  CARD_INDEX,
+  COLLECTIBLE_CARDS,
+  COLLECTIBLE_CARD_INDEX,
+} from "../src/data/cards";
 import {
   DEFAULT_VARIANT,
   variantOrder,
@@ -140,6 +145,8 @@ export function makeCtx(
     repo: new MemoryRepo(),
     cards: CARDS,
     cardIndex: CARD_INDEX,
+    collectibleCards: COLLECTIBLE_CARDS,
+    collectibleCardIndex: COLLECTIBLE_CARD_INDEX,
     rng: mulberry32(seed),
     timezone: "UTC",
     images,
@@ -147,23 +154,23 @@ export function makeCtx(
   };
 }
 
-/** Gives a player every card, each owning only the given variant (metal by default), active = that variant. */
+/** Gives a player every collectible card, each owning only the given variant (metal by default), active = that variant. */
 export function ownEverything(
   ctx: AppContext,
   userId: string,
   variant: VariantId = DEFAULT_VARIANT,
 ): void {
   const player = ctx.repo.get(userId);
-  for (const c of ctx.cards)
+  for (const c of ctx.collectibleCards)
     player.cards[c.id] = { variants: [variant], active: variant };
   void ctx.repo.save(player);
 }
 
-/** Gives a player every card owning every variant (a fully complete collection). */
+/** Gives a player every collectible card owning every variant (a fully complete collection). */
 export function ownEveryVariant(ctx: AppContext, userId: string): void {
   const player = ctx.repo.get(userId);
   const all = variantOrder();
-  for (const c of ctx.cards)
+  for (const c of ctx.collectibleCards)
     player.cards[c.id] = { variants: [...all], active: all[0] };
   void ctx.repo.save(player);
 }

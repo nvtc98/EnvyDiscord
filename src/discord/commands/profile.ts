@@ -42,7 +42,7 @@ export const profileCommand: Command = {
         },
         {
           name: "🎴 Cards",
-          value: `${Object.keys(player.cards).filter((id) => ctx.cardIndex.has(id)).length}/${ctx.cards.length}`,
+          value: `${Object.keys(player.cards).filter((id) => ctx.collectibleCardIndex.has(id)).length}/${ctx.collectibleCards.length}`,
           inline: true,
         },
         {

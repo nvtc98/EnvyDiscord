@@ -37,7 +37,12 @@ export const battleCommand: Command = {
     const player = ctx.repo.get(interaction.user.id);
     const difficulty = (interaction.options.getString("difficulty") ??
       "normal") as Difficulty;
-    const deck = resolveDeck(player, ctx.cards, ctx.cardIndex, ctx.rng);
+    const deck = resolveDeck(
+      player,
+      ctx.collectibleCards,
+      ctx.cardIndex,
+      ctx.rng,
+    );
     const enemyDeck = opponentDeck(ctx.cards, ctx.rng);
 
     const session = startBattle({

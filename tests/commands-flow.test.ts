@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARDS } from "../src/data/cards";
+import { CARDS, COLLECTIBLE_CARDS } from "../src/data/cards";
 import { collectionCommand } from "../src/discord/commands/collection";
 import { dailyCommand } from "../src/discord/commands/daily";
 import { deckCommand } from "../src/discord/commands/deck";
@@ -68,7 +68,7 @@ describe("/collection", () => {
     expect(embedOf(payload).fields).toHaveLength(3);
     expect(embedOf(payload).footer.text).toMatch(
       new RegExp(
-        `Page 1/${Math.ceil(CARDS.length / 3)} · Owned ${CARDS.length}/${CARDS.length}`,
+        `Page 1/${Math.ceil(COLLECTIBLE_CARDS.length / 3)} · Owned ${COLLECTIBLE_CARDS.length}/${COLLECTIBLE_CARDS.length}`,
       ),
     );
     expect(rows(payload)[0].components.map((c: any) => c.disabled)).toEqual([
@@ -133,7 +133,7 @@ describe("/deck", () => {
     expect([menu.min_values, menu.max_values]).toEqual([DECK_SIZE, DECK_SIZE]);
     expect(menu.options).toHaveLength(25); // a select menu holds at most 25 options
     expect(lastPayload(call.reply).content).toMatch(
-      /showing your 25 cheapest of 229/,
+      new RegExp(`showing your 25 cheapest of ${COLLECTIBLE_CARDS.length}`),
     );
 
     const chosen = menu.options.slice(0, DECK_SIZE).map((o: any) => o.value);
@@ -204,7 +204,7 @@ describe("/profile", () => {
     const cards = embedOf(lastPayload(call.reply)).fields.find((f: any) =>
       f.name.includes("Cards"),
     );
-    expect(cards.value).toBe(`1/${CARDS.length}`);
+    expect(cards.value).toBe(`1/${COLLECTIBLE_CARDS.length}`);
   });
 
   it("shows another player's stats read-only using their display name", async () => {
@@ -219,7 +219,7 @@ describe("/profile", () => {
     const embed = embedOf(lastPayload(call.reply));
     expect(embed.title).toContain("User friend");
     const cards = embed.fields.find((f: any) => f.name.includes("Cards"));
-    expect(cards.value).toBe(`1/${CARDS.length}`);
+    expect(cards.value).toBe(`1/${COLLECTIBLE_CARDS.length}`);
   });
 
   it("tells you when the profile you asked about has never started", async () => {

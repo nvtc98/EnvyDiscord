@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CARDS, CARD_INDEX } from "../src/data/cards";
+import {
+  CARDS,
+  CARD_INDEX,
+  COLLECTIBLE_CARDS,
+  COLLECTIBLE_CARD_INDEX,
+} from "../src/data/cards";
 import type { CardDef } from "../src/engine/types";
 import { STARTER_SIZE, drawStarterPack } from "../src/game/starter";
 import { createPlayer, type Player } from "../src/game/player";
@@ -14,11 +19,13 @@ import { NODES, PLACE_WISDOM, STRANGER, TRIBE } from "../src/story/prologue";
 import type { StoryContext } from "../src/story/types";
 import { mulberry32 } from "../src/util/rng";
 
-const NAMES = CARDS.map((c) => c.name);
+// The story only ever shows/grants collectible cards, so the test context mirrors production
+// (storyContext wires the Eyes-only pool). Name matching runs against the collectible names.
+const NAMES = COLLECTIBLE_CARDS.map((c) => c.name);
 const ctx = (seed = 1): StoryContext => ({
   rng: mulberry32(seed),
-  cards: CARDS,
-  cardIndex: CARD_INDEX,
+  cards: COLLECTIBLE_CARDS,
+  cardIndex: COLLECTIBLE_CARD_INDEX,
 });
 
 describe("names", () => {
@@ -104,7 +111,7 @@ describe("starter pack", () => {
 
   it("is always 12 different cards: 2 eternal, 2 bargain and 8 common", () => {
     for (let seed = 1; seed <= 100; seed++) {
-      const pack = drawStarterPack(CARDS, mulberry32(seed));
+      const pack = drawStarterPack(COLLECTIBLE_CARDS, mulberry32(seed));
       expect(pack).toHaveLength(STARTER_SIZE);
       expect(new Set(pack.map((c) => c.id)).size).toBe(12);
       expect(rarityCounts(pack)).toEqual({ eternal: 2, bargain: 2, common: 8 });
@@ -113,11 +120,11 @@ describe("starter pack", () => {
 
   it("differs between draws", () => {
     const rng = mulberry32(5);
-    const a = drawStarterPack(CARDS, rng)
+    const a = drawStarterPack(COLLECTIBLE_CARDS, rng)
       .map((c) => c.id)
       .sort()
       .join();
-    const b = drawStarterPack(CARDS, rng)
+    const b = drawStarterPack(COLLECTIBLE_CARDS, rng)
       .map((c) => c.id)
       .sort()
       .join();
@@ -127,14 +134,16 @@ describe("starter pack", () => {
   it("fails loudly when the card list cannot supply the mix", () => {
     expect(() =>
       drawStarterPack(
-        CARDS.filter((c) => c.rarity !== "eternal"),
+        COLLECTIBLE_CARDS.filter((c) => c.rarity !== "eternal"),
         mulberry32(1),
       ),
     ).toThrow(/eternal/);
   });
 
-  it("every card in the list has a rarity, a cost and a power", () => {
-    for (const c of CARDS) {
+  it("every player (The Eyes) card has a rarity, a cost and a power", () => {
+    // Opponent factions (e.g. botuoi) are intentionally rarity-less and never enter the starter
+    // pack or collection, so this player-deck invariant is scoped to the collectible (Eyes) pool.
+    for (const c of COLLECTIBLE_CARDS) {
       expect(["common", "bargain", "eternal"]).toContain(c.rarity);
       expect(c.cost).toBeGreaterThanOrEqual(1);
       // Stella Eyes is intentionally a 0-power body (power equals the destroyed-power tally when played).
@@ -693,7 +702,7 @@ describe("story: the prologue", () => {
       suggestion: "Abyss Eyes",
     };
     player.story!.pack = {
-      cards: drawStarterPack(CARDS, mulberry32(1)).map((x) => x.id),
+      cards: drawStarterPack(COLLECTIBLE_CARDS, mulberry32(1)).map((x) => x.id),
       rerolls: 0,
     };
     for (const id of Object.keys(NODES)) {

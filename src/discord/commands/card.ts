@@ -17,7 +17,7 @@ export const cardCommand: Command = {
 
   async autocomplete(interaction, ctx) {
     const query = normalize(interaction.options.getFocused());
-    const choices = ctx.cards
+    const choices = ctx.collectibleCards
       .filter((c) => normalize(c.name).includes(query))
       .slice(0, 25)
       .map((c) => ({
@@ -31,8 +31,8 @@ export const cardCommand: Command = {
     const input = interaction.options.getString("name", true);
     const wanted = normalize(input);
     const def =
-      ctx.cardIndex.get(input) ??
-      ctx.cards.find((c) => normalize(c.name) === wanted);
+      ctx.collectibleCardIndex.get(input) ??
+      ctx.collectibleCards.find((c) => normalize(c.name) === wanted);
     if (!def) {
       await interaction.reply({
         content: `No card named "${input}".`,

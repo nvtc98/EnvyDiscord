@@ -7,7 +7,12 @@ import {
   Partials,
   type Interaction,
 } from "discord.js";
-import { CARDS, CARD_INDEX } from "./data/cards";
+import {
+  CARDS,
+  CARD_INDEX,
+  COLLECTIBLE_CARDS,
+  COLLECTIBLE_CARD_INDEX,
+} from "./data/cards";
 import { JsonPlayerRepo } from "./db/json-repo";
 import { loadConfig } from "./config";
 import type { AppContext } from "./discord/command";
@@ -39,6 +44,8 @@ const ctx: AppContext = {
   repo,
   cards: CARDS,
   cardIndex: CARD_INDEX,
+  collectibleCards: COLLECTIBLE_CARDS,
+  collectibleCardIndex: COLLECTIBLE_CARD_INDEX,
   rng: Math.random,
   timezone: config.timezone,
   images,

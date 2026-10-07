@@ -23,9 +23,12 @@ export const deckCommand: Command = {
     }
 
     const current = new Set(
-      resolveDeck(player, ctx.cards, ctx.cardIndex, ctx.rng).cards.map(
-        (c) => c.id,
-      ),
+      resolveDeck(
+        player,
+        ctx.collectibleCards,
+        ctx.cardIndex,
+        ctx.rng,
+      ).cards.map((c) => c.id),
     );
     const menu = new StringSelectMenuBuilder()
       .setCustomId("deck:select")

@@ -89,7 +89,7 @@ export const shopCommand: Command = {
     const player = ctx.repo.get(interaction.user.id);
 
     if (interaction.isButton() && action === "summon") {
-      const result = buyCard(player, ctx.cards, ctx.rng);
+      const result = buyCard(player, ctx.collectibleCards, ctx.rng);
       if (!result.ok) {
         const msg =
           result.reason === "insufficient-coins"
@@ -126,7 +126,7 @@ export const shopCommand: Command = {
 
     if (interaction.isButton() && action === "variant") {
       const purchasableIds = purchasableVariants().map((v) => v.id);
-      const eligible = ctx.cards.filter((c) => {
+      const eligible = ctx.collectibleCards.filter((c) => {
         const have = cardVariants(player, c.id);
         return have.length > 0 && purchasableIds.some((v) => !have.includes(v));
       });
@@ -161,7 +161,7 @@ export const shopCommand: Command = {
 
     if (interaction.isStringSelectMenu() && action === "pickcard") {
       const cardId = interaction.values[0];
-      const card = ctx.cards.find((c) => c.id === cardId);
+      const card = ctx.collectibleCardIndex.get(cardId);
       if (!card) {
         await interaction.update({
           content: "❌ No card by that name.",
@@ -197,7 +197,7 @@ export const shopCommand: Command = {
     if (interaction.isStringSelectMenu() && action === "pickvariant") {
       const cardId = rest[0];
       const variantId = interaction.values[0];
-      const card = ctx.cards.find((c) => c.id === cardId);
+      const card = ctx.collectibleCardIndex.get(cardId);
       if (!card) {
         await interaction.update({
           content: "❌ No card by that name.",
