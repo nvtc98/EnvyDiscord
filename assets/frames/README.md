@@ -3,7 +3,6 @@
 - `variant-metal.png`, `variant-blue.png`, `variant-purple.png`, `variant-red.png`: the frame drawn over the card art, one per colour variant, **PNG with transparency**. A variant without its own file falls back to `variant-metal.png`, then to any other variant file, then to the built-in drawn frame. Variants are cosmetic only. The list of variants and their colours is `src/data/variants.ts`.
 - `layout.json`: where the text goes, in Dextrous pixels (card 240 × 336). Edit these numbers to move or resize the name, ability text, cost and power. Text can also be given another color, weight or alignment there.
 - `source/`: the files exported from Dextrous for the **Blue** frame, the standard the other variants are made from: `blue-template.png` (white background, as exported) and `blue-layout.json` (the Dextrous layout export).
-- `tier-1.png`: the old cutout of the Blue frame, from before variants. Nothing loads it any more; a test still uses it to check that `variant-blue.png` is the untouched original.
 
 ## The variant frames are generated, not drawn
 
@@ -15,6 +14,7 @@ npm run frames:variants -- --sheet preview/variants.png      # also writes a con
 ```
 
 The command removes the white background of `source/blue-template.png`, then recolours the banner and the panel with the colours in `src/data/variants.ts`:
+
 - **Banner**: the radial gradient between `titleLight` and `titleDark`. Every banner pixel's position on the Blue gradient is moved to the same position on the new gradient, so the shape, the soft edges and the transparency stay exactly as they were.
 - **Description panel**: the pixels take `descFill`'s colour and their transparency is scaled to its opacity.
 
