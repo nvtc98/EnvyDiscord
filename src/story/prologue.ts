@@ -750,10 +750,35 @@ export const NODES: Record<string, NodeDef> = {
       title: TRIBE,
       lines: [
         stranger(
-          "It is done. The road opens before us, and the man steps aside into the dark. We are through — and the tale continues anon.",
+          "It is done. The way opens before us, and the man steps aside into the dark. We are through — and the tale continues anon.",
         ),
         narration(
           "The torchlight steadies. Whatever comes next, it waits beyond this page.",
+        ),
+      ],
+      choices: [
+        { label: "Rest", style: "primary" },
+        { label: "Fight again", style: "secondary" },
+      ],
+    }),
+    // Rest → a brief closing (no buttons; the story waits for the next chapter).
+    // Fight again → discard the won snapshot so the launcher runs a FRESH cave battle; a later win
+    // returns here. Rewards are granted each win (farming is allowed by design).
+    choose(p, index) {
+      if (index === 1) {
+        story(p).battle = null;
+        return "cave_battle";
+      }
+      return "rest";
+    },
+  },
+
+  rest: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "Rest, then. Thou hast earned it. When the tale takes up again, thou shalt find me here — and the road beyond awaits.",
         ),
       ],
       choices: [],

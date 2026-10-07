@@ -619,7 +619,14 @@ describe("story: the prologue", () => {
       expect(player.story!.node).toBe("chapter_end");
       expect(player.story!.caveWon).toBe(true);
       expect(player.story!.battle).toBeNull();
-      expect(currentView(player, ctx()).choices).toEqual([]);
+      expect(currentView(player, ctx()).choices.map((c) => c.label)).toEqual([
+        "Rest",
+        "Fight again",
+      ]);
+      // Fight again clears the won snapshot and returns to the battle (farming allowed).
+      applyAction(player, "chapter_end", { type: "choice", index: 1 }, ctx());
+      expect(player.story!.node).toBe("cave_battle");
+      expect(player.story!.battle).toBeNull();
     });
 
     it("resolveStoryBattle moves to cave_loss on a loss (keeps battle), and retry clears it and returns to the battle", () => {
