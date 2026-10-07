@@ -261,8 +261,8 @@ describe("battle scene", () => {
     });
     const perImage = (performance.now() - started) / 4;
 
-    expect(size(normal).width).toBe(1400);
-    expect(size(normal).height).toBeGreaterThan(900);
+    expect(size(normal).width).toBe(1050);
+    expect(size(normal).height).toBeGreaterThan(600);
     for (const png of [normal, won, lost, drawn])
       expect(png.length).toBeLessThan(3 * 1024 * 1024);
     expect(perImage).toBeLessThan(1000); // Discord wants an answer within 3 seconds

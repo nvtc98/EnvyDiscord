@@ -85,8 +85,8 @@ const FONT_FILES: [file: string, family: string][] = [
 
 // Battle scene geometry, in CSS pixels. The image is drawn at a scale times this for sharpness.
 const SCENE_SCALE = 1.5;
-// The battle image is supersampled 2x for a crisp downscaled Discord preview; the map keeps SCENE_SCALE.
-const BATTLE_SCALE = 2;
+// The battle image is drawn at SCENE_SCALE; full cards in the hand replace the need for extra supersampling.
+const BATTLE_SCALE = SCENE_SCALE;
 /** Caps a raw HUD name so a long one cannot overflow the single-line HUD label. */
 const hudName = (s: string): string =>
   s.length > 22 ? s.slice(0, 21) + "…" : s;
@@ -98,8 +98,9 @@ const CELL_GAP = 8;
 const HEADER_Y = 84;
 const BOARD_Y = 108;
 const BOARD_H = CELLS * COMPACT.h + (CELLS - 1) * CELL_GAP;
-const HAND_SCALE = 0.74;
-const HAND_COLS = 4;
+// The hand shows full portrait cards, scaled down from the full 240x336 size.
+const HAND_CARD_SCALE = 0.45;
+const HAND_COLS = 5;
 // Battle HUD avatars: a circle at the left of each HUD strip. Tune layout here in one place.
 const AVATAR_SIZE = 44;
 const AVATAR_GAP = 12;
@@ -184,11 +185,11 @@ export async function createImageRenderer({
       const foe = state.players[foeSeat];
       const hand = me.hand;
       const handRows = Math.ceil(hand.length / HAND_COLS);
-      const handCardW = COMPACT.w * HAND_SCALE;
-      const handCardH = COMPACT.h * HAND_SCALE;
+      const handCardW = Math.round(layout.card.width * HAND_CARD_SCALE);
+      const handCardH = Math.round(layout.card.height * HAND_CARD_SCALE);
       const boardBottom = BOARD_Y + BOARD_H;
       const myHudY = boardBottom + 12;
-      const handY = myHudY + 92;
+      const handY = myHudY + 62;
       const height =
         hand.length > 0
           ? handY + handRows * handCardH + (handRows - 1) * CELL_GAP + 20
@@ -324,21 +325,42 @@ export async function createImageRenderer({
         ctx.fillText("YOUR HAND", MARGIN, handY - 12);
         const xGap = (boardWidth - HAND_COLS * handCardW) / (HAND_COLS - 1);
         for (const [i, card] of hand.entries()) {
+          const cx = MARGIN + (i % HAND_COLS) * (handCardW + xGap);
+          const cy = handY + Math.floor(i / HAND_COLS) * (handCardH + CELL_GAP);
+          const isSelected = card.uid === selectedUid;
+          const isDim = yourTurn && card.def.cost > me.energy;
+          const variant =
+            card.owner === viewer
+              ? (variants?.[card.def.id] ?? DEFAULT_VARIANT)
+              : DEFAULT_VARIANT;
+
           ctx.save();
-          ctx.translate(
-            MARGIN + (i % HAND_COLS) * (handCardW + xGap),
-            handY + Math.floor(i / HAND_COLS) * (handCardH + CELL_GAP),
-          );
-          ctx.scale(HAND_SCALE, HAND_SCALE);
-          drawCompactCard(
+          ctx.translate(cx, cy);
+          ctx.scale(HAND_CARD_SCALE, HAND_CARD_SCALE);
+          if (isDim) ctx.globalAlpha = 0.4;
+          drawFullCard(
             ctx,
-            compactFace(card, card.def.power, viewer, variants, {
-              selected: card.uid === selectedUid,
-              dim: yourTurn && card.def.cost > me.energy,
-            }),
+            layout,
+            { def: card.def, variant },
             await art.get(card.def.id),
+            await frames.forVariant(variant),
           );
           ctx.restore();
+
+          if (isSelected) {
+            const r =
+              Math.round(layout.card.cornerRadius * HAND_CARD_SCALE) + 1;
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(cx - 1, cy - 1, handCardW + 2, handCardH + 2, r);
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = PALETTE.gold;
+            ctx.shadowColor = PALETTE.gold;
+            ctx.shadowBlur = 14;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          }
         }
       }
 
