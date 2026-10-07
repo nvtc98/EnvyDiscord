@@ -55,6 +55,25 @@ export interface Session {
     outcome: Outcome,
     interaction: MessageComponentInteraction,
   ) => Promise<void>;
+  /** structuredClone of GameState captured when control last returned to the human, for Reset turn. */
+  turnSnapshot: GameState | null;
+  /** The log as it stood when control last returned to the human, restored on Reset turn. */
+  turnStartLog: string[] | null;
+}
+
+/**
+ * Whether the human has changed anything this turn (plays spend energy and/or shrink the hand; a
+ * draw or Phoenix rebirth mints a new uid). Single source of truth for both canReset and the reset
+ * guard; never an identity comparison (meaningless after a clone).
+ */
+function humanActedThisTurn(cur: GameState, snap: GameState): boolean {
+  const c = cur.players.bottom,
+    s = snap.players.bottom;
+  return (
+    c.hand.length !== s.hand.length ||
+    c.energy !== s.energy ||
+    cur.nextUid !== snap.nextUid
+  );
 }
 
 /** Battles live in memory only, one per user. A restart drops unfinished battles. */
@@ -140,6 +159,11 @@ export const screenOf = (
   log: session.log,
   playerName: session.playerName,
   opponentName: session.opponentName,
+  canReset:
+    session.turnSnapshot !== null &&
+    session.state.active === "bottom" &&
+    session.state.winner === null &&
+    humanActedThisTurn(session.state, session.turnSnapshot),
 });
 
 /**
@@ -241,6 +265,8 @@ export function startBattle(opts: StartBattleOpts): Session {
     playerAvatarImage: undefined,
     playerName: opts.playerName,
     opponentName: opts.opponentName,
+    turnSnapshot: null,
+    turnStartLog: null,
   };
   const opening = [
     first === "bottom" ? "You go first." : "The enemy goes first.",
@@ -252,6 +278,11 @@ export function startBattle(opts: StartBattleOpts): Session {
   ];
   const aiEvents = advanceAi(session, ctx);
   pushLog(session, [...opening, ...describeEvents(aiEvents, "bottom")]);
+  // If control sits with the human after the opening, capture the pre-play snapshot for Reset turn.
+  if (session.state.active === "bottom" && !session.state.winner) {
+    session.turnSnapshot = structuredClone(session.state);
+    session.turnStartLog = [...session.log];
+  }
   sessions.set(opts.userId, session);
 
   ctx.log.game("battle_started", {
@@ -348,6 +379,25 @@ export async function handleBattleComponent(
     session.state = step.state;
     events = step.events;
     pushLog(session, ["You forfeited."]);
+  } else if (kind === "reset") {
+    if (
+      session.state.active !== "bottom" ||
+      session.state.winner ||
+      session.turnSnapshot === null ||
+      !humanActedThisTurn(session.state, session.turnSnapshot)
+    ) {
+      await reject("Nothing to reset.");
+      return;
+    }
+    session.state = structuredClone(session.turnSnapshot);
+    session.selectedUid = null;
+    pushLog(session, session.turnStartLog ?? []);
+    await mirrorStoryBattle(ctx, session);
+    await interaction.update({
+      ...renderBattle(await withImage(ctx, session)),
+      attachments: [],
+    });
+    return;
   } else {
     return;
   }
@@ -409,6 +459,7 @@ async function finishBattle(
     difficulty: session.difficulty,
     winner: session.state.winner,
     rounds: session.state.round,
+    turns: session.state.turnsPlayed,
     forfeited: kind === "forfeit",
     coinsAwarded: coins,
     coinsTotal: player.coins,
@@ -463,10 +514,16 @@ async function animateEndOfTurn(
   const events = [...own.events, ...playback.events];
   logEvents(ctx, session, userId, events);
 
-  // The human's own end-turn produces no visible line; it just hands over to the opponent.
-  // Beats come from the opponent's turn; keep only those with something to show.
+  // The human's own end-turn now shifts the tide, so it always carries a visible line; it becomes
+  // beat 0 (the human's own post-shift board). The AI's beats follow, filtered to drop empty ones.
   const ownLines = describeEvents(own.events, "bottom");
-  const visibleBeats = playback.beats.filter((b) => b.lines.length > 0);
+  const aiVisible = playback.beats.filter((b) => b.lines.length > 0);
+  // Beat 0 is the human's own post-shift board (moved marker + own tide line); AI beats follow.
+  // On a human-side game-over (knockout/cap on the human's own endTurn) there is no animation:
+  // the end screen covers the board, so emit zero visible beats and let finalRender show it.
+  const visibleBeats = own.state.winner
+    ? []
+    : [{ state: own.state, lines: ownLines }, ...aiVisible];
 
   // The final log the session should settle on (matches the old non-animated result, trimmed).
   const allLines = [...ownLines, ...playback.beats.flatMap((b) => b.lines)];
@@ -474,7 +531,8 @@ async function animateEndOfTurn(
   const myId = session.id;
   const stillMine = () => sessions.get(userId)?.id === myId;
 
-  // No visible beats (shouldn't happen for a real AI turn): skip animation, do one final render.
+  // No visible beats now means the human's own endTurn finished the game (knockout/cap): skip
+  // animation, do one final render — the end screen covers the board.
   if (visibleBeats.length === 0) {
     pushLog(session, [...preTurnLog, ...allLines]);
     await finalRender(interaction, ctx, session, battleId, userId, kind, (p) =>
@@ -483,8 +541,9 @@ async function animateEndOfTurn(
     return;
   }
 
-  // Running log that grows one beat at a time, mirroring the old per-step append.
-  const runningLines = [...preTurnLog, ...ownLines];
+  // Running log that grows one beat at a time, mirroring the old per-step append. ownLines now lives
+  // inside beat 0 (pushed via first.lines below), so it must NOT be seeded here or it counts twice.
+  const runningLines = [...preTurnLog];
 
   // Beat 0: acknowledge the button and strip all controls while the opponent acts.
   const first = visibleBeats[0];
@@ -544,6 +603,13 @@ async function finalRender(
 ): Promise<void> {
   try {
     if (!session.state.winner) {
+      // Control is returning to the human: capture the pre-play snapshot for Reset turn.
+      session.turnSnapshot =
+        session.state.active === "bottom"
+          ? structuredClone(session.state)
+          : null;
+      session.turnStartLog =
+        session.state.active === "bottom" ? [...session.log] : null;
       await mirrorStoryBattle(ctx, session);
       await send({
         ...renderBattle(await withImage(ctx, session)),

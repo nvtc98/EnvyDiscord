@@ -655,92 +655,65 @@ export function drawArena(
   ctx.fillRect(0, 0, w, h);
 }
 
-const hpColor = (ratio: number) =>
-  ratio > 0.5 ? PALETTE.hpHigh : ratio > 0.25 ? PALETTE.hpMid : PALETTE.hpLow;
+/** Triangle marker height for the tide meter. */
+const TRI_H = 16;
 
-export interface HudData {
-  label: string;
-  color: string;
-  hp: number;
-  maxHp: number;
-  hand: number;
-  deck: number;
-  /** Only the viewer's own energy is shown. */
-  energy?: { current: number; max: number };
-}
-
-/** A player's strip: name, HP bar and (for the viewer) energy pips. Drawn at the origin, `width` wide, 56 tall. */
-export function drawHud(ctx: Ctx, d: HudData, width: number): void {
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-  ctx.font = heading(15);
-  ctx.fillStyle = d.color;
-  // HUD labels render in all-caps; callers pass the raw name and drawHud uppercases here.
-  ctx.fillText(d.label.toUpperCase(), 0, 14);
-
-  ctx.font = body(400, 12);
-  ctx.fillStyle = PALETTE.muted;
-  ctx.textAlign = "right";
-  ctx.fillText(`HAND ${d.hand}  ·  DECK ${d.deck}`, width, 14);
-
-  const barY = 22;
-  const barW = width * 0.52;
-  const ratio = Math.max(0, Math.min(1, d.hp / d.maxHp));
-  roundRect(ctx, 0, barY, barW, 15, 4);
-  ctx.fillStyle = PALETTE.inset;
+/**
+ * The vertical tide meter: a tug-of-war needle in the left gutter. The bar spans {x,y,w,h}; its
+ * gradient runs top (enemy red) -> middle (muted) -> bottom (player blue). A faint gold tick marks
+ * the even point. A triangle marker slides to the current balance (higher balance = lower on
+ * screen, since the human sits at the bottom). No number and no ENEMY/YOU text on the bar.
+ */
+export function drawTideMeter(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  balance: number,
+): void {
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, PALETTE.theirs);
+  grad.addColorStop(0.5, PALETTE.muted);
+  grad.addColorStop(1, PALETTE.mine);
+  roundRect(ctx, x, y, w, h, w / 2);
+  ctx.fillStyle = grad;
   ctx.fill();
-  if (ratio > 0) {
-    ctx.save();
-    roundRect(ctx, 0, barY, barW, 15, 4);
-    ctx.clip();
-    ctx.fillStyle = hpColor(ratio);
-    ctx.fillRect(0, barY, Math.max(15, barW * ratio), 15);
-    ctx.restore();
-  }
-  roundRect(ctx, 0, barY, barW, 15, 4);
+  roundRect(ctx, x, y, w, h, w / 2);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(201,151,58,0.35)";
+  ctx.strokeStyle = "rgba(201,151,58,0.3)";
   ctx.stroke();
-  ctx.textAlign = "left";
-  ctx.font = body(700, 13);
-  ctx.fillStyle = PALETTE.text;
-  ctx.fillText(`${Math.max(0, d.hp)} / ${d.maxHp} HP`, barW + 10, barY + 12.5);
 
-  if (d.energy) {
-    const pip = 15;
-    const x0 = width - 9 * (pip + 3) + 3;
-    for (let i = 0; i < 9; i++) {
-      const cx = x0 + i * (pip + 3) + pip / 2;
-      const cy = barY + 8;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(Math.PI / 4);
-      ctx.beginPath();
-      ctx.rect(-5, -5, 10, 10);
-      if (i < d.energy.current) {
-        ctx.fillStyle = PALETTE.energy;
-        ctx.fill();
-      } else if (i < d.energy.max) {
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = PALETTE.energy;
-        ctx.stroke();
-      } else {
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(255,255,255,0.14)";
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    ctx.textAlign = "right";
-    ctx.font = body(700, 12);
-    ctx.fillStyle = PALETTE.energy;
-    ctx.fillText(
-      `ENERGY ${d.energy.current}/${d.energy.max}`,
-      width,
-      barY + 36,
-    );
-  }
-  ctx.textAlign = "left";
+  // Center tick (even point): a short horizontal line slightly wider than the bar, faint gold.
+  const midY = y + h / 2;
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = PALETTE.gold;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, midY);
+  ctx.lineTo(x + w + 3, midY);
+  ctx.stroke();
+  ctx.restore();
+
+  // Marker: a triangle on the right of the bar at the current balance. Clamp the drawn center so
+  // the whole glyph stays on the bar at the extremes.
+  const clamped = Math.max(0, Math.min(100, balance));
+  const markerY = y + (clamped / 100) * h;
+  const triHalf = TRI_H / 2;
+  const drawY = Math.max(y + triHalf, Math.min(y + h - triHalf, markerY));
+  const lean =
+    clamped > 50 ? PALETTE.mine : clamped < 50 ? PALETTE.theirs : PALETTE.gold;
+  ctx.beginPath();
+  ctx.moveTo(x + w + 2, drawY);
+  ctx.lineTo(x + w + 2 + TRI_H * 0.7, drawY - triHalf);
+  ctx.lineTo(x + w + 2 + TRI_H * 0.7, drawY + triHalf);
+  ctx.closePath();
+  ctx.fillStyle = lean;
+  ctx.shadowColor = lean;
+  ctx.shadowBlur = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 /** Small label above a lane, with optional modifier tags such as "x2" or "ANCHORED". */

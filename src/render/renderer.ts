@@ -6,7 +6,7 @@ import {
   CELLS,
   LANES,
   LANE_NAMES,
-  MAX_HP,
+  MAX_TURNS,
   opponentOf,
   type CardDef,
   type CardInstance,
@@ -23,9 +23,9 @@ import {
   drawCompactCard,
   drawEmptyCell,
   drawFullCard,
-  drawHud,
   drawLaneHeader,
   drawMap,
+  drawTideMeter,
   type CompactFace,
 } from "./draw";
 import { FrameLibrary } from "./frames";
@@ -53,9 +53,9 @@ export interface BattleView {
   playerAvatar?: AvatarImage | null;
   /** The opponent's portrait, already decoded. Null/omitted -> generated placeholder. */
   opponentAvatar?: AvatarImage | null;
-  /** Raw player HUD name (e.g. "Ocean Eyes"). drawHud uppercases it; falls back to "You" when absent. */
+  /** Raw player HUD name (e.g. "Ocean Eyes"). Uppercased for the identity row; "You" when absent. */
   playerName?: string;
-  /** Raw opponent HUD name. drawHud uppercases it; falls back to "The Enemy" when absent. */
+  /** Raw opponent HUD name. Uppercased for the identity row; "The Enemy" when absent. */
   opponentName?: string;
 }
 
@@ -90,20 +90,58 @@ const BATTLE_SCALE = SCENE_SCALE;
 /** Caps a raw HUD name so a long one cannot overflow the single-line HUD label. */
 const hudName = (s: string): string =>
   s.length > 22 ? s.slice(0, 21) + "…" : s;
-const SCENE_W = 700;
+
+/**
+ * A two-line identity block (name in the side colour, HAND·DECK below in muted) drawn to the right
+ * of an avatar and vertically centered on the avatar's center. Imports: uses the module's fonts.
+ */
+function drawIdentityText(
+  ctx: import("@napi-rs/canvas").SKRSContext2D,
+  x: number,
+  centerY: number,
+  name: string,
+  color: string,
+  sub: string,
+): void {
+  const nameSize = 15;
+  const subSize = 12;
+  const lineGap = 6;
+  const total = nameSize + lineGap + subSize;
+  const top = centerY - total / 2;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = `700 ${nameSize}px ${TITLE_FONT}`;
+  ctx.fillStyle = color;
+  ctx.fillText(name.toUpperCase(), x, top);
+  ctx.font = `400 ${subSize}px ${FONT_FAMILY}`;
+  ctx.fillStyle = PALETTE.muted;
+  ctx.fillText(sub, x, top + nameSize + lineGap);
+  ctx.textBaseline = "alphabetic";
+}
+const SCENE_W = 780;
 const MARGIN = 40;
 const LANE_W = COMPACT.w;
 const LANE_GAP = 16;
 const CELL_GAP = 8;
-const HEADER_Y = 84;
-const BOARD_Y = 108;
+// Battle HUD avatars: a circle at the left of each identity row. Tune layout here in one place.
+const AVATAR_SIZE = 44;
+const AVATAR_GAP = 12;
+// The vertical tide meter lives in the left gutter; the board shifts right to clear it.
+const METER_W = 14;
+const METER_GAP = 18;
+const BOARD_X = MARGIN + METER_W + METER_GAP;
+// Vertical layout derives from the enemy identity row's height (see design PART 4.6).
+const TOP_PAD = 14;
+const HUD_LINE_H = 18;
+const ENEMY_ROW_H = Math.max(AVATAR_SIZE, 2 * HUD_LINE_H);
+const HEADER_GAP = 8;
+const HEADER_H = 20;
+const HEADER_Y = TOP_PAD + ENEMY_ROW_H + HEADER_GAP;
+const BOARD_Y = HEADER_Y + HEADER_H + 6;
 const BOARD_H = CELLS * COMPACT.h + (CELLS - 1) * CELL_GAP;
 // The hand shows full portrait cards, scaled down from the full 240x336 size.
 const HAND_CARD_SCALE = 0.45;
 const HAND_COLS = 5;
-// Battle HUD avatars: a circle at the left of each HUD strip. Tune layout here in one place.
-const AVATAR_SIZE = 44;
-const AVATAR_GAP = 12;
 
 /** Throws if the native canvas module or the bundled fonts cannot be loaded; callers fall back to text. */
 export async function createImageRenderer({
@@ -188,12 +226,14 @@ export async function createImageRenderer({
       const handCardW = Math.round(layout.card.width * HAND_CARD_SCALE);
       const handCardH = Math.round(layout.card.height * HAND_CARD_SCALE);
       const boardBottom = BOARD_Y + BOARD_H;
-      const myHudY = boardBottom + 12;
-      const handY = myHudY + 62;
+      // Player identity row sits below the board; its avatar is centered here.
+      const playerRowY = boardBottom + 12;
+      const playerRowCenterY = playerRowY + AVATAR_SIZE / 2;
+      const handY = playerRowY + AVATAR_SIZE + 16;
       const height =
         hand.length > 0
           ? handY + handRows * handCardH + (handRows - 1) * CELL_GAP + 20
-          : myHudY + 76;
+          : playerRowY + AVATAR_SIZE + 20;
 
       const canvas = createCanvas(
         SCENE_W * BATTLE_SCALE,
@@ -210,47 +250,49 @@ export async function createImageRenderer({
       );
 
       const yourTurn = state.active === viewer && !state.winner;
-      const boardWidth = LANES * LANE_W + (LANES - 1) * LANE_GAP;
-      // The HUD text block shifts right to make room for the avatar in the left margin gutter.
-      const hudShift = AVATAR_SIZE + AVATAR_GAP;
-      const hudWidth = boardWidth - hudShift;
 
+      // Vertical tide meter in the left gutter, spanning exactly the board block height. Drawn with
+      // the board (before the win overlay) so the overlay scrim dims it too.
+      drawTideMeter(ctx, MARGIN, BOARD_Y, METER_W, BOARD_H, state.balance);
+
+      // Enemy identity row above the board: avatar left, name + HAND·DECK centered on the avatar.
+      const enemyCenterY = TOP_PAD + AVATAR_SIZE / 2;
       drawAvatar(
         ctx,
         MARGIN + AVATAR_SIZE / 2,
-        14 + AVATAR_SIZE / 2,
+        enemyCenterY,
         AVATAR_SIZE,
         opponentAvatar,
         PALETTE.theirs,
       );
-      ctx.save();
-      ctx.translate(MARGIN + hudShift, 14);
-      drawHud(
+      drawIdentityText(
         ctx,
-        {
-          label: hudName(opponentName ?? "The Enemy"),
-          color: PALETTE.theirs,
-          hp: foe.hp,
-          maxHp: MAX_HP,
-          hand: foe.hand.length,
-          deck: foe.deck.length,
-        },
-        hudWidth,
+        MARGIN + AVATAR_SIZE + AVATAR_GAP,
+        enemyCenterY,
+        hudName(opponentName ?? "The Enemy"),
+        PALETTE.theirs,
+        `HAND ${foe.hand.length} · DECK ${foe.deck.length}`,
       );
-      ctx.restore();
 
-      ctx.textAlign = "center";
-      ctx.font = `700 12px ${TITLE_FONT}`;
+      // TURN counter top-right on the enemy row band, anchored MARGIN from the right edge.
+      const turnNo = Math.min(
+        state.turnsPlayed + (state.winner ? 0 : 1),
+        MAX_TURNS,
+      );
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.font = `700 14px ${TITLE_FONT}`;
       ctx.fillStyle = PALETTE.gold;
       ctx.fillText(
-        `ROUND ${state.round}${state.winner ? "" : yourTurn ? "  ·  YOUR TURN" : "  ·  ENEMY TURN"}`,
-        SCENE_W / 2,
-        66,
+        `TURN ${turnNo} / ${MAX_TURNS}`,
+        SCENE_W - MARGIN,
+        enemyCenterY,
       );
       ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
 
       for (let lane = 0; lane < LANES; lane++) {
-        const x = MARGIN + lane * (LANE_W + LANE_GAP);
+        const x = BOARD_X + lane * (LANE_W + LANE_GAP);
         const cells = state.lanes[lane];
         const tags: string[] = [];
         if (isAnchored(cells)) tags.push("ANCHORED");
@@ -291,41 +333,43 @@ export async function createImageRenderer({
         }
       }
 
+      // Player identity row below the board: avatar left, name + HAND·DECK centered on the avatar.
       drawAvatar(
         ctx,
         MARGIN + AVATAR_SIZE / 2,
-        myHudY + AVATAR_SIZE / 2,
+        playerRowCenterY,
         AVATAR_SIZE,
         playerAvatar,
         PALETTE.mine,
       );
-      ctx.save();
-      ctx.translate(MARGIN + hudShift, myHudY);
-      drawHud(
+      drawIdentityText(
         ctx,
-        {
-          label: hudName(playerName ?? "You"),
-          color: PALETTE.mine,
-          hp: me.hp,
-          maxHp: MAX_HP,
-          hand: hand.length,
-          deck: me.deck.length,
-          energy: {
-            current: yourTurn ? me.energy : 0,
-            max: Math.min(Math.max(me.turns, 1), 9),
-          },
-        },
-        hudWidth,
+        MARGIN + AVATAR_SIZE + AVATAR_GAP,
+        playerRowCenterY,
+        hudName(playerName ?? "You"),
+        PALETTE.mine,
+        `HAND ${hand.length} · DECK ${me.deck.length}`,
       );
-      ctx.restore();
+
+      // ENERGY right-aligned on the player row, anchored MARGIN from the right edge (matching TURN).
+      // Fixed /9 = MAX_ENERGY.
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.font = `700 14px ${TITLE_FONT}`;
+      ctx.fillStyle = PALETTE.energy;
+      ctx.fillText(
+        `ENERGY ${yourTurn ? me.energy : 0}/9`,
+        SCENE_W - MARGIN,
+        playerRowCenterY,
+      );
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
 
       if (hand.length > 0) {
-        ctx.font = `700 12px ${TITLE_FONT}`;
-        ctx.fillStyle = PALETTE.muted;
-        ctx.fillText("YOUR HAND", MARGIN, handY - 12);
+        const boardWidth = LANES * LANE_W + (LANES - 1) * LANE_GAP;
         const xGap = (boardWidth - HAND_COLS * handCardW) / (HAND_COLS - 1);
         for (const [i, card] of hand.entries()) {
-          const cx = MARGIN + (i % HAND_COLS) * (handCardW + xGap);
+          const cx = BOARD_X + (i % HAND_COLS) * (handCardW + xGap);
           const cy = handY + Math.floor(i / HAND_COLS) * (handCardH + CELL_GAP);
           const isSelected = card.uid === selectedUid;
           const isDim = yourTurn && card.def.cost > me.energy;

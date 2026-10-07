@@ -50,6 +50,7 @@ function makeOnStoryEnd(ctx: AppContext, dm: DmChannel) {
       difficulty: session.difficulty,
       winner: session.state.winner,
       rounds: session.state.round,
+      turns: session.state.turnsPlayed,
       forfeited: false,
       coinsAwarded: coins,
       coinsTotal: player.coins,
@@ -169,5 +170,7 @@ function rebuildSession(
     playerName: player.story?.name ?? undefined,
     opponentName: "Bò SPD",
     onStoryEnd,
+    turnSnapshot: null,
+    turnStartLog: null,
   };
 }

@@ -11,7 +11,7 @@ import { canPlay } from "../engine/rules";
 import {
   CELLS,
   LANE_NAMES,
-  MAX_HP,
+  MAX_TURNS,
   opponentOf,
   type GameState,
   type LaneIndex,
@@ -35,6 +35,8 @@ export interface BattleScreen {
   playerName?: string;
   /** Shown as the opponent's HUD label; the renderer falls back to "The Enemy" when absent. */
   opponentName?: string;
+  /** Whether the Reset turn button is enabled (human has acted this turn, game not over). */
+  canReset?: boolean;
 }
 
 const LANES = [0, 1, 2] as const;
@@ -147,6 +149,11 @@ function actionButtons(
       .setStyle(ButtonStyle.Success)
       .setDisabled(!myTurn),
     new ButtonBuilder()
+      .setCustomId(`battle:${screen.id}:reset`)
+      .setLabel("Reset turn")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!(screen.canReset ?? false)),
+    new ButtonBuilder()
       .setCustomId(`battle:${screen.id}:forfeit`)
       .setLabel("Forfeit")
       .setStyle(ButtonStyle.Danger)
@@ -168,7 +175,10 @@ export function battleComponents(screen: BattleScreen) {
 function infoLine(state: GameState, viewer: Seat): string {
   const me = state.players[viewer];
   const foe = state.players[opponentOf(viewer)];
-  return `You ${me.hp}/${MAX_HP} HP · Energy ${me.energy} · Hand ${me.hand.length} · Deck ${me.deck.length}   |   Enemy ${foe.hp}/${MAX_HP} HP · Hand ${foe.hand.length} · Deck ${foe.deck.length}`;
+  // Same rule as the renderer TURN counter (Part 4.5): in-progress turn while playing,
+  // turns-actually-resolved once over, both clamped to MAX_TURNS.
+  const turn = Math.min(state.turnsPlayed + (state.winner ? 0 : 1), MAX_TURNS);
+  return `Tide ${state.balance}/100 · Turn ${turn}/${MAX_TURNS} · You H${me.hand.length} D${me.deck.length} · Enemy H${foe.hand.length} D${foe.deck.length} · E${me.energy}`;
 }
 
 function embed(
@@ -210,12 +220,13 @@ function embed(
 export function renderBattle(screen: BattleScreen) {
   const { state } = screen;
   const myTurn = state.winner === null && state.active === screen.viewer;
+  const turn = Math.min(state.turnsPlayed + (state.winner ? 0 : 1), MAX_TURNS);
   return {
     content: "",
     embeds: [
       embed(
         screen,
-        `⚔️ Round ${state.round} · ${myTurn ? "Your turn" : "Enemy's turn"}`,
+        `⚔️ Turn ${turn}/${MAX_TURNS} · ${myTurn ? "Your turn" : "Enemy's turn"}`,
         EMBED_COLOR.battle,
       ),
     ],
