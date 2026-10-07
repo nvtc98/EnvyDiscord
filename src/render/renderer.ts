@@ -6,10 +6,10 @@ import {
   CELLS,
   LANES,
   LANE_NAMES,
+  MAX_ENERGY,
   MAX_TURNS,
   opponentOf,
   type CardDef,
-  type CardInstance,
   type Faction,
   type GameState,
   type Seat,
@@ -27,7 +27,6 @@ import {
   drawLaneHeader,
   drawMap,
   drawTideMeter,
-  type CompactFace,
 } from "./draw";
 import { FrameLibrary } from "./frames";
 import { DEFAULT_LAYOUT, loadLayout, type CardLayout } from "./layout";
@@ -88,9 +87,9 @@ const FONT_FILES: [file: string, family: string][] = [
 const SCENE_SCALE = 1.5;
 // The battle image is drawn at SCENE_SCALE; full cards in the hand replace the need for extra supersampling.
 const BATTLE_SCALE = SCENE_SCALE;
-/** Caps a raw HUD name so a long one cannot overflow the single-line HUD label. */
+/** Caps a raw HUD name so a long one cannot overflow the narrow left-rail HUD label. */
 const hudName = (s: string): string =>
-  s.length > 22 ? s.slice(0, 21) + "…" : s;
+  s.length > 12 ? s.slice(0, 11) + "…" : s;
 
 /**
  * A two-line identity block (name in the side colour, HAND·DECK below in muted) drawn to the right
@@ -119,30 +118,77 @@ function drawIdentityText(
   ctx.fillText(sub, x, top + nameSize + lineGap);
   ctx.textBaseline = "alphabetic";
 }
-const SCENE_W = 780;
-const MARGIN = 40;
-const LANE_W = COMPACT.w;
-const LANE_GAP = 16;
-const CELL_GAP = 8;
-// Battle HUD avatars: a circle at the left of each identity row. Tune layout here in one place.
+// The battle image is a fixed 1:1 square: SCENE logical px, scaled by BATTLE_SCALE to the device size.
+const SCENE = 845;
+const MARGIN = 24;
+// Left rail (enemy identity / meter / player identity) and right gutter (TURN + energy pips).
+const RAIL_W = 150;
+const GUTTER_W = 70;
+const CELL_GAP = 12;
+// The single hand row at the bottom of the scene.
+const HAND_GAP = 10;
+const HAND_MARGIN = 16;
+const TOP_PAD = 24;
+const BOTTOM_PAD = 24;
+// Lane header strip above the board.
+const LANE_HEADER_H = 18;
+const LANE_HEADER_GAP = 6;
+// Battle HUD avatars: a circle at the top of each identity block in the left rail.
 const AVATAR_SIZE = 44;
 const AVATAR_GAP = 12;
-// The vertical tide meter lives in the left gutter; the board shifts right to clear it.
+// The vertical Eye Privilege meter lives in the left rail between the two identities.
 const METER_W = 14;
-const METER_GAP = 18;
-const BOARD_X = MARGIN + METER_W + METER_GAP;
-// Vertical layout derives from the enemy identity row's height (see design PART 4.6).
-const TOP_PAD = 14;
-const HUD_LINE_H = 18;
-const ENEMY_ROW_H = Math.max(AVATAR_SIZE, 2 * HUD_LINE_H);
-const HEADER_GAP = 8;
-const HEADER_H = 20;
-const HEADER_Y = TOP_PAD + ENEMY_ROW_H + HEADER_GAP;
-const BOARD_Y = HEADER_Y + HEADER_H + 6;
-const BOARD_H = CELLS * COMPACT.h + (CELLS - 1) * CELL_GAP;
-// The hand shows full portrait cards, scaled down from the full 240x336 size.
-const HAND_CARD_SCALE = 0.45;
-const HAND_COLS = 5;
+// Board cells are full portrait cards at this scale; the hand uses smaller full cards.
+const BOARD_CARD_SCALE = 0.58;
+const HAND_CARD_SCALE = 0.27;
+// Energy orbs in the right gutter: a PIP_COLS x 3 grid of small circles.
+const PIP_R = 7;
+const PIP_GAP = 7;
+const PIP_COLS = 3;
+
+/**
+ * The right-gutter energy readout: an "ENERGY" label then a PIP_COLS x 3 grid of orbs, right-anchored
+ * to `right`. The first `shown` orbs of MAX_ENERGY are lit (bright + glow), the rest are dim. `labelY`
+ * is the label's top; the grid starts just below it. Restores textAlign/textBaseline when done.
+ */
+function drawEnergyPips(
+  ctx: import("@napi-rs/canvas").SKRSContext2D,
+  right: number,
+  labelY: number,
+  shown: number,
+): void {
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.font = `700 12px ${TITLE_FONT}`;
+  ctx.fillStyle = PALETTE.energy;
+  ctx.fillText("ENERGY", right, labelY);
+
+  const pipStride = 2 * PIP_R + PIP_GAP;
+  const gridW = PIP_COLS * pipStride - PIP_GAP;
+  const gridLeft = right - gridW;
+  const gridTop = labelY + 16;
+  for (let i = 0; i < MAX_ENERGY; i++) {
+    const col = i % PIP_COLS;
+    const row = Math.floor(i / PIP_COLS);
+    const cx = gridLeft + col * pipStride + PIP_R;
+    const cy = gridTop + row * pipStride + PIP_R;
+    const lit = i < shown;
+    ctx.beginPath();
+    ctx.arc(cx, cy, PIP_R, 0, Math.PI * 2);
+    if (lit) {
+      ctx.fillStyle = PALETTE.energy;
+      ctx.shadowColor = PALETTE.energy;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = "rgba(91,176,232,0.18)";
+      ctx.fill();
+    }
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
 
 /** Throws if the native canvas module or the bundled fonts cannot be loaded; callers fall back to text. */
 export async function createImageRenderer({
@@ -179,26 +225,6 @@ export async function createImageRenderer({
 
   const art = new ArtLibrary(join(assetsDir, "cards"));
   const frames = new FrameLibrary(join(assetsDir, "frames"));
-
-  const compactFace = (
-    card: CardInstance,
-    power: number,
-    viewer: Seat,
-    variants: Record<string, VariantId> | undefined,
-    extra: Partial<CompactFace> = {},
-  ): CompactFace => ({
-    id: card.def.id,
-    name: card.def.name,
-    cost: card.def.cost,
-    power,
-    basePower: card.def.power,
-    variant:
-      card.owner === viewer
-        ? (variants?.[card.def.id] ?? DEFAULT_VARIANT)
-        : DEFAULT_VARIANT,
-    hasAbility: card.def.ability !== undefined,
-    ...extra,
-  });
 
   return {
     async cards(views, { scale = 1.5 } = {}) {
@@ -243,45 +269,53 @@ export async function createImageRenderer({
       const foeSeat = opponentOf(viewer);
       const foe = state.players[foeSeat];
       const hand = me.hand;
-      const handRows = Math.ceil(hand.length / HAND_COLS);
-      // Hand grid cells use The Eyes base card size (uniform grid; botuoi shares the same 240×336 base).
-      const handCardW = Math.round(eyesLayout.card.width * HAND_CARD_SCALE);
-      const handCardH = Math.round(eyesLayout.card.height * HAND_CARD_SCALE);
-      const boardBottom = BOARD_Y + BOARD_H;
-      // Player identity row sits below the board; its avatar is centered here.
-      const playerRowY = boardBottom + 12;
-      const playerRowCenterY = playerRowY + AVATAR_SIZE / 2;
-      const handY = playerRowY + AVATAR_SIZE + 16;
-      const height =
-        hand.length > 0
-          ? handY + handRows * handCardH + (handRows - 1) * CELL_GAP + 20
-          : playerRowY + AVATAR_SIZE + 20;
 
-      const canvas = createCanvas(
-        SCENE_W * BATTLE_SCALE,
-        Math.round(height * BATTLE_SCALE),
-      );
+      // Board cells and hand cards are full portrait cards scaled from The Eyes base size (botuoi
+      // shares the same 240x336 base), so the whole square is driven by eyesLayout.card.
+      const w = eyesLayout.card.width;
+      const h = eyesLayout.card.height;
+      const cellW = Math.round(w * BOARD_CARD_SCALE);
+      const cellH = Math.round(h * BOARD_CARD_SCALE);
+      const BOARD_W = LANES * cellW + (LANES - 1) * CELL_GAP;
+      const BOARD_H = CELLS * cellH + (CELLS - 1) * CELL_GAP;
+      const handCardW = Math.round(w * HAND_CARD_SCALE);
+      const handCardH = Math.round(h * HAND_CARD_SCALE);
+
+      // Vertical layout: the lane-header + board block is centred in the space above the bottom hand band.
+      const HAND_BAND_H = handCardH + HAND_MARGIN;
+      const BOARD_BLOCK_H = LANE_HEADER_H + LANE_HEADER_GAP + BOARD_H;
+      const availableAbove = SCENE - HAND_BAND_H;
+      const blockTop = Math.round((availableAbove - BOARD_BLOCK_H) / 2);
+      const LANE_HEADER_Y = Math.max(TOP_PAD, blockTop);
+      const BOARD_Y = LANE_HEADER_Y + LANE_HEADER_H + LANE_HEADER_GAP;
+
+      // Horizontal layout: left rail, centred board channel, right gutter.
+      const railRight = MARGIN + RAIL_W;
+      const gutterLeft = SCENE - MARGIN - GUTTER_W;
+      const channelW = gutterLeft - railRight;
+      const BOARD_X = railRight + Math.round((channelW - BOARD_W) / 2);
+      const handY = SCENE - BOTTOM_PAD - handCardH;
+
+      const device = Math.round(SCENE * BATTLE_SCALE);
+      const canvas = createCanvas(device, device);
       const ctx = canvas.getContext("2d");
       ctx.scale(BATTLE_SCALE, BATTLE_SCALE);
       drawArena(
         ctx,
-        SCENE_W,
-        height,
+        SCENE,
+        SCENE,
         BOARD_Y + BOARD_H / 2,
         state.round * 977 + 13,
       );
 
       const yourTurn = state.active === viewer && !state.winner;
 
-      // Vertical tide meter in the left gutter, spanning exactly the board block height. Drawn with
-      // the board (before the win overlay) so the overlay scrim dims it too.
-      drawTideMeter(ctx, MARGIN, BOARD_Y, METER_W, BOARD_H, state.balance);
-
-      // Enemy identity row above the board: avatar left, name + HAND·DECK centered on the avatar.
-      const enemyCenterY = TOP_PAD + AVATAR_SIZE / 2;
+      // --- Left rail: enemy identity (top), Eye Privilege meter (middle), player identity (bottom). ---
+      const RAIL_X = MARGIN;
+      const enemyCenterY = LANE_HEADER_Y + AVATAR_SIZE / 2;
       drawAvatar(
         ctx,
-        MARGIN + AVATAR_SIZE / 2,
+        RAIL_X + AVATAR_SIZE / 2,
         enemyCenterY,
         AVATAR_SIZE,
         opponentAvatar,
@@ -289,14 +323,47 @@ export async function createImageRenderer({
       );
       drawIdentityText(
         ctx,
-        MARGIN + AVATAR_SIZE + AVATAR_GAP,
+        RAIL_X + AVATAR_SIZE + AVATAR_GAP,
         enemyCenterY,
         hudName(opponentName ?? "The Enemy"),
         PALETTE.theirs,
         `HAND ${foe.hand.length} · DECK ${foe.deck.length}`,
       );
 
-      // TURN counter top-right on the enemy row band, anchored MARGIN from the right edge.
+      const boardBottom = BOARD_Y + BOARD_H;
+      const playerCenterY = boardBottom - AVATAR_SIZE / 2;
+      drawAvatar(
+        ctx,
+        RAIL_X + AVATAR_SIZE / 2,
+        playerCenterY,
+        AVATAR_SIZE,
+        playerAvatar,
+        PALETTE.mine,
+      );
+      drawIdentityText(
+        ctx,
+        RAIL_X + AVATAR_SIZE + AVATAR_GAP,
+        playerCenterY,
+        hudName(playerName ?? "You"),
+        PALETTE.mine,
+        `HAND ${hand.length} · DECK ${me.deck.length}`,
+      );
+
+      // The Eye Privilege meter runs between the two avatars. No numeric value on the bar. Drawn
+      // before the win overlay so the overlay scrim dims it too.
+      const meterX = RAIL_X + AVATAR_SIZE / 2 - METER_W / 2;
+      const meterTop = enemyCenterY + AVATAR_SIZE / 2 + 12;
+      const meterBottom = playerCenterY - AVATAR_SIZE / 2 - 12;
+      drawTideMeter(
+        ctx,
+        meterX,
+        meterTop,
+        METER_W,
+        meterBottom - meterTop,
+        state.balance,
+      );
+
+      // --- Right gutter: TURN counter (top) + energy pips (below). ---
       const turnNo = Math.min(
         state.turnsPlayed + (state.winner ? 0 : 1),
         MAX_TURNS,
@@ -307,14 +374,21 @@ export async function createImageRenderer({
       ctx.fillStyle = PALETTE.gold;
       ctx.fillText(
         `TURN ${turnNo} / ${MAX_TURNS}`,
-        SCENE_W - MARGIN,
-        enemyCenterY,
+        SCENE - MARGIN,
+        LANE_HEADER_Y + 12,
       );
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
+      drawEnergyPips(
+        ctx,
+        SCENE - MARGIN,
+        LANE_HEADER_Y + 34,
+        yourTurn ? me.energy : 0,
+      );
 
+      // --- Board: 3x3 full portrait cards with owner outlines + live-power colouring. ---
       for (let lane = 0; lane < LANES; lane++) {
-        const x = BOARD_X + lane * (LANE_W + LANE_GAP);
+        const x = BOARD_X + lane * (cellW + CELL_GAP);
         const cells = state.lanes[lane];
         const tags: string[] = [];
         if (isAnchored(cells)) tags.push("ANCHORED");
@@ -328,71 +402,87 @@ export async function createImageRenderer({
             tags.push(seat === viewer ? "YOU x2" : "ENEMY x2");
         }
         ctx.save();
-        ctx.translate(x, HEADER_Y);
-        drawLaneHeader(ctx, LANE_NAMES[lane], tags, LANE_W);
+        ctx.translate(x, LANE_HEADER_Y);
+        drawLaneHeader(ctx, LANE_NAMES[lane], tags, cellW);
         ctx.restore();
 
         for (let row = 0; row < CELLS; row++) {
           const card = cells[viewer === "bottom" ? row : CELLS - 1 - row];
           ctx.save();
-          ctx.translate(x, BOARD_Y + row * (COMPACT.h + CELL_GAP));
+          ctx.translate(x, BOARD_Y + row * (cellH + CELL_GAP));
           if (card) {
-            drawCompactCard(
-              ctx,
-              compactFace(
-                card,
-                effectivePower(state, lane, card),
-                viewer,
-                variants,
-                { owner: card.owner === viewer ? "mine" : "theirs" },
-              ),
-              await art.get(card.def.id),
+            const faction = cardFaction(card.def);
+            const variant =
+              card.owner === viewer
+                ? (variants?.[card.def.id] ?? DEFAULT_VARIANT)
+                : DEFAULT_VARIANT;
+            const r = Math.round(
+              eyesLayout.card.cornerRadius * BOARD_CARD_SCALE,
             );
+            ctx.save();
+            ctx.scale(BOARD_CARD_SCALE, BOARD_CARD_SCALE);
+            drawFullCard(
+              ctx,
+              layoutFor(faction),
+              {
+                def: card.def,
+                variant,
+                livePower: effectivePower(state, lane, card),
+              },
+              await art.get(card.def.id),
+              await frames.forCard(faction, variant),
+            );
+            ctx.restore();
+            // Owner-coloured outline around the whole card.
+            const ownerColor =
+              card.owner === viewer ? PALETTE.mine : PALETTE.theirs;
+            ctx.beginPath();
+            ctx.roundRect(-1, -1, cellW + 2, cellH + 2, r + 1);
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = ownerColor;
+            ctx.shadowColor = ownerColor;
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
           } else {
-            drawEmptyCell(ctx);
+            drawEmptyCell(ctx, cellW, cellH);
           }
           ctx.restore();
         }
       }
 
-      // Player identity row below the board: avatar left, name + HAND·DECK centered on the avatar.
-      drawAvatar(
-        ctx,
-        MARGIN + AVATAR_SIZE / 2,
-        playerRowCenterY,
-        AVATAR_SIZE,
-        playerAvatar,
-        PALETTE.mine,
-      );
-      drawIdentityText(
-        ctx,
-        MARGIN + AVATAR_SIZE + AVATAR_GAP,
-        playerRowCenterY,
-        hudName(playerName ?? "You"),
-        PALETTE.mine,
-        `HAND ${hand.length} · DECK ${me.deck.length}`,
-      );
+      // Win overlay (after the board + meter so the scrim dims them too).
+      if (state.winner) {
+        const won = state.winner === viewer;
+        const draw = state.winner === "draw";
+        ctx.fillStyle = "rgba(4,3,6,0.66)";
+        ctx.fillRect(0, BOARD_Y - 6, SCENE, BOARD_H + 12);
+        ctx.textAlign = "center";
+        ctx.shadowColor = draw
+          ? "rgba(143,136,123,0.6)"
+          : won
+            ? "rgba(201,151,58,0.7)"
+            : "rgba(155,29,46,0.8)";
+        ctx.shadowBlur = 30;
+        ctx.font = `700 70px ${TITLE_FONT}`;
+        ctx.fillStyle = draw ? "#cfc7b6" : won ? "#e3bf6a" : "#b3243a";
+        ctx.fillText(
+          draw ? "DRAW" : won ? "VICTORY" : "DEFEAT",
+          SCENE / 2,
+          BOARD_Y + BOARD_H / 2 + 24,
+        );
+        ctx.shadowBlur = 0;
+        ctx.textAlign = "left";
+      }
 
-      // ENERGY right-aligned on the player row, anchored MARGIN from the right edge (matching TURN).
-      // Fixed /9 = MAX_ENERGY.
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.font = `700 14px ${TITLE_FONT}`;
-      ctx.fillStyle = PALETTE.energy;
-      ctx.fillText(
-        `ENERGY ${yourTurn ? me.energy : 0}/9`,
-        SCENE_W - MARGIN,
-        playerRowCenterY,
-      );
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-
+      // --- Hand: a single bottom row of smaller full cards, confined to the board column. ---
       if (hand.length > 0) {
-        const boardWidth = LANES * LANE_W + (LANES - 1) * LANE_GAP;
-        const xGap = (boardWidth - HAND_COLS * handCardW) / (HAND_COLS - 1);
+        const handCount = hand.length;
+        const handRowW = handCount * handCardW + (handCount - 1) * HAND_GAP;
+        const handX0 = BOARD_X + Math.round((BOARD_W - handRowW) / 2);
         for (const [i, card] of hand.entries()) {
-          const cx = BOARD_X + (i % HAND_COLS) * (handCardW + xGap);
-          const cy = handY + Math.floor(i / HAND_COLS) * (handCardH + CELL_GAP);
+          const cx = handX0 + i * (handCardW + HAND_GAP);
+          const cy = handY;
           const isSelected = card.uid === selectedUid;
           const isDim = yourTurn && card.def.cost > me.energy;
           const variant =
@@ -430,29 +520,6 @@ export async function createImageRenderer({
             ctx.restore();
           }
         }
-      }
-
-      if (state.winner) {
-        const won = state.winner === viewer;
-        const draw = state.winner === "draw";
-        ctx.fillStyle = "rgba(4,3,6,0.66)";
-        ctx.fillRect(0, BOARD_Y - 6, SCENE_W, BOARD_H + 12);
-        ctx.textAlign = "center";
-        ctx.shadowColor = draw
-          ? "rgba(143,136,123,0.6)"
-          : won
-            ? "rgba(201,151,58,0.7)"
-            : "rgba(155,29,46,0.8)";
-        ctx.shadowBlur = 30;
-        ctx.font = `700 70px ${TITLE_FONT}`;
-        ctx.fillStyle = draw ? "#cfc7b6" : won ? "#e3bf6a" : "#b3243a";
-        ctx.fillText(
-          draw ? "DRAW" : won ? "VICTORY" : "DEFEAT",
-          SCENE_W / 2,
-          BOARD_Y + BOARD_H / 2 + 24,
-        );
-        ctx.shadowBlur = 0;
-        ctx.textAlign = "left";
       }
 
       return canvas.toBuffer("image/png");

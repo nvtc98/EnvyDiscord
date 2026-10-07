@@ -261,8 +261,8 @@ describe("battle scene", () => {
     });
     const perImage = (performance.now() - started) / 4;
 
-    expect(size(normal).width).toBe(1170);
-    expect(size(normal).height).toBeGreaterThan(600);
+    expect(size(normal).width).toBe(1268);
+    expect(size(normal).height).toBe(1268);
     for (const png of [normal, won, lost, drawn])
       expect(png.length).toBeLessThan(3 * 1024 * 1024);
     expect(perImage).toBeLessThan(1000); // Discord wants an answer within 3 seconds
@@ -322,7 +322,7 @@ describe("battle scene", () => {
     expect(withAvatars.equals(withPlaceholders)).toBe(false);
   });
 
-  it("a tall hand makes a taller image, an empty hand a shorter one", async () => {
+  it("holds a fixed 1268x1268 square across empty, full and top-viewer states", async () => {
     const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
     const base = newGame(
       { bottom: CARDS.slice(0, 12), top: CARDS.slice(0, 12) },
@@ -331,21 +331,26 @@ describe("battle scene", () => {
     ).state;
     const none = structuredClone(base);
     none.players.bottom.hand = [];
-    const many = structuredClone(base);
+    const emptyBoard = structuredClone(base);
+    const full = structuredClone(base);
+    full.players.bottom.hand = [];
     for (let i = 0; i < 6; i++)
-      many.players.bottom.hand.push({
+      full.players.bottom.hand.push({
         uid: 900 + i,
         def: CARDS[i],
         owner: "bottom",
         bonus: 0,
       });
-    const heights = [none, base, many].map(
-      async (state) =>
-        size(await renderer.battle({ state, viewer: "bottom" })).height,
-    );
-    const [h0, h1, h2] = await Promise.all(heights);
-    expect(h0).toBeLessThan(h1);
-    expect(h1).toBeLessThanOrEqual(h2);
+    for (const [state, viewer] of [
+      [none, "bottom"],
+      [emptyBoard, "bottom"],
+      [full, "bottom"],
+      [midGame(), "top"],
+    ] as const) {
+      const png = await renderer.battle({ state, viewer });
+      expect(png.subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true);
+      expect(size(png)).toEqual({ width: 1268, height: 1268 });
+    }
   });
 });
 

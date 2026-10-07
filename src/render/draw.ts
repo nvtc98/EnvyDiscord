@@ -370,6 +370,8 @@ export interface FullFace {
   variant: VariantId;
   /** Small label at the top, e.g. "NEW" or "Blue". */
   badge?: string;
+  /** Power on the board right now (after buffs and lane effects). Drawn instead of the base power, green/red when it differs. */
+  livePower?: number;
 }
 
 /** Layer 1: art, clipped to the card's rounded outline. Layer 2: the frame (transparent PNG). Layer 3: text. */
@@ -402,7 +404,18 @@ export function drawFullCard(
   drawLine(ctx, f.name, face.def.name, cardFont, f.name.color, false);
   drawParagraph(ctx, f.description, cardText(face.def));
   drawLine(ctx, f.cost, String(face.def.cost), cardFont);
-  drawLine(ctx, f.power, String(face.def.power), cardFont);
+  const live = face.livePower ?? face.def.power;
+  drawLine(
+    ctx,
+    f.power,
+    String(live),
+    cardFont,
+    live > face.def.power
+      ? "#74e6a1"
+      : live < face.def.power
+        ? "#ff8080"
+        : f.power.color,
+  );
 
   if (face.badge) {
     ctx.font = cardFont(700)(8);
@@ -571,8 +584,12 @@ export function drawCompactCard(ctx: Ctx, face: CompactFace, art: Art): void {
 }
 
 /** An empty board cell. */
-export function drawEmptyCell(ctx: Ctx): void {
-  roundRect(ctx, 0, 0, COMPACT.w, COMPACT.h, 8);
+export function drawEmptyCell(
+  ctx: Ctx,
+  w: number = COMPACT.w,
+  h: number = COMPACT.h,
+): void {
+  roundRect(ctx, 0, 0, w, h, 8);
   ctx.fillStyle = "rgba(255,255,255,0.025)";
   ctx.fill();
   ctx.lineWidth = 1.2;
