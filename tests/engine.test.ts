@@ -19,8 +19,8 @@ import {
   totalPower,
 } from "../src/engine/rules";
 import {
-  MAX_HP,
-  MAX_ROUNDS,
+  MAX_TURNS,
+  BALANCE_START,
   type CardInstance,
   type Cell,
 } from "../src/engine/types";
@@ -134,7 +134,8 @@ describe("setup and turn flow", () => {
     expect(state.active).toBe("bottom");
     expect(state.players.bottom.deck).toHaveLength(9);
     expect(state.players.top.deck).toHaveLength(9);
-    expect(state.players.bottom.hp).toBe(MAX_HP);
+    expect(state.balance).toBe(BALANCE_START);
+    expect(state.turnsPlayed).toBe(0);
   });
 
   it("the second player draws at the start of their turn, reaching 4 cards, with 1 energy", () => {
@@ -158,7 +159,9 @@ describe("setup and turn flow", () => {
       state = endTurn(state, mulberry32(0)).state; // -> top
       expect(state.players.top.energy).toBe(Math.min(round, 9));
       state = endTurn(state, mulberry32(0)).state; // resolves, next round, bottom
-      if (state.winner) break;
+      // Keep the game going past the 18-turn cap: this test only exercises the
+      // energy curve (energy tracks players[seat].turns, not turnsPlayed).
+      state.turnsPlayed = 0;
     }
     expect(seen.slice(0, 11)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9]);
   });
@@ -328,31 +331,6 @@ describe("abilities", () => {
     return playCard(state, c.uid, lane).state;
   };
 
-  it("active heal restores HP but never above the maximum", () => {
-    const after = play(
-      "bottom",
-      def("H", 1, 1, { timing: "active", effect: { kind: "heal", amount: 4 } }),
-      (s) => (s.players.bottom.hp = 10),
-    );
-    expect(after.players.bottom.hp).toBe(14);
-    const capped = play(
-      "bottom",
-      def("H", 1, 1, { timing: "active", effect: { kind: "heal", amount: 4 } }),
-      (s) => (s.players.bottom.hp = 18),
-    );
-    expect(capped.players.bottom.hp).toBe(MAX_HP);
-  });
-
-  it("active damage hits the opponent immediately and can win the game", () => {
-    const dmg = def("D", 1, 1, {
-      timing: "active",
-      effect: { kind: "damage", amount: 3 },
-    });
-    expect(play("bottom", dmg).players.top.hp).toBe(MAX_HP - 3);
-    const lethal = play("bottom", dmg, (s) => (s.players.top.hp = 3));
-    expect(lethal.winner).toBe("bottom");
-  });
-
   it("active draw draws that many cards, and nothing from an empty deck", () => {
     const draw2 = def("W", 1, 1, {
       timing: "active",
@@ -425,101 +403,39 @@ describe("abilities", () => {
   });
 });
 
-describe("round resolution", () => {
-  it("does nothing after the first player's turn, and resolves after the second's", () => {
+describe("turn resolution", () => {
+  it("shifts the tide by the board-power difference after a single turn", () => {
     const state = emptyGame();
     setLane(state, 0, [
       instance(def("E", 1, 4), "top"),
       null,
       instance(def("P", 1, 3), "bottom"),
     ]);
-    const mid = endTurn(state, mulberry32(0));
-    expect(mid.state.players.bottom.hp).toBe(MAX_HP);
-    expect(mid.state.round).toBe(1);
-    const end = endTurn(mid.state, mulberry32(0));
-    expect(end.state.players.bottom.hp).toBe(MAX_HP - 4);
-    expect(end.state.players.top.hp).toBe(MAX_HP - 3);
-    expect(end.state.round).toBe(2);
-    expect(end.state.active).toBe("bottom");
-    expect(end.events.find((e) => e.type === "round_resolved")).toMatchObject({
-      damage: { bottom: 4, top: 3 },
-      hp: { bottom: 16, top: 17 },
+    // bottom 3 - top 4 = -1, so the tide moves toward the enemy on the first turn-end.
+    const end = endTurn(state, mulberry32(0));
+    expect(end.state.turnsPlayed).toBe(1);
+    expect(end.state.balance).toBe(49);
+    expect(end.state.active).toBe("top");
+    expect(end.events.find((e) => e.type === "tide_shifted")).toMatchObject({
+      delta: -1,
+      balance: 49,
+      turn: 1,
     });
   });
 
-  it("the first player is whoever the game says, in every round", () => {
+  it("every turn resolves — the tide moves after the first player's turn", () => {
+    const state = emptyGame();
+    setLane(state, 0, [null, null, instance(def("P", 1, 3), "bottom")]);
+    const mid = endTurn(state, mulberry32(0));
+    expect(mid.state.turnsPlayed).toBe(1); // not only after a full round
+    expect(mid.state.balance).toBe(53); // bottom 3 - top 0 = +3
+  });
+
+  it("the first player is whoever the game says, and round still bumps per pair of turns", () => {
     let state = emptyGame("top");
     state = endTurn(endTurn(state, mulberry32(0)).state, mulberry32(0)).state;
     expect(state.active).toBe("top");
     expect(state.round).toBe(2);
-  });
-
-  it("end-of-round heals happen before damage, so they can save a player", () => {
-    const state = emptyGame();
-    const shroom = def("S", 1, 0, {
-      timing: "endOfRound",
-      effect: { kind: "heal", amount: 3 },
-    });
-    state.players.bottom.hp = 2;
-    setLane(state, 0, [
-      instance(def("E", 1, 4), "top"),
-      null,
-      instance(shroom, "bottom"),
-    ]);
-    const end = endTurn(endTurn(state, mulberry32(0)).state, mulberry32(0)).state;
-    expect(end.players.bottom.hp).toBe(1); // 2 + 3 - 4
-    expect(end.winner).toBeNull();
-  });
-
-  it("heals do not exceed the maximum HP", () => {
-    const state = emptyGame();
-    setLane(state, 0, [
-      null,
-      null,
-      instance(
-        def("S", 1, 0, {
-          timing: "endOfRound",
-          effect: { kind: "heal", amount: 5 },
-        }),
-        "bottom",
-      ),
-    ]);
-    expect(endTurn(endTurn(state, mulberry32(0)).state, mulberry32(0)).state.players.bottom.hp).toBe(MAX_HP);
-  });
-
-  it("the player who reaches 0 first loses, and both reaching 0 is a draw", () => {
-    const lose = emptyGame();
-    lose.players.bottom.hp = 3;
-    setLane(lose, 0, [instance(def("E", 1, 3), "top"), null, null]);
-    const done = endTurn(endTurn(lose, mulberry32(0)).state, mulberry32(0));
-    expect(done.state.winner).toBe("top");
-    expect(done.events.at(-1)).toMatchObject({
-      type: "game_over",
-      winner: "top",
-      reason: "hp",
-    });
-    expect(() => endTurn(done.state, mulberry32(0))).toThrow();
-
-    const draw = emptyGame();
-    draw.players.bottom.hp = 3;
-    draw.players.top.hp = 2;
-    setLane(draw, 0, [
-      instance(def("E", 1, 3), "top"),
-      null,
-      instance(def("P", 1, 2), "bottom"),
-    ]);
-    expect(endTurn(endTurn(draw, mulberry32(0)).state, mulberry32(0)).state.winner).toBe("draw");
-  });
-
-  it(`after round ${MAX_ROUNDS} the player with more HP wins`, () => {
-    const state = emptyGame();
-    state.round = MAX_ROUNDS;
-    state.players.top.hp = 7;
-    const finished = endTurn(endTurn(state, mulberry32(0)).state, mulberry32(0)).state;
-    expect(finished.winner).toBe("bottom");
-    const even = emptyGame();
-    even.round = MAX_ROUNDS;
-    expect(endTurn(endTurn(even, mulberry32(0)).state, mulberry32(0)).state.winner).toBe("draw");
   });
 
   it("a forfeit gives the win to the other seat and is not applied twice", () => {
@@ -601,31 +517,13 @@ describe("AI", () => {
         let turns = 0;
         while (!state.winner) {
           state = playAiTurn(state, difficulty, rng).state;
-          expect(++turns).toBeLessThan(MAX_ROUNDS * 2 + 2);
+          expect(++turns).toBeLessThan(MAX_TURNS + 2);
         }
         expect(["bottom", "top", "draw"]).toContain(state.winner);
       }
     },
     30_000,
   );
-
-  it("hard takes a lethal damage ability when it is available", () => {
-    const state = emptyGame("top");
-    state.players.bottom.hp = 3;
-    const shark = give(
-      state,
-      "top",
-      def("SHARK", 1, 1, {
-        timing: "active",
-        effect: { kind: "damage", amount: 3 },
-      }),
-    );
-    give(state, "top", def("FILLER", 1, 1));
-    state.players.top.energy = 1;
-    const after = playAiTurn(state, "hard", mulberry32(1)).state;
-    expect(after.winner).toBe("top");
-    expect(shark.uid).toBeGreaterThan(0);
-  });
 
   it("normal and hard prefer pushing off a strong enemy card over a plain play", () => {
     const state = emptyGame("top");
@@ -648,13 +546,19 @@ describe("AI", () => {
     }
   });
 
-  it("evaluate rewards board power and being able to kill", () => {
+  it("evaluate rewards board power and a favourable tide, without reading HP", () => {
     const state = emptyGame();
     const base = evaluate(state, "bottom");
+    // A bigger board advantage for `me` scores higher.
     setLane(state, 0, [null, null, instance(def("P", 1, 5), "bottom")]);
-    expect(evaluate(state, "bottom")).toBeGreaterThan(base);
-    state.players.top.hp = 5;
-    expect(evaluate(state, "bottom")).toBeGreaterThan(150);
+    const withBoard = evaluate(state, "bottom");
+    expect(withBoard).toBeGreaterThan(base);
+    // A higher balance favours bottom, so bumping it raises bottom's score further.
+    const leaning = structuredClone(state);
+    leaning.balance = 80;
+    expect(evaluate(leaning, "bottom")).toBeGreaterThan(withBoard);
+    // The same higher balance is worse for top (seat-fixed direction).
+    expect(evaluate(leaning, "top")).toBeLessThan(evaluate(state, "top"));
   });
 });
 

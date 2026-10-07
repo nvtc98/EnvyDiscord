@@ -74,9 +74,9 @@ describe("advanceAiBeats", () => {
     }
   });
 
-  it("emits a round-resolution beat when the opponent is the second player", () => {
+  it("emits a tide beat when the opponent ends its turn", () => {
     // `bottom` goes first; ending the human's turn hands over to the AI as the second player.
-    // When the AI then ends its turn the round resolves, which must surface as its own beat.
+    // When the AI then ends its turn the tide resolves, which must surface as its own beat.
     const game = newGame(
       { bottom: CARDS, top: CARDS },
       "bottom",
@@ -90,10 +90,10 @@ describe("advanceAiBeats", () => {
       mulberry32(99),
       "bottom",
     );
-    const hasRoundBeat = playback.beats.some((b) =>
-      b.lines.some((l) => /Round \d+ ends/.test(l)),
+    const hasTideBeat = playback.beats.some((b) =>
+      b.lines.some((l) => /tide (shifts|holds)/i.test(l)),
     );
-    expect(hasRoundBeat).toBe(true);
+    expect(hasTideBeat).toBe(true);
   });
 
   it("keeps hidden events (enemy draws, turn starts) out of the visible lines", () => {

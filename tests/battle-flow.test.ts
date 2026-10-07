@@ -116,9 +116,10 @@ describe("/battle", () => {
     expect(laneRow.components.every((c: any) => c.disabled)).toBe(true); // nothing selected yet
     expect(actionRow.components.map((c: any) => c.label)).toEqual([
       "End turn",
+      "Reset turn",
       "Forfeit",
     ]);
-    expect(embedOf(payload).title).toMatch(/Round 1/);
+    expect(embedOf(payload).title).toMatch(/Turn \d+/);
     expect(
       ctx.log.entries.find((e) => e.type === "battle_started")?.data,
     ).toMatchObject({ difficulty: "normal" });
@@ -194,11 +195,19 @@ describe("/battle", () => {
     // Controls vanish while the opponent acts (the acknowledge frame).
     expect(lastPayload(click.update).components).toEqual([]);
     const update = finalFrame(click);
-    expect(embedOf(update).title).toMatch(/Round 2 · Your turn/);
-    expect(embedOf(update).description).toMatch(/Round 1 ends/);
-    expect(rows(update)[2].components.every((c: any) => !c.disabled)).toBe(
-      true,
-    );
+    expect(embedOf(update).title).toMatch(/Turn \d+\/\d+ · Your turn/);
+    expect(embedOf(update).description).toMatch(/tide (shifts|holds)/i);
+    // End turn and Forfeit are enabled on the player's fresh turn; Reset stays
+    // disabled until the human plays a card.
+    const action = rows(update)[2].components;
+    expect(action.map((c: any) => c.label)).toEqual([
+      "End turn",
+      "Reset turn",
+      "Forfeit",
+    ]);
+    expect(action[0].disabled).toBeFalsy();
+    expect(action[1].disabled).toBe(true);
+    expect(action[2].disabled).toBeFalsy();
     expect(rows(payload)).toHaveLength(3);
   });
 
@@ -271,9 +280,11 @@ describe("/battle", () => {
       if (/The enemy goes first/.test(embedOf(payload).description)) {
         found = true;
         expect(embedOf(payload).title).toMatch(/Your turn/);
-        expect(rows(payload)[2].components.every((c: any) => !c.disabled)).toBe(
-          true,
-        );
+        // End turn and Forfeit are enabled; Reset is disabled until the human acts.
+        const action = rows(payload)[2].components;
+        expect(action[0].disabled).toBeFalsy();
+        expect(action[1].disabled).toBe(true);
+        expect(action[2].disabled).toBeFalsy();
         expect(
           ctx.log.entries.find((e) => e.type === "battle_started")?.data,
         ).toMatchObject({ first: "top" });

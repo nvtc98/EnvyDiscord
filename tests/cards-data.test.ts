@@ -118,4 +118,26 @@ describe("parseAbility validation", () => {
       /takes no amount/,
     );
   });
+
+  it.each(["heal 1", "damage 1", "healRound 1"])(
+    "throws on the removed token %s",
+    (shorthand) => {
+      expect(() => parseAbility(shorthand, "Test Eyes")).toThrow(
+        /unknown ability token/,
+      );
+    },
+  );
+
+  it("no card string in cards.json uses a removed ability token", () => {
+    const withAbility = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL("../src/data/cards.json", import.meta.url)),
+        "utf8",
+      ),
+    ) as Array<{ ability?: string }>;
+    for (const c of withAbility) {
+      if (!c.ability) continue;
+      expect(c.ability).not.toMatch(/^(heal|damage|healRound)\b/);
+    }
+  });
 });
