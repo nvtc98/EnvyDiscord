@@ -24,6 +24,10 @@ export function describeEvent(event: GameEvent, viewer: Seat): string | null {
     }
     case "ability":
       return `${event.card.name} ${event.text}.`;
+    case "moved": {
+      const to = LANE_NAMES[event.to.lane];
+      return `${who(event.seat)} ${event.card.name} slipped to the ${to} lane.`;
+    }
     case "transformed":
       return `${event.from.name} became ${event.into.name}.`;
     case "tide_shifted": {

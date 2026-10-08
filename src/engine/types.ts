@@ -23,13 +23,19 @@ export type ActiveEffect =
   | { kind: "destroyedPower" } // Stella: set bonus so effective power = destroyedPower tally
   | { kind: "shield" } // Bedrock: shield self from enemy pushes this turn
   | { kind: "pushLane" } // Siren: extra push step on the lane, far direction
-  | { kind: "destroyLane" }; // Laser: destroy every other card in the lane
+  | { kind: "destroyLane" } // Laser: destroy every other card in the lane
+  | { kind: "shuffleRedraw" } // Phantom: shuffle hand+deck together, redraw to the post-play hand size
+  | { kind: "buffLaneAll"; amount: number }; // Oracle: +amount power to EVERY card in the lane, both seats (self included)
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
   | { kind: "drainStartOfTurn"; amount: number } // Venom: -amount power to every other card each turn start
   | { kind: "transformAt"; count: number; into: string } // Bò SPD: transform into `into` once `count` cards have been destroyed this match
-  | { kind: "balanceCoefficient"; k: number }; // Bò SPD: contributes `k` to the single global tide coefficient (§6)
+  | { kind: "balanceCoefficient"; k: number } // Bò SPD: contributes `k` to the single global tide coefficient (§6)
+  | { kind: "phasing" } // Phasing: an enemy push that would destroy it slips it to a random empty lane instead
+  | { kind: "wicked" } // Wicked: gains +1 power whenever any card moves (a `moved` event) while on board
+  | { kind: "reflecting" } // Reflecting: an enemy push that displaces it shoves a random other lane one step
+  | { kind: "costReduction"; amount: number }; // Gentle: owner's cards cost `amount` less while this is on the board
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
 export type EndOfRoundEffect = { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
 export type OnDestroyEffect = { kind: "rebirth"; amount: number }; // Phoenix: return to hand with +amount
@@ -129,6 +135,14 @@ export type GameEvent =
       destroyed: { card: CardDef; owner: Seat } | null;
     }
   | { type: "ability"; seat: Seat; card: CardDef; text: string }
+  | {
+      type: "moved";
+      seat: Seat; // owner of the moved card
+      uid: number; // the card instance that moved (uid preserved across the move)
+      card: CardDef; // its def, for the log sentence
+      from: { lane: LaneIndex; cell: number };
+      to: { lane: LaneIndex; cell: number };
+    }
   | {
       type: "transformed";
       seat: Seat;

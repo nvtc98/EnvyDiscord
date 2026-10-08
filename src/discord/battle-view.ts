@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 import { cardText } from "../engine/abilities";
 import { pushInto } from "../engine/push";
-import { canPlay } from "../engine/rules";
+import { canPlay, effectiveCost } from "../engine/rules";
 import {
   CELLS,
   LANE_NAMES,
@@ -81,7 +81,10 @@ function select(
         // A card the player can't afford this turn is tagged "(Too expensive)" at the END of the
         // LABEL (after the name + cost/power) so it reads on the title line, not buried in the dim
         // description.
-        const suffix = card.def.cost > me.energy ? " (Too expensive)" : "";
+        const suffix =
+          effectiveCost(screen.state, screen.viewer, card.def) > me.energy
+            ? " (Too expensive)"
+            : "";
         return {
           label:
             `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${card.def.power}${suffix}`.slice(

@@ -21,6 +21,16 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: Push this lane one step away from you; cards forced off the edge are destroyed.";
       case "destroyLane":
         return "Active: Destroy every other card in this lane.";
+      case "shuffleRedraw":
+        return "Active: Shuffle your hand into your deck, then draw that many cards.";
+      case "buffLaneAll":
+        // No "other": Oracle buffs the whole lane including itself (design Part E.2).
+        return `Active: Every card in this lane gets +${effect.amount} power.`;
+      default:
+        // Compiler belt: the active switch previously had no default and fell through to the
+        // continuous block, leaving the two cases above unenforced. assertNever forces every
+        // active kind to be handled here.
+        return assertNever(effect);
     }
   }
   if (timing === "continuous") {
@@ -37,6 +47,16 @@ export function abilityText(ability: Ability | undefined): string {
         return effect.k === 1
           ? "Passive: Pulls The Eye Privilege normally."
           : `Passive: Pulls The Eye Privilege ${effect.k} times harder.`;
+      case "phasing":
+        return "Passive: When an enemy push would destroy this, slip to a random empty lane instead.";
+      case "wicked":
+        return "Passive: Whenever any card moves, this gains +1 power.";
+      case "reflecting":
+        return "Passive: When an enemy push displaces this, shove a random other lane one step.";
+      case "costReduction":
+        return effect.amount === 1
+          ? "Passive: Your cards cost 1 less (minimum 0)."
+          : `Passive: Your cards cost ${effect.amount} less (minimum 0).`;
       default:
         return assertNever(effect);
     }

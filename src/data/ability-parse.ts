@@ -23,7 +23,17 @@ const TOKENS: Record<string, TokenSpec> = {
   shield: { timing: "active", kind: "shield" },
   pushLane: { timing: "active", kind: "pushLane" },
   destroyLane: { timing: "active", kind: "destroyLane" },
+  shuffleRedraw: { timing: "active", kind: "shuffleRedraw" },
+  buffLaneAll: { timing: "active", kind: "buffLaneAll", amountField: "amount" },
   laneDouble: { timing: "continuous", kind: "laneDouble" },
+  phasing: { timing: "continuous", kind: "phasing" },
+  wicked: { timing: "continuous", kind: "wicked" },
+  reflecting: { timing: "continuous", kind: "reflecting" },
+  costReduction: {
+    timing: "continuous",
+    kind: "costReduction",
+    amountField: "amount",
+  },
   anchor: { timing: "continuous", kind: "anchor" },
   drainStartOfTurn: {
     timing: "continuous",

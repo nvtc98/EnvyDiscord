@@ -1,5 +1,5 @@
 import type { Rng } from "../util/rng";
-import { shuffle } from "../util/rng";
+import { mulberry32, pick, shuffle } from "../util/rng";
 import { hasContinuous } from "./abilities";
 import { entryCell, pushInto, pushMovers, wouldPush } from "./push";
 import {
@@ -15,6 +15,7 @@ import {
   type CardDef,
   type CardInstance,
   type Cell,
+  type ContinuousEffect,
   type GameEvent,
   type GameState,
   type LaneIndex,
@@ -301,8 +302,12 @@ function sirenPush(
   seat: Seat,
   sirenDef: CardDef,
   events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
 ): void {
   const cells = state.lanes[lane];
+  // Snapshot enemy-owned Reflecting cards in this lane BEFORE the shove, to detect displacement after.
+  const reflSnapshot = snapshotReflecting(state, lane, seat);
   const step = seat === "bottom" ? -1 : 1;
   const farEdge = seat === "bottom" ? 0 : CELLS - 1;
   const order: number[] = [];
@@ -325,7 +330,17 @@ function sirenPush(
       cells[i] = null;
     }
   }
-  if (destroyed) destroyCard(state, destroyed, events, "siren");
+  if (destroyed)
+    resolvePushedOffCard(
+      state,
+      destroyed,
+      lane,
+      seat,
+      events,
+      "siren",
+      rng,
+      fires,
+    );
   events.push({
     type: "ability",
     seat,
@@ -334,6 +349,17 @@ function sirenPush(
       ? "pushed the lane, blocked by a shielded card"
       : "pushed the lane",
   });
+  // Reflecting answers each displaced snapshot (after the Siren log line).
+  fireReflecting(
+    state,
+    lane,
+    seat,
+    reflSnapshot,
+    destroyed ? destroyed.uid : null,
+    events,
+    rng,
+    fires,
+  );
 }
 
 interface OceanReturn {
@@ -428,6 +454,32 @@ export function totalPower(state: GameState, owner: Seat): number {
 export const isAnchored = (lane: readonly Cell[]): boolean =>
   lane.some((c) => c !== null && hasContinuous(c.def, "anchor"));
 
+/**
+ * A card's cost for `seat` right now: base cost minus 1 per `costReduction` (Gentle) card of `seat` on
+ * the board, floored at 0. Board-state-derived, so it tracks Gentle entering/leaving automatically.
+ * Multiple Gentles stack. Uses an inline continuous/kind check (hasContinuous's narrow type cannot be
+ * widened to the new kinds — design C.2).
+ */
+export function effectiveCost(
+  state: GameState,
+  seat: Seat,
+  card: CardDef,
+): number {
+  let reduction = 0;
+  for (let lane = 0; lane < LANES; lane++)
+    for (let i = 0; i < CELLS; i++) {
+      const c = state.lanes[lane][i];
+      if (
+        c &&
+        c.owner === seat &&
+        c.def.ability?.timing === "continuous" &&
+        c.def.ability.effect.kind === "costReduction"
+      )
+        reduction += c.def.ability.effect.amount;
+    }
+  return Math.max(0, card.cost - reduction);
+}
+
 export type PlayCheck =
   | { ok: true }
   | {
@@ -444,7 +496,8 @@ export function canPlay(
   const player = state.players[state.active];
   const card = player.hand.find((c) => c.uid === uid);
   if (!card) return { ok: false, reason: "not-in-hand" };
-  if (card.def.cost > player.energy) return { ok: false, reason: "energy" };
+  if (effectiveCost(state, state.active, card.def) > player.energy)
+    return { ok: false, reason: "energy" };
   const cells = state.lanes[lane];
   if (isAnchored(cells) && wouldPush(cells, state.active))
     return { ok: false, reason: "anchored" };
@@ -468,8 +521,244 @@ export function legalPlays(state: GameState): Play[] {
   return plays;
 }
 
+/** True when `lane` is completely empty (all cells null). */
+const laneIsEmpty = (cells: readonly Cell[]): boolean =>
+  cells.every((c) => c === null);
+
+/** The lane indices (0..LANES-1) that are completely empty right now. */
+function emptyLanes(state: GameState): LaneIndex[] {
+  const out: LaneIndex[] = [];
+  for (let lane = 0; lane < LANES; lane++)
+    if (laneIsEmpty(state.lanes[lane])) out.push(lane as LaneIndex);
+  return out;
+}
+
+/** True if `card` carries the given continuous effect kind (inline check — hasContinuous's type is narrow). */
+function hasContinuousKind(
+  card: CardDef,
+  kind: ContinuousEffect["kind"],
+): boolean {
+  const ab = card.ability;
+  return ab?.timing === "continuous" && ab.effect.kind === kind;
+}
+
+/**
+ * Moves `card` (same uid/owner/bonus/shield — the whole instance by reference) into `toLane` at the
+ * entry cell for the card's owner, emitting a `moved` event. precondition: toLane is empty — this does a
+ * DIRECT placement at entryCell(owner) with NO occupancy check, so the caller must verify the target
+ * lane is empty (Phasing's emptyLanes guard). The caller must already have removed the card from its
+ * origin cell.
+ */
+function moveCardToEmptyLane(
+  state: GameState,
+  card: CardInstance,
+  from: { lane: LaneIndex; cell: number },
+  toLane: LaneIndex,
+  events: GameEvent[],
+): void {
+  const cell = entryCell(card.owner);
+  state.lanes[toLane][cell] = card;
+  events.push({
+    type: "moved",
+    seat: card.owner,
+    uid: card.uid,
+    card: card.def,
+    from,
+    to: { lane: toLane, cell },
+  });
+}
+
+// Reaction-fire cap: counts phantom-push FIRES (not raw recursion/step depth), set comfortably above
+// the natural bound. See the recursion-termination argument above phantomPush (design Part D.5).
+const REACTION_FIRE_CAP = LANES * CELLS * 2;
+
+/**
+ * Resolve a card that an ENEMY push has shoved off the far edge. Phasing may redirect it to a random
+ * empty lane (a move) instead of dying; otherwise it is destroyed. `actor` is the seat whose action
+ * caused the push. Returns true if the card was rescued (moved) rather than destroyed.
+ *
+ * precondition for `pick`: it is called ONLY inside the `emptyLanes.length > 0` branch, so it is never
+ * handed an empty array (design D.1, MEDIUM-2). Preserve this guard-then-pick ordering.
+ */
+function resolvePushedOffCard(
+  state: GameState,
+  card: CardInstance,
+  fromLane: LaneIndex,
+  actor: Seat,
+  events: GameEvent[],
+  cause: DestroyCause,
+  rng: Rng,
+  fires: { n: number },
+): boolean {
+  if (card.owner !== actor && hasContinuousKind(card.def, "phasing")) {
+    const empties = emptyLanes(state);
+    if (empties.length > 0) {
+      // pick is reachable only here, where empties is provably non-empty.
+      const chosen = pick(empties, rng);
+      // The card is already off the board; record a synthetic far-edge origin cell (cosmetic — the
+      // `moved` describeEvent reads only `to`).
+      const farEdge = actor === "bottom" ? 0 : CELLS - 1;
+      moveCardToEmptyLane(
+        state,
+        card,
+        { lane: fromLane, cell: farEdge },
+        chosen,
+        events,
+      );
+      return true;
+    }
+  }
+  destroyCard(state, card, events, cause);
+  return false;
+}
+
+/*
+ * Recursion-termination argument (design Part D.5). The only recursive edge is a phantom push (or
+ * Phasing move) causing another push that triggers another Reflecting/Phasing. Termination is
+ * guaranteed by a strict monotone decrease plus a per-action cap:
+ *   1. Phantom pushes never add cards — occupancy is non-increasing, strictly decreasing when a card
+ *      falls off the edge.
+ *   2. A phantom push that destroys none moves cards strictly toward the far edge; the sum of
+ *      distances-to-far-edge strictly decreases and is bounded below by 0.
+ *   3. Phasing's move relocates one card to an empty lane; it does not create cards and happens only
+ *      instead of a destruction.
+ *   4. Reflecting fires at most once per displacement, only from an enemy actor, and never targets its
+ *      own lane, so it cannot directly re-displace itself.
+ *   5. Hard cap (belt): a shared `fires` counter counts reaction FIRES (phantom pushes), capped at
+ *      LANES*CELLS*2 (=18). On hitting the cap, stop firing further reactions; the already-applied
+ *      board stands (no rollback), no event is emitted. Unreachable in normal play.
+ */
+function phantomPush(
+  state: GameState,
+  lane: LaneIndex,
+  actor: Seat,
+  events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
+  reflectingOwner: Seat,
+  reflectingDef: CardDef,
+): void {
+  if (fires.n >= REACTION_FIRE_CAP) return; // cap: stop firing, board stands, no event
+  fires.n += 1;
+  const cells = state.lanes[lane];
+  const empty = laneIsEmpty(cells);
+  const step = actor === "bottom" ? -1 : 1;
+  const farEdge = actor === "bottom" ? 0 : CELLS - 1;
+  let destroyed: CardInstance | null = null;
+  // Visit the far edge first (like sirenPush) so each card slides into a vacated slot.
+  for (let k = 0; k < CELLS; k++) {
+    const i = farEdge - step * k;
+    const occupant = cells[i];
+    if (!occupant) continue;
+    const dest = i + step;
+    if (dest < 0 || dest >= CELLS) {
+      cells[i] = null;
+      destroyed = occupant; // at most one card falls off a single-step shove
+    } else {
+      cells[dest] = occupant;
+      cells[i] = null;
+    }
+  }
+  if (destroyed)
+    resolvePushedOffCard(
+      state,
+      destroyed,
+      lane,
+      actor,
+      events,
+      "push",
+      rng,
+      fires,
+    );
+  events.push({
+    type: "ability",
+    seat: reflectingOwner,
+    card: reflectingDef,
+    text: empty ? "rippled an empty lane" : "pushed another lane in answer",
+  });
+}
+
+/**
+ * Snapshot of an enemy-owned Reflecting card present in a lane before a push, so displacement can be
+ * detected by comparing cells after the push resolves.
+ */
+interface ReflSnapshot {
+  uid: number;
+  cell: number;
+  def: CardDef;
+  owner: Seat;
+  lane: LaneIndex;
+}
+
+/** Enemy-owned (relative to `actor`) Reflecting cards currently in `lane`, with their cell indices. */
+function snapshotReflecting(
+  state: GameState,
+  lane: LaneIndex,
+  actor: Seat,
+): ReflSnapshot[] {
+  const out: ReflSnapshot[] = [];
+  const cells = state.lanes[lane];
+  for (let i = 0; i < CELLS; i++) {
+    const c = cells[i];
+    if (c && c.owner !== actor && hasContinuousKind(c.def, "reflecting"))
+      out.push({ uid: c.uid, cell: i, def: c.def, owner: c.owner, lane });
+  }
+  return out;
+}
+
+/**
+ * For each snapshotted Reflecting card displaced by the just-resolved push (its uid moved to a
+ * different cell in `lane`, or it is the `destroyedUid` that was shoved off), fire one phantom push on
+ * a random OTHER lane. `actor` is the Reflecting card's enemy (the push's actor). The other-lanes array
+ * is always length 2, so pick never gets an empty array (design D.1/D.3).
+ */
+function fireReflecting(
+  state: GameState,
+  lane: LaneIndex,
+  actor: Seat,
+  snapshot: ReflSnapshot[],
+  destroyedUid: number | null,
+  events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
+): void {
+  for (const s of snapshot) {
+    const nowCell = state.lanes[lane].findIndex((c) => c?.uid === s.uid);
+    const displaced =
+      s.uid === destroyedUid || (nowCell !== -1 && nowCell !== s.cell);
+    if (!displaced) continue;
+    const others = ([0, 1, 2] as LaneIndex[]).filter((l) => l !== lane);
+    const target = pick(others, rng);
+    phantomPush(state, target, actor, events, rng, fires, s.owner, s.def);
+  }
+}
+
+/** Count every `moved` event and bump each on-board Wicked's bonus by that count (design D.2). */
+function applyMoveReactions(state: GameState, events: GameEvent[]): void {
+  const moves = events.filter((e) => e.type === "moved").length;
+  if (moves === 0) return;
+  for (let lane = 0; lane < LANES; lane++)
+    for (let i = 0; i < CELLS; i++) {
+      const c = state.lanes[lane][i];
+      if (c && hasContinuousKind(c.def, "wicked")) {
+        c.bonus += moves;
+        events.push({
+          type: "ability",
+          seat: c.owner,
+          card: c.def,
+          text: `gained ${moves} power from movement`,
+        });
+      }
+    }
+}
+
 /** Plays a card from the active player's hand into a lane. Does not modify `prev`. */
-export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
+export function playCard(
+  prev: GameState,
+  uid: number,
+  lane: LaneIndex,
+  rng: Rng = mulberry32(prev.nextUid),
+): Step {
   const check = canPlay(prev, uid, lane);
   if (!check.ok)
     throw new Error(`Cannot play card ${uid} in lane ${lane}: ${check.reason}`);
@@ -480,7 +769,14 @@ export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
   const player = state.players[seat];
   const handIndex = player.hand.findIndex((c) => c.uid === uid);
   const [card] = player.hand.splice(handIndex, 1);
-  player.energy -= card.def.cost;
+  // Charge the discounted cost (Gentle), the same value canPlay gated on.
+  player.energy -= effectiveCost(state, seat, card.def);
+
+  const fires = { n: 0 }; // shared reaction-fire counter for this action (phantom-push cap)
+
+  // Snapshot enemy-owned Reflecting cards in the target lane BEFORE the entry push, to detect
+  // displacement afterward (design D.4 step 2).
+  const entryReflSnapshot = snapshotReflecting(state, lane, seat);
 
   const { lane: nextLane, destroyed } = pushInto(state.lanes[lane], card, seat);
   state.lanes[lane] = nextLane;
@@ -495,12 +791,39 @@ export function playCard(prev: GameState, uid: number, lane: LaneIndex): Step {
       : null,
   });
 
-  // Route the entry-push destruction through destroyCard BEFORE applyActive, so Stella's tally
-  // already includes the card her own entry push shoved off.
-  if (destroyed) destroyCard(state, destroyed, events, "push");
+  // Resolve the entry-push off-edge card: Phasing may redirect it, else it is destroyed (BEFORE
+  // applyActive so Stella's tally already includes the card this entry push shoved off).
+  if (destroyed)
+    resolvePushedOffCard(
+      state,
+      destroyed,
+      lane,
+      seat,
+      events,
+      "push",
+      rng,
+      fires,
+    );
+
+  // Reflecting answers: for each snapshotted enemy Reflecting that the entry push displaced, fire one
+  // phantom push on a random other lane (design D.4 step 5).
+  fireReflecting(
+    state,
+    lane,
+    seat,
+    entryReflSnapshot,
+    destroyed ? destroyed.uid : null,
+    events,
+    rng,
+    fires,
+  );
 
   const ability = card.def.ability;
-  if (ability?.timing === "active") applyActive(state, card, lane, events);
+  if (ability?.timing === "active")
+    applyActive(state, card, lane, events, rng, fires);
+
+  // Wicked reads every `moved` event emitted in this action (entry/Siren Phasing relocations).
+  applyMoveReactions(state, events);
 
   // After every destroy this action could cause (entry push + any active destroys), sweep the board
   // once so Bò SPD cards transform the instant the match tally crosses their threshold (§5).
@@ -513,6 +836,8 @@ function applyActive(
   card: CardInstance,
   lane: LaneIndex,
   events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
 ): void {
   const seat = card.owner;
   const me = state.players[seat];
@@ -558,7 +883,7 @@ function applyActive(
       say("cannot be pushed by the enemy this turn");
       break;
     case "pushLane":
-      sirenPush(state, lane, seat, card.def, events);
+      sirenPush(state, lane, seat, card.def, events, rng, fires);
       break;
     case "destroyLane": {
       const cells = state.lanes[lane];
@@ -575,6 +900,32 @@ function applyActive(
         destroyedNames.length === 0
           ? "found no other cards to destroy"
           : `destroyed ${destroyedNames.join(", ")}`,
+      );
+      break;
+    }
+    case "shuffleRedraw": {
+      // Phantom was already spliced from me.hand in playCard, so me.hand.length is the post-play size.
+      const before = me.hand.length;
+      const pool = [...me.hand.map((c) => c.def), ...me.deck]; // defs only; board cards untouched
+      me.hand = []; // clear instances (defs preserved in pool)
+      me.deck = shuffle(pool, rng);
+      draw(state, seat, before, events); // redraw to the post-play size; draw() enforces MAX_HAND
+      say(
+        `shuffled their hand into the deck and drew ${me.hand.length} card${me.hand.length === 1 ? "" : "s"}`,
+      );
+      break;
+    }
+    case "buffLaneAll": {
+      // Oracle buffs EVERY card in the lane, both seats, including itself (no uid/owner exclusion).
+      let buffed = 0;
+      for (const occupant of state.lanes[lane]) {
+        if (occupant) {
+          occupant.bonus += effect.amount;
+          buffed += 1;
+        }
+      }
+      say(
+        `gave +${effect.amount} power to every card in this lane (${buffed})`,
       );
       break;
     }

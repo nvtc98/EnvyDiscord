@@ -473,7 +473,9 @@
     "name": "Gentle Eyes",
     "rarity": "eternal",
     "cost": 6,
-    "power": 4
+    "power": 4,
+    "ability": "costReduction 1",
+    "note": "Khi còn trên sân, mọi thẻ của phe ta giảm 1 cost (tối thiểu 0). Rời sân thì không còn tính."
   },
   {
     "name": "Glacial Eyes",
@@ -819,7 +821,9 @@
     "name": "Oracle Eyes",
     "rarity": "common",
     "cost": 3,
-    "power": 2
+    "power": 2,
+    "ability": "buffLaneAll 2",
+    "note": "Khi ra sân: +2 power cho MỌI thẻ trong hàng này (cả ta lẫn địch, kể cả chính nó)."
   },
   {
     "name": "Orbit Eyes",
@@ -867,13 +871,17 @@
     "name": "Phantom Eyes",
     "rarity": "bargain",
     "cost": 3,
-    "power": 6
+    "power": 6,
+    "ability": "shuffleRedraw",
+    "note": "Khi ra sân: trộn toàn bộ hand + deck lại rồi rút lại đúng số lá bằng hand sau khi đã ra Phantom."
   },
   {
     "name": "Phasing Eyes",
     "rarity": "common",
     "cost": 2,
-    "power": 3
+    "power": 3,
+    "ability": "phasing",
+    "note": "Khi địch đẩy hủy thẻ này mà có cột trống, dịch chuyển sang một cột trống ngẫu nhiên thay vì bị hủy."
   },
   {
     "name": "Phoenix Eyes",
@@ -923,7 +931,9 @@
     "name": "Reflecting Eyes",
     "rarity": "common",
     "cost": 4,
-    "power": 6
+    "power": 6,
+    "ability": "reflecting",
+    "note": "Khi địch đẩy làm xê dịch thẻ này, đẩy ngẫu nhiên 1 trong 2 cột còn lại đi 1 bước."
   },
   {
     "name": "Relic Eyes",
@@ -1343,7 +1353,9 @@
     "name": "Wicked Eyes",
     "rarity": "eternal",
     "cost": 4,
-    "power": 7
+    "power": 7,
+    "ability": "wicked",
+    "note": "Mỗi khi có bất kỳ thẻ nào di chuyển (hiệu ứng move), thẻ này +1 power."
   },
   {
     "name": "Widow Eyes",

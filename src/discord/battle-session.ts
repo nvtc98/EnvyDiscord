@@ -388,6 +388,25 @@ function hasPush(events: readonly GameEvent[]): boolean {
   return events.some((e) => e.type === "played" && e.destroyed !== null);
 }
 
+/**
+ * Whether the `after-push` beat should fire for a resolved action/beat. True when the entry push killed
+ * a unit (`hasPush`), OR a card moved (Phasing relocate — a `moved` event), OR the beat destroyed more
+ * cards than before it (phantom-push / Siren-triggered kills that never populate `played.destroyed`).
+ * `destroyedBefore`/`destroyedAfter` are the monotonic `state.destroyedCount` before/after the action.
+ * Shared by the human-play branch and the AI/playback loop so both compose one expression.
+ */
+export function pushBeatFired(
+  events: readonly GameEvent[],
+  destroyedBefore: number,
+  destroyedAfter: number,
+): boolean {
+  return (
+    hasPush(events) ||
+    events.some((e) => e.type === "moved") ||
+    destroyedAfter > destroyedBefore
+  );
+}
+
 /** True when this beat's events carry a tide shift of at least TIDE_SHIFT_MIN magnitude. */
 function hasTideShift(events: readonly GameEvent[]): boolean {
   return events.some(
@@ -617,7 +636,8 @@ export async function handleBattleComponent(
       await reject("You can't play that card there right now.");
       return;
     }
-    const step = playCard(session.state, uid, lane);
+    const destroyedBefore = session.state.destroyedCount;
+    const step = playCard(session.state, uid, lane, ctx.rng);
     session.state = step.state;
     session.selectedUid = null;
     events = step.events;
@@ -633,7 +653,7 @@ export async function handleBattleComponent(
         events,
         interaction,
       )) || didReanchor;
-    if (hasPush(events))
+    if (pushBeatFired(events, destroyedBefore, session.state.destroyedCount))
       didReanchor =
         (await runBeat(
           ctx,
@@ -782,6 +802,7 @@ async function animateAiTurn(
   visibleBeats: { state: GameState; lines: string[] }[],
   surface: AnimationSurface,
   preLines: string[],
+  startDestroyed: number,
 ): Promise<boolean> {
   const interaction = surface.interaction;
   let didReanchor = false;
@@ -827,8 +848,11 @@ async function animateAiTurn(
   // AI-turn beats run AFTER the animation loop (never interleaved with per-frame edits), from each
   // beat's own state/events: after-push per destroying placement, tide/near-* per end-turn-resolution
   // beat. Then after-enemy-turn once.
+  // Seed from the PRE-AI-TURN baseline (session.state is already playback.finalState here), so each
+  // beat compares against the state immediately before it — not the post-turn maximum (HIGH-1).
+  let prevDestroyed = startDestroyed;
   for (const beat of playback.beats) {
-    if (hasPush(beat.events))
+    if (pushBeatFired(beat.events, prevDestroyed, beat.state.destroyedCount))
       didReanchor =
         (await runBeat(
           ctx,
@@ -846,6 +870,7 @@ async function animateAiTurn(
         beat.events,
         interaction,
       )) || didReanchor;
+    prevDestroyed = beat.state.destroyedCount;
   }
   didReanchor =
     (await runBeat(
@@ -893,6 +918,9 @@ async function animateEndOfTurn(
     ctx.rng,
     "bottom",
   );
+  // Capture the pre-AI-turn kill count (the state advanceAiBeats consumed) BEFORE reassigning
+  // session.state to the post-turn final state, so the after-push gate seeds from the right baseline.
+  const startDestroyed = own.state.destroyedCount;
   // Advance to the authoritative final state at once; the animation is purely presentational.
   session.state = playback.finalState;
   const events = [...own.events, ...playback.events];
@@ -970,6 +998,7 @@ async function animateEndOfTurn(
       visibleBeats,
       surface,
       preTurnLog,
+      startDestroyed,
     )) || didReanchor;
 
   await finalRender(
@@ -1003,6 +1032,9 @@ export async function animateOpeningTurn(
     ctx.rng,
     "bottom",
   );
+  // Pre-opening kill count (the state advanceAiBeats consumed) BEFORE session.state is reassigned to
+  // the post-turn final state — the correct baseline for the after-push gate (HIGH-1).
+  const startDestroyed = session.state.destroyedCount;
   session.state = playback.finalState;
   logEvents(ctx, session, session.userId, playback.events);
   // Beat 0 is the first AI beat (no human beat 0); only non-empty beats are visible.
@@ -1018,6 +1050,7 @@ export async function animateOpeningTurn(
       visibleBeats,
       surface,
       preLines,
+      startDestroyed,
     );
   } else {
     // No visible AI beat: settle on the pre-opening log only (equivalent to [...preLines]).
