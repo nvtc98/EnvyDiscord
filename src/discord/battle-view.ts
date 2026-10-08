@@ -83,7 +83,7 @@ function select(
         // description.
         const suffix =
           effectiveCost(screen.state, screen.viewer, card.def) > me.energy
-            ? " (Too expensive)"
+            ? " (Too expensive) ⛔"
             : "";
         return {
           label:
