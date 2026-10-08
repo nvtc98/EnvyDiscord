@@ -48,7 +48,7 @@ async function pick(ctx: Ctx, userId: string, id: string, uid: string) {
 /** The first option in the card menu the player can afford right now, if any. */
 const affordable = (payload: any) =>
   rows(payload)[0].components[0].options.find(
-    (o: any) => !o.description.startsWith("Too expensive"),
+    (o: any) => !o.label.includes("Too expensive"),
   );
 
 /** The action row's buttons, keyed by label, for the latest frame. */
@@ -115,9 +115,9 @@ describe("reset turn", () => {
     // The AI was not re-run: control still sits with the human, turn count unchanged.
     expect(session.state.active).toBe("bottom");
     // Reset re-renders in place and disables itself again on the restored turn.
-    expect(actionButtons(lastPayload(click.update))["Reset turn"].disabled).toBe(
-      true,
-    );
+    expect(
+      actionButtons(lastPayload(click.update))["Reset turn"].disabled,
+    ).toBe(true);
   });
 
   it("is disabled and rejects when nothing was played", async () => {

@@ -70,7 +70,7 @@ async function pick(ctx: Ctx, userId: string, id: string, uid: string) {
 /** An option in the card menu the player can afford right now. */
 const affordable = (payload: any) =>
   rows(payload)[0].components[0].options.find(
-    (o: any) => !o.description.startsWith("Too expensive"),
+    (o: any) => !o.label.includes("Too expensive"),
   );
 
 /** Starts battles with successive seeds until the opening hand contains a card that can be played at once. */
@@ -297,7 +297,7 @@ describe("/battle", () => {
     const ctx = makeCtx(3);
     const { payload, id } = await start(ctx);
     const expensive = rows(payload)[0].components[0].options.find((o: any) =>
-      o.description.startsWith("Too expensive"),
+      o.label.includes("Too expensive"),
     );
     if (expensive) {
       const click = await pick(ctx, "u1", id, expensive.value);

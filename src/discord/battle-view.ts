@@ -78,17 +78,17 @@ function select(
     menu.addOptions(
       me.hand.slice(0, 25).map((card, i) => {
         const text = cardText(card.def) || "No ability";
+        // A card the player can't afford this turn is tagged "(Too expensive)" at the END of the
+        // LABEL (after the name + cost/power) so it reads on the title line, not buried in the dim
+        // description.
+        const suffix = card.def.cost > me.energy ? " (Too expensive)" : "";
         return {
           label:
-            `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${card.def.power}`.slice(
+            `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${card.def.power}${suffix}`.slice(
               0,
               100,
             ),
-          description:
-            `${card.def.cost > me.energy ? "Too expensive. " : ""}${text}`.slice(
-              0,
-              100,
-            ),
+          description: text.slice(0, 100),
           value: String(card.uid),
           default: card.uid === screen.selectedUid,
         };
