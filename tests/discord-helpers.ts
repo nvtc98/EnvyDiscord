@@ -75,6 +75,17 @@ export function dmChannel() {
     const m = byId.get(id);
     if (m) m.components = [];
   });
+  // Mirrors production: editing a prior message in place to a new board payload (opening-animation
+  // frames). Points byId[id] at the NEW payload and appends it to `sent` so a later componentsOf(id)
+  // or board scan sees the animated/final frame, WITHOUT mutating the originally-sent object (so a
+  // test can still inspect what the first send carried). A missing id is a no-op (benign in
+  // production). asDmChannel prefers this mock-provided edit over raw.messages.edit.
+  const edit = vi.fn(async (id: string, payload: any) => {
+    if (byId.has(id)) {
+      byId.set(id, payload);
+      sent.push(payload);
+    }
+  });
   // Mirrors channel.messages.delete(id): the re-anchor delete. Observable via deleteMessage.mock.calls;
   // byId.delete only makes a later componentsOf(id) return undefined for the removed id.
   const deleteMessage = vi.fn(async (id: string) => {
@@ -84,6 +95,7 @@ export function dmChannel() {
     send,
     sendTyping,
     clearComponents,
+    edit,
     deleteMessage,
     sent,
     events,

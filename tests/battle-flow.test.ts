@@ -25,7 +25,12 @@ async function start(
 ) {
   const interaction = slashInteraction(userId, { difficulty });
   await battleCommand.execute(interaction as never, ctx);
-  const payload = interaction.reply.mock.calls[0][0] as any;
+  // When the human goes first, the single reply carries the controls board. When the OPPONENT opens,
+  // the first reply is CONTROL-LESS and the opening animation restores controls via editReply (which
+  // shares the reply spy here) — so the board with controls is the last recorded call either way.
+  const calls = interaction.reply.mock.calls.map((c) => c[0] as any);
+  const payload =
+    [...calls].reverse().find((p) => rows(p).length >= 3) ?? calls.at(-1);
   return { payload, id: customIdOf(payload).split(":")[1] };
 }
 

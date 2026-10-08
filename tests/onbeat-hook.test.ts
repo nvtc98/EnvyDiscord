@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  animateOpeningTurn,
   handleBattleComponent,
   runBattleStartBeat,
   sessions,
   setBattleStepDelay,
   startBattle,
+  type AnimationSurface,
   type BattleBeat,
   type BattleBoardPayload,
   type BattleDm,
   type Session,
 } from "../src/discord/battle-session";
+import { describeEvents } from "../src/engine/events";
+import { endTurn } from "../src/engine/rules";
 import { CARD_INDEX, COLLECTIBLE_CARDS } from "../src/data/cards";
 import { NPC_INDEX, npcDeck } from "../src/data/npcs";
 import {
@@ -606,5 +610,109 @@ describe("optional realism: Bo SPD NPC ordering", () => {
     // The required end-of-turn beats appeared; before-finish is the last beat recorded.
     expect(phases).toContain("after-player-end-turn");
     expect(phases.at(-1)).toBe("before-finish");
+  });
+});
+
+/** A fake AnimationSurface for the opening path (interaction null — the launch has none). */
+function fakeOpeningSurface(): AnimationSurface {
+  return {
+    interaction: null,
+    showFirstFrame: async (_p: BattleBoardPayload) => {},
+    editFrame: async (_p: BattleBoardPayload) => {},
+    showControls: async (_p: BattleBoardPayload) => {},
+  };
+}
+
+describe("onBeat ordering — opponent-first opening animation", () => {
+  it("fires only the opening-animation beats (after-push/tide/near-* then after-enemy-turn); no battle-start or after-player-end-turn", async () => {
+    const ctx = makeCtx(7);
+    const npc = NPC_INDEX.get("bo-spd")!;
+    const phases: string[] = [];
+    // Opponent-first (goesFirst), NO `first: "bottom"` override — the enemy opens.
+    const session = startBattle({
+      ctx,
+      userId: "op1",
+      username: "op1",
+      deck: COLLECTIBLE_CARDS.slice(0, 12),
+      opponentDeck: npcDeck(npc, CARD_INDEX),
+      opponentGuaranteedOpening: npc.guaranteedOpening,
+      opponentGoesFirst: true,
+      difficulty: "normal",
+      variants: {},
+    });
+    session.onBeat = async (ev: BattleBeat) => {
+      phases.push(ev.phase);
+    };
+    // The launcher does NOT call runBattleStartBeat on the opening path; drive the animation directly.
+    await animateOpeningTurn(ctx, session, fakeOpeningSurface());
+
+    // Neither battle-start nor after-player-end-turn fire for the opening.
+    expect(phases).not.toContain("battle-start");
+    expect(phases).not.toContain("after-player-end-turn");
+    // after-enemy-turn fires exactly once, and it is the LAST opening-animation beat recorded.
+    expect(phases.filter((p) => p === "after-enemy-turn")).toHaveLength(1);
+    expect(phases.at(-1)).toBe("after-enemy-turn");
+    // Every recorded beat is one of the allowed opening-animation beats.
+    const allowed = new Set([
+      "after-push",
+      "tide-shifted",
+      "near-win",
+      "near-defeat",
+      "after-enemy-turn",
+    ]);
+    expect(phases.every((p) => allowed.has(p))).toBe(true);
+    sessions.delete("op1");
+  });
+
+  it("mid-game end-turn still fires after-player-end-turn then after-enemy-turn in order", async () => {
+    const ctx = makeCtx(7);
+    const phases: string[] = [];
+    const session = startBattle({
+      ctx,
+      userId: "op2",
+      username: "op2",
+      deck: COLLECTIBLE_CARDS.slice(0, 12),
+      opponentDeck: COLLECTIBLE_CARDS.slice(0, 12),
+      first: "bottom",
+      difficulty: "normal",
+      variants: {},
+    });
+    session.onBeat = async (ev: BattleBeat) => {
+      phases.push(ev.phase);
+    };
+    const end = press("op2", session.id, "end");
+    await handleBattleComponent(end as never, ctx);
+    expect(phases[0]).toBe("after-player-end-turn");
+    if (phases.includes("after-enemy-turn")) {
+      expect(phases.indexOf("after-player-end-turn")).toBeLessThan(
+        phases.indexOf("after-enemy-turn"),
+      );
+    }
+    sessions.delete("op2");
+  });
+});
+
+describe("mid-game log-settle regression (HIGH-1 mid-game side)", () => {
+  it("the human's own end-turn tide line survives the visible-beats settle", async () => {
+    const ctx = makeCtx(7);
+    // A state where the human leads on power so their own end-turn produces a visible tide line.
+    const state = forcedPushState();
+    state.lanes[1] = [null, null, inst(70, "bottom")];
+    const session = makeSession("hl1", state);
+
+    // Compute the human's own end-turn lines independently on a FRESH rng stream (same seed), so the
+    // probe's endTurn sees the same rng the handler's endTurn will consume first.
+    const probeCtx = makeCtx(7);
+    const probe = endTurn(structuredClone(state), probeCtx.rng);
+    const ownLines = describeEvents(probe.events, "bottom");
+    expect(ownLines.length).toBeGreaterThan(0); // the human's end-turn carries a visible line
+
+    const end = press("hl1", session.id, "end");
+    await handleBattleComponent(end as never, ctx);
+
+    // The settled log STILL contains the human's own end-turn line(s) — the visible-beats settle did
+    // NOT drop beat 0 (a playback.beats-only settle would have).
+    for (const line of ownLines) expect(session.log).toContain(line);
+    sessions.delete("hl1");
   });
 });

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { MessageFlags, type MessageComponentInteraction } from "discord.js";
 import { type Difficulty } from "../engine/ai";
-import { advanceAiBeats } from "../engine/ai-playback";
+import { advanceAiBeats, type AiPlayback } from "../engine/ai-playback";
 import { describeEvents } from "../engine/events";
 import { canPlay, endTurn, forfeit, newGame, playCard } from "../engine/rules";
 import { seedGuaranteedOpening } from "../engine/opening";
@@ -88,6 +88,38 @@ export type OnBeat = (ev: BattleBeat) => Promise<void>;
  * payload a compile error.
  */
 export type BattleBoardPayload = ReturnType<typeof renderBattle>;
+
+/**
+ * How a caller posts frame 0 of an animated enemy turn, edits later frames, and restores controls.
+ * The one seam that lets the mid-game end-of-turn path (editing a clicked component) and the opening
+ * path (editing a launcher-posted message) share a single beat-animation routine (`animateAiTurn`).
+ */
+export interface AnimationSurface {
+  /**
+   * Render frame 0 (`visibleBeats[0].state`) with controls ALREADY stripped. This frame MUST be shown
+   * on BOTH paths — it is the board the moment the enemy's opening card hits the table. Mid-game this
+   * is the component `interaction.update({...,components:[],attachments:[]})`; for the opening it EDITS
+   * the launcher's already-posted (control-less) board in place to beat 0's board (NOT a no-op — the
+   * first send rendered the pre-move empty board). Editing a control-less message changes only the
+   * board image/log, so no button flash. A reject bails to the loop's best-effort tail.
+   */
+  showFirstFrame(payload: BattleBoardPayload): Promise<void>;
+  /** Replace the in-place board on a later beat (same message), controls stripped. Benign failure => drop the frame. */
+  editFrame(payload: BattleBoardPayload): Promise<void>;
+  /**
+   * Post the FINAL board with its controls INTACT — the control-restoring send used by
+   * `restoreHumanControls` after the enemy turn animates. Unlike `editFrame`, this MUST NOT override
+   * `components`; it spreads the caller's payload as-is so `renderBattle`'s `battleComponents` survive
+   * and the human gets live buttons back.
+   */
+  showControls(payload: BattleBoardPayload): Promise<void>;
+  /**
+   * The component interaction to thread into onBeat callbacks, or null (the opening/launch has none).
+   * Threading null is contract-valid: runBeat/BattleBeat accept null and the shipping flow never sets
+   * session.onBeat, so runBeat short-circuits and interaction is never dereferenced on the opening path.
+   */
+  readonly interaction: MessageComponentInteraction | null;
+}
 
 /** The minimal DM surface re-anchor needs: send a board payload, delete the old board message. */
 export interface BattleDm {
@@ -227,21 +259,9 @@ export function logEvents(
   }
 }
 
-/**
- * Advances the AI's turns until it is the human's turn again (or the game ends), applying the final
- * state to the session at once (no animation). Used for the opening, where the enemy's first move is
- * shown instantly. Returns every event in order, for logging.
- */
-export function advanceAi(session: Session, ctx: AppContext): GameEvent[] {
-  const playback = advanceAiBeats(
-    session.state,
-    session.difficulty,
-    ctx.rng,
-    "bottom",
-  );
-  session.state = playback.finalState;
-  return playback.events;
-}
+/** True when the session, as returned by startBattle, is waiting on the opponent's opening turn. */
+export const opponentOpens = (session: Session): boolean =>
+  session.state.active === "top" && session.state.winner === null;
 
 export const screenOf = (
   session: Session,
@@ -456,7 +476,10 @@ export interface StartBattleOpts {
 }
 
 /**
- * Builds the GameState, runs the opening AI instantly, stores the session and logs `battle_started`.
+ * Builds the GameState, seeds any guaranteed opening, stores the session and logs `battle_started`.
+ * It does NOT advance the opponent's opening turn — when the opponent is the first mover the returned
+ * session sits at the enemy's pre-move state (`opponentOpens(session) === true`) and the caller
+ * animates the opening via `animateOpeningTurn`.
  */
 export function startBattle(opts: StartBattleOpts): Session {
   const { ctx } = opts;
@@ -473,8 +496,8 @@ export function startBattle(opts: StartBattleOpts): Session {
     first,
     ctx.rng,
   );
-  // Seed the opponent's guaranteed opening cards AFTER the deal and BEFORE advanceAi runs below, so if
-  // the NPC moves first it already holds the guaranteed card when its opening turn plays. HOLD only.
+  // Seed the opponent's guaranteed opening cards AFTER the deal and BEFORE the opening animation plays,
+  // so if the NPC moves first it already holds the guaranteed card when its opening turn animates. HOLD only.
   if (opts.opponentGuaranteedOpening?.length)
     seedGuaranteedOpening(game.state, "top", opts.opponentGuaranteedOpening);
   const guests = opts.guests ?? [];
@@ -504,9 +527,10 @@ export function startBattle(opts: StartBattleOpts): Session {
         ]
       : []),
   ];
-  const aiEvents = advanceAi(session, ctx);
-  pushLog(session, [...opening, ...describeEvents(aiEvents, "bottom")]);
-  // If control sits with the human after the opening, capture the pre-play snapshot for Reset turn.
+  pushLog(session, opening);
+  // When the human is the first mover there is no enemy opening to animate: capture the pre-play
+  // snapshot for Reset turn here. When the opponent opens (state.active === "top"), this block is
+  // skipped and the snapshot is captured at the end of the opening animation (restoreHumanControls).
   if (session.state.active === "bottom" && !session.state.winner) {
     session.turnSnapshot = structuredClone(session.state);
     session.turnStartLog = [...session.log];
@@ -524,7 +548,6 @@ export function startBattle(opts: StartBattleOpts): Session {
     enemyDeck: opts.opponentDeck.map((c) => c.id),
     origin: session.origin,
   });
-  logEvents(ctx, session, opts.userId, aiEvents);
   return session;
 }
 
@@ -740,6 +763,104 @@ async function finishBattle(
 }
 
 /**
+ * Walks the caller-assembled `visibleBeats` as an animated enemy turn on the given surface: frame 0
+ * immediately (controls stripped, via `surface.showFirstFrame`), then `delay(stepDelayMs)` +
+ * `surface.editFrame` per later visible beat, then the per-beat after-push/tide/near-* beats and
+ * after-enemy-turn once (driven from `playback.beats`). `preLines` seeds the running log (the human's
+ * own end-turn lines for mid-game; just the pre-opening log for the opening). Beat 0's own lines live
+ * inside `visibleBeats[0].lines`. The CALLER has ALREADY set `session.state = playback.finalState` and
+ * logged events. Settles the log to `[...preLines, ...visibleBeats.flatMap(b => b.lines)]` — VISIBLE
+ * beats, not `playback.beats`, so the human's own end-turn line (beat 0 mid-game) survives. Returns
+ * whether any onBeat re-anchored.
+ *
+ * PRECONDITION: `visibleBeats.length > 0` — the caller only invokes this when the enemy actually acts.
+ */
+async function animateAiTurn(
+  ctx: AppContext,
+  session: Session,
+  playback: AiPlayback,
+  visibleBeats: { state: GameState; lines: string[] }[],
+  surface: AnimationSurface,
+  preLines: string[],
+): Promise<boolean> {
+  const interaction = surface.interaction;
+  let didReanchor = false;
+
+  // Running log that grows one beat at a time, mirroring the old per-step append.
+  const runningLines = [...preLines];
+
+  // Beat 0: show the first frame with controls already stripped (via the surface).
+  const first = visibleBeats[0];
+  runningLines.push(...first.lines);
+  pushLog(session, runningLines);
+  try {
+    await surface.showFirstFrame(
+      renderBattle(await withImage(ctx, session, first.state)),
+    );
+  } catch {
+    // If even the first frame fails, bail to a best-effort final render below.
+  }
+
+  const myId = session.id;
+  const stillMine = () => sessions.get(session.userId)?.id === myId;
+
+  // Subsequent beats: wait, then edit the same message in place.
+  for (let i = 1; i < visibleBeats.length; i++) {
+    await delay(stepDelayMs);
+    if (!stillMine()) return didReanchor; // a second /battle replaced this session mid-animation
+    const beat = visibleBeats[i];
+    runningLines.push(...beat.lines);
+    pushLog(session, runningLines);
+    try {
+      await surface.editFrame(
+        renderBattle(await withImage(ctx, session, beat.state)),
+      );
+    } catch {
+      break; // a dropped frame is fine; the state is already authoritative
+    }
+  }
+
+  // Settle the log on the VISIBLE beats (NOT playback.beats), so beat 0's own lines survive.
+  pushLog(session, [...preLines, ...visibleBeats.flatMap((b) => b.lines)]);
+  if (!stillMine()) return didReanchor;
+
+  // AI-turn beats run AFTER the animation loop (never interleaved with per-frame edits), from each
+  // beat's own state/events: after-push per destroying placement, tide/near-* per end-turn-resolution
+  // beat. Then after-enemy-turn once.
+  for (const beat of playback.beats) {
+    if (hasPush(beat.events))
+      didReanchor =
+        (await runBeat(
+          ctx,
+          session,
+          "after-push",
+          beat.state,
+          beat.events,
+          interaction,
+        )) || didReanchor;
+    didReanchor =
+      (await runTideBeats(
+        ctx,
+        session,
+        beat.state,
+        beat.events,
+        interaction,
+      )) || didReanchor;
+  }
+  didReanchor =
+    (await runBeat(
+      ctx,
+      session,
+      "after-enemy-turn",
+      playback.finalState,
+      [],
+      interaction,
+    )) || didReanchor;
+
+  return didReanchor;
+}
+
+/**
  * Plays the opponent's turn back as an animated sequence inside the same ephemeral message. The human
  * has just pressed "End the turn" on their own turn: we end their turn, advance the AI, then step
  * through the opponent's beats ~1.4s apart, re-rendering BOTH the board image and the log embed each
@@ -808,16 +929,11 @@ async function animateEndOfTurn(
     ? []
     : [{ state: own.state, lines: ownLines }, ...aiVisible];
 
-  // The final log the session should settle on (matches the old non-animated result, trimmed).
-  const allLines = [...ownLines, ...playback.beats.flatMap((b) => b.lines)];
-
-  const myId = session.id;
-  const stillMine = () => sessions.get(userId)?.id === myId;
-
   // No visible beats now means the human's own endTurn finished the game (knockout/cap): skip
   // animation, do one final render — the end screen covers the board.
   if (visibleBeats.length === 0) {
     // The human's own endTurn ended the game: NO AI beats run and after-enemy-turn does NOT fire.
+    const allLines = [...ownLines, ...playback.beats.flatMap((b) => b.lines)];
     pushLog(session, [...preTurnLog, ...allLines]);
     await finalRender(
       interaction,
@@ -832,79 +948,28 @@ async function animateEndOfTurn(
     return;
   }
 
-  // Running log that grows one beat at a time, mirroring the old per-step append. ownLines now lives
-  // inside beat 0 (pushed via first.lines below), so it must NOT be seeded here or it counts twice.
-  const runningLines = [...preTurnLog];
-
-  // Beat 0: acknowledge the button and strip all controls while the opponent acts.
-  const first = visibleBeats[0];
-  runningLines.push(...first.lines);
-  pushLog(session, runningLines);
-  try {
-    const screen = await withImage(ctx, session, first.state);
-    await interaction.update({
-      ...renderBattle(screen),
-      components: [],
-      attachments: [],
-    });
-  } catch {
-    // If even the acknowledge fails, bail to a best-effort final render below.
-  }
-
-  // Subsequent beats: wait, then edit the same message in place.
-  for (let i = 1; i < visibleBeats.length; i++) {
-    await delay(stepDelayMs);
-    if (!stillMine()) return; // a second /battle replaced this session mid-animation
-    const beat = visibleBeats[i];
-    runningLines.push(...beat.lines);
-    pushLog(session, runningLines);
-    try {
-      const screen = await withImage(ctx, session, beat.state);
-      await interaction.editReply({
-        ...renderBattle(screen),
-        components: [],
-        attachments: [],
-      });
-    } catch {
-      break; // a dropped frame is fine; the state is already authoritative
-    }
-  }
-
-  // Settle the log on exactly what the non-animated path would show.
-  pushLog(session, [...preTurnLog, ...allLines]);
-  if (!stillMine()) return;
-
-  // AI-turn beats run AFTER the animation loop (never interleaved with per-frame edits), from each
-  // beat's own state/events (the readonly `events` field added to the engine Beat): after-push per
-  // destroying placement, and tide/near-* per end-turn-resolution beat. Then after-enemy-turn once.
-  for (const beat of playback.beats) {
-    if (hasPush(beat.events))
-      didReanchor =
-        (await runBeat(
-          ctx,
-          session,
-          "after-push",
-          beat.state,
-          beat.events,
-          interaction,
-        )) || didReanchor;
-    didReanchor =
-      (await runTideBeats(
-        ctx,
-        session,
-        beat.state,
-        beat.events,
-        interaction,
-      )) || didReanchor;
-  }
+  // The mid-game surface: frame 0 acknowledges the clicked component (controls stripped), later frames
+  // edit it in place, and showControls restores controls via a plain editReply (components NOT stripped).
+  const surface: AnimationSurface = {
+    interaction,
+    showFirstFrame: (p) =>
+      interaction
+        .update({ ...p, components: [], attachments: [] })
+        .then(() => {}),
+    editFrame: (p) =>
+      interaction
+        .editReply({ ...p, components: [], attachments: [] })
+        .then(() => {}),
+    showControls: (p) => interaction.editReply(p).then(() => {}),
+  };
   didReanchor =
-    (await runBeat(
+    (await animateAiTurn(
       ctx,
       session,
-      "after-enemy-turn",
-      playback.finalState,
-      [],
-      interaction,
+      playback,
+      visibleBeats,
+      surface,
+      preTurnLog,
     )) || didReanchor;
 
   await finalRender(
@@ -917,6 +982,91 @@ async function animateEndOfTurn(
     (p) => interaction.editReply(p),
     didReanchor,
   );
+}
+
+/**
+ * Animate the opponent's OPENING turn on the given surface. Precondition: opponentOpens(session) is
+ * true — the caller checks this before posting the opening board. Advances the AI to its authoritative
+ * final state, logs its events once, animates the beats with the shared routine, then restores the
+ * human's controls / captures the Reset snapshot. Errors in a frame edit drop that frame; the state is
+ * already authoritative.
+ */
+export async function animateOpeningTurn(
+  ctx: AppContext,
+  session: Session,
+  surface: AnimationSurface,
+): Promise<void> {
+  const preLines = [...session.log]; // the opening line(s) seeded by startBattle
+  const playback = advanceAiBeats(
+    session.state,
+    session.difficulty,
+    ctx.rng,
+    "bottom",
+  );
+  session.state = playback.finalState;
+  logEvents(ctx, session, session.userId, playback.events);
+  // Beat 0 is the first AI beat (no human beat 0); only non-empty beats are visible.
+  const visibleBeats = playback.beats
+    .filter((b) => b.lines.length > 0)
+    .map((b) => ({ state: b.state, lines: b.lines }));
+  let didReanchor = false;
+  if (visibleBeats.length > 0) {
+    didReanchor = await animateAiTurn(
+      ctx,
+      session,
+      playback,
+      visibleBeats,
+      surface,
+      preLines,
+    );
+  } else {
+    // No visible AI beat: settle on the pre-opening log only (equivalent to [...preLines]).
+    pushLog(session, [...preLines, ...visibleBeats.flatMap((b) => b.lines)]);
+  }
+  if (session.state.winner) {
+    // Defensive: a first-move knockout is NOT reachable with shipped decks. Log and return WITHOUT
+    // finishing — finishBattle/onStoryEnd require a component interaction we do not have here.
+    ctx.log.message("error", {
+      battleId: session.id,
+      phase: "opening-game-over",
+    });
+    return;
+  }
+  // Restore the human's controls through the CONTROL-PRESERVING send (showControls), NOT editFrame.
+  await restoreHumanControls(
+    ctx,
+    session,
+    (p) => surface.showControls(p as BattleBoardPayload),
+    didReanchor,
+  );
+}
+
+/**
+ * Return control to the human after an animated enemy turn: capture the Reset snapshot (when the human
+ * is now active), mirror a story battle to the DB, and render the live-controls board UNLESS a beat
+ * already re-anchored it. Wrapped in the same guard finalRender uses so a stray edit error never
+ * strands the player without controls.
+ */
+async function restoreHumanControls(
+  ctx: AppContext,
+  session: Session,
+  send: (payload: Record<string, unknown>) => Promise<unknown>,
+  didReanchor: boolean,
+): Promise<void> {
+  try {
+    session.turnSnapshot =
+      session.state.active === "bottom" ? structuredClone(session.state) : null;
+    session.turnStartLog =
+      session.state.active === "bottom" ? [...session.log] : null;
+    await mirrorStoryBattle(ctx, session);
+    if (!didReanchor)
+      await send({
+        ...renderBattle(await withImage(ctx, session)),
+        attachments: [],
+      });
+  } catch {
+    // Last-ditch: never leave the player stuck without controls.
+  }
 }
 
 /**
@@ -934,26 +1084,13 @@ async function finalRender(
   send: (payload: Record<string, unknown>) => Promise<unknown>,
   didReanchor = false,
 ): Promise<void> {
+  if (!session.state.winner) {
+    // Control is returning to the human: capture the Reset snapshot, mirror, and restore controls
+    // (unless a re-anchor already posted the final board with live controls at the DM bottom).
+    await restoreHumanControls(ctx, session, send, didReanchor);
+    return;
+  }
   try {
-    if (!session.state.winner) {
-      // Control is returning to the human: capture the pre-play snapshot for Reset turn.
-      session.turnSnapshot =
-        session.state.active === "bottom"
-          ? structuredClone(session.state)
-          : null;
-      session.turnStartLog =
-        session.state.active === "bottom" ? [...session.log] : null;
-      await mirrorStoryBattle(ctx, session);
-      // A re-anchor this cycle already posted the final board (with live controls) at the DM bottom,
-      // so skip the own render (§4.1); the bookkeeping/mirror above still runs. Otherwise render as
-      // today. (The game-over branch below always renders the end screen normally.)
-      if (!didReanchor)
-        await send({
-          ...renderBattle(await withImage(ctx, session)),
-          attachments: [],
-        });
-      return;
-    }
     await finishBattle(interaction, ctx, session, battleId, userId, kind, send);
   } catch {
     // Last-ditch: never leave the player stuck without controls.

@@ -60,6 +60,12 @@ export interface DmChannel {
    * interaction point remains in the DM. Best-effort: a missing/too-old/gone message is swallowed.
    */
   clearComponents(messageId: string): Promise<void>;
+  /**
+   * Edit a previously-sent message in place to the given board payload. Used to animate the opponent's
+   * opening enemy turn frame-by-frame on the DM board without re-sending. Best-effort: a benign edit
+   * failure (message deleted / too old / gone) is swallowed so a dropped frame never breaks the launch.
+   */
+  edit(messageId: string, payload: object): Promise<void>;
 }
 
 /**
@@ -72,6 +78,8 @@ interface RawDmChannel {
   messages: { edit(messageId: string, payload: object): Promise<unknown> };
   /** Present when the channel already implements the DmChannel seam directly (e.g. a test mock). */
   clearComponents?(messageId: string): Promise<void>;
+  /** Present when the channel already implements the edit seam directly (e.g. a test mock). */
+  edit?(messageId: string, payload: object): Promise<void>;
 }
 
 /**
@@ -86,6 +94,11 @@ function asDmChannel(raw: RawDmChannel, log: Logger): DmChannel {
   const edit = raw.clearComponents
     ? (id: string) => raw.clearComponents!(id)
     : (id: string) => raw.messages.edit(id, { components: [] }).then(() => {});
+  // Mirror the clearComponents mock-vs-raw split for a full board edit (opening animation frames).
+  const rawEdit = raw.edit
+    ? (id: string, payload: object) => raw.edit!(id, payload)
+    : (id: string, payload: object) =>
+        raw.messages.edit(id, payload).then(() => {});
   return {
     send: (payload) => raw.send(payload),
     sendTyping: () => raw.sendTyping(),
@@ -97,6 +110,22 @@ function asDmChannel(raw: RawDmChannel, log: Logger): DmChannel {
           log.message("error", {
             messageId,
             error: `benign edit error swallowed while clearing stale buttons: ${
+              (error as { code?: unknown }).code ?? "unknown"
+            }`,
+          });
+          return;
+        }
+        throw error;
+      }
+    },
+    async edit(messageId: string, payload: object): Promise<void> {
+      try {
+        await rawEdit(messageId, payload);
+      } catch (error) {
+        if (isBenignEditError(error)) {
+          log.message("error", {
+            messageId,
+            error: `benign edit error swallowed while animating: ${
               (error as { code?: unknown }).code ?? "unknown"
             }`,
           });

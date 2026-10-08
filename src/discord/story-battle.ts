@@ -8,10 +8,13 @@ import { resolveStoryBattle } from "../story/engine";
 import type { StoryBattleState } from "../story/types";
 import { renderBattle, renderBattleEnd } from "./battle-view";
 import {
+  animateOpeningTurn,
+  opponentOpens,
   sessions,
   startBattle,
   toStoryBattleState,
   withImage,
+  type AnimationSurface,
   type Session,
 } from "./battle-session";
 import type { AppContext } from "./command";
@@ -110,9 +113,8 @@ export async function launchStoryBattle(
   const snap = player.story?.battle ?? null;
   const canResume = snap != null && snap.state.winner === null;
 
-  let session: Session;
   if (canResume) {
-    session = rebuildSession(
+    const session = rebuildSession(
       snap,
       user,
       player,
@@ -121,39 +123,81 @@ export async function launchStoryBattle(
       boSpd.name,
     );
     sessions.set(user.id, session);
-  } else {
-    const deck = resolveDeck(
-      player,
-      ctx.collectibleCards,
-      ctx.cardIndex,
-      ctx.rng,
-    );
-    const enemyDeck = npcDeck(boSpd, ctx.cardIndex);
-    session = startBattle({
-      ctx,
-      userId: user.id,
-      username: user.username,
-      deck: deck.cards,
-      opponentDeck: enemyDeck,
-      opponentGuaranteedOpening: boSpd.guaranteedOpening,
-      opponentGoesFirst: boSpd.goesFirst,
-      difficulty: "normal",
-      variants: variantsOf(player),
-      guests: deck.guests,
-      origin: "story",
-      opponentPortrait: boSpd.portrait,
-      playerAvatarUrl: avatarUrl,
-      playerName: player.story?.name ?? undefined,
-      opponentName: boSpd.name,
-    });
-    session.onStoryEnd = onStoryEnd;
-    // Mirror the live session into the DB so a resume can rebuild.
-    player.story!.battle = toStoryBattleState(session);
+    // Resume never animates: a rebuilt snapshot is already on the human's turn. Just re-send the board.
+    const sent = await dm.send(renderBattle(await withImage(ctx, session)));
+    recordLive(user.id, sent.id, player);
+    await ctx.repo.save(player);
+    return;
   }
 
-  const sent = await dm.send(renderBattle(await withImage(ctx, session)));
-  recordLive(user.id, sent.id, player);
+  // FRESH battle.
+  const deck = resolveDeck(
+    player,
+    ctx.collectibleCards,
+    ctx.cardIndex,
+    ctx.rng,
+  );
+  const enemyDeck = npcDeck(boSpd, ctx.cardIndex);
+  const session = startBattle({
+    ctx,
+    userId: user.id,
+    username: user.username,
+    deck: deck.cards,
+    opponentDeck: enemyDeck,
+    opponentGuaranteedOpening: boSpd.guaranteedOpening,
+    opponentGoesFirst: boSpd.goesFirst,
+    difficulty: "normal",
+    variants: variantsOf(player),
+    guests: deck.guests,
+    origin: "story",
+    opponentPortrait: boSpd.portrait,
+    playerAvatarUrl: avatarUrl,
+    playerName: player.story?.name ?? undefined,
+    opponentName: boSpd.name,
+  });
+  session.onStoryEnd = onStoryEnd;
+  // Mirror the (pre-opening) live session into the DB so a resume can rebuild.
+  player.story!.battle = toStoryBattleState(session);
+
+  const screen = renderBattle(await withImage(ctx, session));
+  const opening = opponentOpens(session);
+  // Post the opening board CONTROL-LESS when the opponent opens (no button flash); otherwise WITH controls.
+  const sent = await dm.send(opening ? { ...screen, components: [] } : screen);
+  const liveId = sent.id;
+  recordLive(user.id, liveId, player);
+  // Pre-opening save: a crash DURING the animation still leaves a resumable (enemy-start) snapshot.
   await ctx.repo.save(player);
+
+  if (opening) {
+    const surface: AnimationSurface = {
+      interaction: null,
+      // Frame 0 (the enemy's opening card on the board) edits the control-less board in place.
+      showFirstFrame: async (p) => {
+        await dm.edit(session.boardMessageId ?? liveId, {
+          ...p,
+          components: [],
+          attachments: [],
+        });
+      },
+      editFrame: async (p) => {
+        await dm.edit(session.boardMessageId ?? liveId, {
+          ...p,
+          components: [],
+          attachments: [],
+        });
+      },
+      // Final board WITH controls: components NOT stripped; attachments dropped so no second image stacks.
+      showControls: async (p) => {
+        await dm.edit(session.boardMessageId ?? liveId, {
+          ...p,
+          attachments: [],
+        });
+      },
+    };
+    await animateOpeningTurn(ctx, session, surface);
+    // NO extra save here: animateOpeningTurn -> restoreHumanControls -> mirrorStoryBattle re-mirrors the
+    // POST-opening state and saves it. A trailing save of this stale `player` would clobber that mirror.
+  }
 }
 
 /** Active variant of each owned card, by card id (same as /battle). */
