@@ -12,7 +12,7 @@ import {
 /** A valid Bò-SPD-shaped entry, cloned so tests can mutate a single field to craft a bad entry. */
 const goodEntry = (): NPCDef => ({
   id: "bo-spd",
-  name: "Bò SPD",
+  name: "SPD",
   deck: [
     "bo-tuoi",
     "bo-tuoi",
@@ -37,7 +37,7 @@ describe("npcs.json loads and validates", () => {
     expect(NPCS.length).toBeGreaterThanOrEqual(1);
     const boSpd = NPC_INDEX.get("bo-spd");
     expect(boSpd).toBeDefined();
-    expect(boSpd!.name).toBe("Bò SPD");
+    expect(boSpd!.name).toBe("SPD");
     expect(boSpd!.deck).toHaveLength(12);
     expect(boSpd!.deck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
     expect(
@@ -57,9 +57,7 @@ describe("validateNpc throws loudly on bad data", () => {
   it("throws on the wrong deck length", () => {
     const bad = goodEntry();
     bad.deck = bad.deck.slice(0, 11);
-    expect(() => validateNpc(bad)).toThrow(
-      /deck has 11 cards, expected 12/,
-    );
+    expect(() => validateNpc(bad)).toThrow(/deck has 11 cards, expected 12/);
   });
 
   it("throws on an unknown card id in the deck", () => {
