@@ -141,15 +141,15 @@ const METER_W = 14;
 // Board cells are full portrait cards at this scale; the hand uses smaller full cards.
 const BOARD_CARD_SCALE = 0.58;
 const HAND_CARD_SCALE = 0.27;
-// Energy orbs in the right gutter: a PIP_COLS x 3 grid of small circles.
-const PIP_R = 7;
-const PIP_GAP = 7;
-const PIP_COLS = 3;
+// Energy orbs in the right gutter: a single row of MAX_ENERGY small circles.
+const PIP_R = 5;
+const PIP_GAP = 4;
+const PIP_COLS = MAX_ENERGY;
 
 /**
- * The right-gutter energy readout: an "ENERGY" label then a PIP_COLS x 3 grid of orbs, right-anchored
- * to `right`. The first `shown` orbs of MAX_ENERGY are lit (bright + glow), the rest are dim. `labelY`
- * is the label's top; the grid starts just below it. Restores textAlign/textBaseline when done.
+ * The right-gutter energy readout: an "ENERGY" label then a single row of MAX_ENERGY orbs,
+ * right-anchored to `right`. The first `shown` orbs are lit (bright + glow), the rest are dim. `labelY`
+ * is the label's top; the row starts just below it. Restores textAlign/textBaseline when done.
  */
 function drawEnergyPips(
   ctx: import("@napi-rs/canvas").SKRSContext2D,
@@ -403,7 +403,9 @@ export async function createImageRenderer({
         }
         ctx.save();
         ctx.translate(x, LANE_HEADER_Y);
-        drawLaneHeader(ctx, LANE_NAMES[lane], tags, cellW);
+        // Lane names (LEFT/MIDDLE/RIGHT) are dropped; keep the header only for status tags
+        // (ANCHORED, YOU x2, ENEMY x2) so lane modifiers stay visible.
+        drawLaneHeader(ctx, "", tags, cellW);
         ctx.restore();
 
         for (let row = 0; row < CELLS; row++) {
