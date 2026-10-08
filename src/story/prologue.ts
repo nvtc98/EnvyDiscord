@@ -672,11 +672,11 @@ export const NODES: Record<string, NodeDef> = {
         ),
         narration("The torch gutters, and his face swims up out of the black."),
         stranger(
-          "This is **Bò SPD** — kin to the tribe above, and the one who keeps the gate below. Best him at the cards, and the road is thine.",
+          "This is **SPD** — kin to the tribe above, and the one who keeps the gate below. Best him at the cards, and the road is thine.",
         ),
       ],
       choices: go("I am ready"),
-      portrait: { assetKey: "boss-spd-story", alt: "Bò SPD" },
+      portrait: { assetKey: "boss-spd-story", alt: "SPD" },
     }),
     choose: () => "cave_terms",
   },

@@ -584,7 +584,7 @@ describe("story: the prologue", () => {
       expect(player.story!.node).toBe("reveal_face");
       expect(currentView(player, ctx()).portrait).toEqual({
         assetKey: "boss-spd-story",
-        alt: "Bò SPD",
+        alt: "SPD",
       });
     });
 
