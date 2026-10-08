@@ -79,7 +79,7 @@ const DESIGNED: CardDef[] = [
     name: "Laser Eyes",
     rarity: "common",
     cost: 4,
-    power: 4,
+    power: 3,
     faction: "the-eyes",
     ability: { timing: "active", effect: { kind: "destroyLane" } },
   },
