@@ -144,7 +144,6 @@ const HAND_CARD_SCALE = 0.27;
 // Energy orbs in the right gutter: a single row of MAX_ENERGY small circles.
 const PIP_R = 5;
 const PIP_GAP = 4;
-const PIP_COLS = MAX_ENERGY;
 
 /**
  * The right-gutter energy readout: an "ENERGY" label then a single row of MAX_ENERGY orbs,
@@ -163,27 +162,38 @@ function drawEnergyPips(
   ctx.fillStyle = PALETTE.energy;
   ctx.fillText("ENERGY", right, labelY);
 
+  // A single row of small mana crystals (diamonds), right-anchored. Lit crystals get a vertical
+  // light->dark gradient and a glow; spent ones are a faint hollow outline.
   const pipStride = 2 * PIP_R + PIP_GAP;
-  const gridW = PIP_COLS * pipStride - PIP_GAP;
-  const gridLeft = right - gridW;
-  const gridTop = labelY + 16;
+  const rowW = MAX_ENERGY * pipStride - PIP_GAP;
+  const left = right - rowW;
+  const cy = labelY + 16 + PIP_R;
   for (let i = 0; i < MAX_ENERGY; i++) {
-    const col = i % PIP_COLS;
-    const row = Math.floor(i / PIP_COLS);
-    const cx = gridLeft + col * pipStride + PIP_R;
-    const cy = gridTop + row * pipStride + PIP_R;
+    const cx = left + i * pipStride + PIP_R;
     const lit = i < shown;
+    // Diamond: top, right, bottom, left. Slightly taller than wide for a gem look.
     ctx.beginPath();
-    ctx.arc(cx, cy, PIP_R, 0, Math.PI * 2);
+    ctx.moveTo(cx, cy - PIP_R);
+    ctx.lineTo(cx + PIP_R * 0.8, cy);
+    ctx.lineTo(cx, cy + PIP_R);
+    ctx.lineTo(cx - PIP_R * 0.8, cy);
+    ctx.closePath();
     if (lit) {
-      ctx.fillStyle = PALETTE.energy;
+      const g = ctx.createLinearGradient(cx, cy - PIP_R, cx, cy + PIP_R);
+      g.addColorStop(0, "#bfe3fb");
+      g.addColorStop(0.5, PALETTE.energy);
+      g.addColorStop(1, "#2f6ea1");
+      ctx.fillStyle = g;
       ctx.shadowColor = PALETTE.energy;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 6;
       ctx.fill();
       ctx.shadowBlur = 0;
     } else {
-      ctx.fillStyle = "rgba(91,176,232,0.18)";
+      ctx.fillStyle = "rgba(91,176,232,0.12)";
       ctx.fill();
+      ctx.strokeStyle = "rgba(91,176,232,0.4)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
   }
   ctx.textAlign = "left";
