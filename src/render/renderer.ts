@@ -139,8 +139,8 @@ const AVATAR_GAP = 12;
 // The vertical Eye Privilege meter lives in the left rail between the two identities.
 const METER_W = 14;
 // Board cells are full portrait cards at this scale; the hand uses smaller full cards.
-const BOARD_CARD_SCALE = 0.58;
-const HAND_CARD_SCALE = 0.27;
+const BOARD_CARD_SCALE = 0.5;
+const HAND_CARD_SCALE = 0.5;
 // Energy orbs in the right gutter: a single row of MAX_ENERGY small circles.
 const PIP_R = 5;
 const PIP_GAP = 4;
@@ -291,15 +291,11 @@ export async function createImageRenderer({
       const handCardW = Math.round(w * HAND_CARD_SCALE);
       const handCardH = Math.round(h * HAND_CARD_SCALE);
 
-      // Vertical layout: the board block is centred in the space above the bottom hand band. The
-      // board's top row, the enemy avatar/identity, and the TURN/energy readout all share this same
-      // top y (BOARD_Y) so they line up; lane status tags are drawn just ABOVE the top row.
-      const HAND_BAND_H = handCardH + HAND_MARGIN;
-      const availableAbove = SCENE - HAND_BAND_H;
-      const BOARD_Y = Math.max(
-        TOP_PAD,
-        Math.round((availableAbove - BOARD_H) / 2),
-      );
+      // Vertical layout: the board block sits near the TOP (leaving extra room above the enlarged
+      // bottom hand band, so the board and the hand are clearly separated). The board's top row, the
+      // enemy avatar/identity, and the TURN/energy readout share this top y (BOARD_Y) so they line
+      // up; lane status tags are drawn just ABOVE the top row. The top strip holds the tags.
+      const BOARD_Y = TOP_PAD + LANE_HEADER_H;
 
       // Horizontal layout: left rail, centred board channel, right gutter.
       const railRight = MARGIN + RAIL_W;
@@ -490,13 +486,24 @@ export async function createImageRenderer({
         ctx.textAlign = "left";
       }
 
-      // --- Hand: a single bottom row of smaller full cards, confined to the board column. ---
+      // --- Hand: a single bottom row of full cards, centred across the whole width. It sits in the
+      // reserved bottom band below the rail and gutter, so it may be wider than the board column. ---
       if (hand.length > 0) {
         const handCount = hand.length;
-        const handRowW = handCount * handCardW + (handCount - 1) * HAND_GAP;
-        const handX0 = BOARD_X + Math.round((BOARD_W - handRowW) / 2);
+        // Spread the hand across the same usable width as the HUD above (MARGIN .. SCENE-MARGIN) so a
+        // full hand's outer edges line up with the left rail and right gutter. The gap grows to fill
+        // that width but is capped so a 1-2 card hand doesn't fling cards to the far edges; whatever
+        // the gap, the row stays centred in the usable width.
+        const usableW = SCENE - 2 * MARGIN;
+        const slackGap =
+          handCount > 1
+            ? (usableW - handCount * handCardW) / (handCount - 1)
+            : HAND_GAP;
+        const gap = Math.max(HAND_GAP, Math.min(slackGap, handCardW * 0.5));
+        const handRowW = handCount * handCardW + (handCount - 1) * gap;
+        const handX0 = Math.round((SCENE - handRowW) / 2);
         for (const [i, card] of hand.entries()) {
-          const cx = handX0 + i * (handCardW + HAND_GAP);
+          const cx = handX0 + i * (handCardW + gap);
           const cy = handY;
           const isSelected = card.uid === selectedUid;
           const isDim = yourTurn && card.def.cost > me.energy;
