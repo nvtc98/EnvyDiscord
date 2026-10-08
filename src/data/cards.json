@@ -100,8 +100,8 @@
     "rarity": "common",
     "cost": 3,
     "power": 5,
-    "ability": "shield",
-    "note": "Không thể bị địch đẩy trong lượt này."
+    "ability": "pushImmune",
+    "note": "Bị động: không thể bị đẩy hủy — vẫn trượt trong hàng nhưng không bao giờ rơi khỏi mép mà chết."
   },
   {
     "name": "Behemoth Eyes",
@@ -822,8 +822,8 @@
     "rarity": "common",
     "cost": 3,
     "power": 2,
-    "ability": "buffLaneAll 2",
-    "note": "Khi ra sân: +2 power cho MỌI thẻ trong hàng này (cả ta lẫn địch, kể cả chính nó)."
+    "ability": "buffRowAll 2",
+    "note": "Khi ra sân: +2 power cho MỌI thẻ cùng hàng ngang (cùng chỉ số ô trên cả 3 làn, cả ta lẫn địch, kể cả chính nó)."
   },
   {
     "name": "Orbit Eyes",
@@ -1249,7 +1249,7 @@
     "name": "Venom Eyes",
     "rarity": "bargain",
     "cost": 5,
-    "power": 8,
+    "power": 6,
     "ability": "drainStartOfTurn 1",
     "note": "Đầu mỗi lượt, giảm 1 power của mọi thẻ khác trên sân (tối đa về 0)."
   },

@@ -27,6 +27,16 @@ export function pushInto(
   let i = entryCell(seat);
   for (;;) {
     const occupant = next[i];
+    // If the far-edge occupant is push-immune and advancing it would run off the board, the push is
+    // absorbed: nothing moves and the played card does not enter. The immunity is checked INLINE
+    // against occupant.def.ability (NOT via isPushImmune) to keep push.ts free of an abilities.ts
+    // import. The test is on `occupant` (the card that would fall off), not `carried`.
+    const atFarEdge = i + step < 0 || i + step >= CELLS;
+    const occImmune =
+      occupant?.def.ability?.timing === "continuous" &&
+      occupant.def.ability.effect.kind === "pushImmune";
+    if (occupant && atFarEdge && occImmune)
+      return { lane: [...lane], destroyed: null };
     next[i] = carried;
     if (!occupant) return { lane: next, destroyed: null };
     carried = occupant;
@@ -38,18 +48,3 @@ export function pushInto(
 /** A push is needed when the entry cell is already taken. */
 export const wouldPush = (lane: readonly Cell[], seat: Seat): boolean =>
   lane[entryCell(seat)] !== null;
-
-/**
- * The cell indices a push by `seat` would displace: walk from the entry cell toward the far edge,
- * collecting every occupied index until the first empty cell (same stop condition as `pushInto`),
- * excluding the empty landing cell. Pure geometry — no `GameState` knowledge.
- */
-export function pushMovers(lane: readonly Cell[], seat: Seat): number[] {
-  const step = seat === "bottom" ? -1 : 1;
-  const movers: number[] = [];
-  for (let i = entryCell(seat); i >= 0 && i < CELLS; i += step) {
-    if (lane[i] === null) break;
-    movers.push(i);
-  }
-  return movers;
-}

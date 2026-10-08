@@ -3,7 +3,6 @@ import {
   canPlay,
   effectivePower,
   endTurn,
-  isShielded,
   playCard,
   totalPower,
 } from "../src/engine/rules";
@@ -23,8 +22,8 @@ const stella = (): Ability => ({
   effect: { kind: "destroyedPower" },
 });
 const bedrock = (): Ability => ({
-  timing: "active",
-  effect: { kind: "shield" },
+  timing: "continuous",
+  effect: { kind: "pushImmune" },
 });
 const phoenix = (): Ability => ({
   timing: "onDestroy",
@@ -142,29 +141,27 @@ describe("Stella Eyes", () => {
   });
 });
 
-describe("Bedrock Eyes shield", () => {
-  it("blocks an enemy push during the enemy next turn, then expires", () => {
-    // bottom plays Bedrock; top (enemy) then tries to push it.
+describe("Bedrock Eyes push immunity", () => {
+  it("an entry push that would carry it off the far edge leaves it on the far-edge cell and destroys nothing", () => {
     const state = emptyGame("bottom");
-    const after = play(state, "bottom", def("BED", 3, 5, bedrock()), 0);
-    const bed = after.lanes[0].find((c) => c?.def.id === "BED")!;
-    // Shield is set to enemy.turns + 1.
-    expect(bed.shieldedUntil).toBe(after.players.top.turns + 1);
-    // During the enemy's current (next) turn, isShielded is true.
-    expect(isShielded(bed, after)).toBe(true);
-
-    // Simulate the enemy's turn passing: bump enemy turns beyond the shield window.
-    const later = structuredClone(after);
-    later.players.top.turns = bed.shieldedUntil! + 1;
-    expect(isShielded(bed, later)).toBe(false);
+    // bottom's far edge is cell 0. Full lane with the immune BED at the far edge.
+    setLane(state, 0, [
+      instance(def("BED", 3, 5, bedrock()), "top"),
+      instance(def("MID", 1, 1), "top"),
+      instance(def("MINE", 1, 1), "bottom"),
+    ]);
+    const after = play(state, "bottom", def("X", 1, 1), 0);
+    // The immune card absorbs the push: nothing moves, nothing is destroyed.
+    expect(after.destroyedPower).toBe(0);
+    const bed = after.lanes[0].find((c) => c?.def.id === "BED");
+    expect(bed).toBeDefined();
+    expect(after.lanes[0][0]?.def.id).toBe("BED"); // stays at its far-edge cell
   });
 
-  it('canPlay returns reason "shielded" for an enemy push into a shielded card', () => {
-    const state = emptyGame("top"); // top is active (the enemy of the shield owner)
+  it("an enemy play into a lane holding a pushImmune card is legal, and the immune card is not destroyed", () => {
+    const state = emptyGame("top"); // top is active (the enemy of the immune card's owner)
     const bed = instance(def("BED", 3, 5, bedrock()), "bottom");
-    bed.shieldedUntil = state.players.top.turns + 1; // shielded against top
-    setLane(state, 0, [null, instance(def("MID", 1, 1), "bottom"), bed]);
-    // top enters from cell 0; the lane [null, MID, BED] pushing from top would shove MID then BED.
+    // top enters from cell 0; a full lane means the push chain reaches BED at the far edge (cell 2).
     setLane(state, 0, [
       instance(def("T0", 1, 1), "top"),
       instance(def("MID", 1, 1), "bottom"),
@@ -172,23 +169,70 @@ describe("Bedrock Eyes shield", () => {
     ]);
     const y = give(state, "top", def("Y", 1, 1));
     state.players.top.energy = 1;
-    expect(canPlay(state, y.uid, 0)).toEqual({ ok: false, reason: "shielded" });
+    expect(canPlay(state, y.uid, 0).ok).toBe(true);
+    const after = playCard(state, y.uid, 0).state;
+    expect(after.destroyedPower).toBe(0);
+    expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(true);
   });
 
-  it("the shield owner can still shove their own shielded card", () => {
+  it("an OWNER push that would carry it off the far edge also leaves it in place (immunity is ownership-agnostic)", () => {
     const state = emptyGame("bottom");
-    const bed = instance(def("BED", 3, 5, bedrock()), "bottom");
-    bed.shieldedUntil = state.players.top.turns + 1;
-    // bottom enters at cell 2; a full own lane means bottom's push moves its own cards.
+    // bottom's far edge is cell 0: a full OWN lane with the immune BED at the far edge.
     setLane(state, 0, [
-      instance(def("A", 1, 1), "bottom"),
+      instance(def("BED", 3, 5, bedrock()), "bottom"),
       instance(def("B", 1, 1), "bottom"),
-      bed,
+      instance(def("A", 1, 1), "bottom"),
     ]);
     const x = give(state, "bottom", def("X", 1, 1));
     state.players.bottom.energy = 1;
-    // The shield only guards against the enemy, so the owner's own push is legal.
+    // The owner may still play into the lane, but cannot shove its own immune card off.
     expect(canPlay(state, x.uid, 0).ok).toBe(true);
+    const after = playCard(state, x.uid, 0).state;
+    expect(after.destroyedPower).toBe(0);
+    expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(true);
+  });
+
+  it("a pushImmune card mid-lane with a gap ahead still slides one step when pushed", () => {
+    const state = emptyGame("bottom");
+    // bottom enters at cell 2; BED sits at cell 2 with a gap ahead (cell 1 empty), so it slides to cell 1.
+    const bed = instance(def("BED", 3, 5, bedrock()), "bottom");
+    setLane(state, 0, [null, null, bed]);
+    const after = play(state, "bottom", def("X", 1, 1), 0);
+    const moved = after.lanes[0].find((c) => c?.def.id === "BED")!;
+    expect(moved.uid).toBe(bed.uid); // uid preserved across the slide
+    expect(after.lanes[0][1]?.def.id).toBe("BED"); // slid from cell 2 to cell 1
+    expect(after.destroyedPower).toBe(0);
+  });
+
+  it("Reflecting's phantom push does not destroy a pushImmune card at the far edge", () => {
+    const state = emptyGame();
+    state.active = "top";
+    // Reflecting is bottom-owned in lane 0; a top play into lane 0 displaces it and fires a phantom
+    // push on a RANDOM other lane. Put the immune wall in BOTH other lanes so whichever is picked,
+    // the immune card survives (top's far edge is cell 2, with a card behind it at cell 1).
+    const reflecting: Ability = {
+      timing: "continuous",
+      effect: { kind: "reflecting" },
+    };
+    const reflInst = instance(def("REF", 4, 6, reflecting), "bottom");
+    setLane(state, 0, [reflInst, null, instance(def("P", 1, 1), "bottom")]);
+    setLane(state, 1, [
+      null,
+      instance(def("BEHIND1", 1, 1), "top"),
+      instance(def("BED", 3, 5, bedrock()), "top"),
+    ]);
+    setLane(state, 2, [
+      null,
+      instance(def("BEHIND2", 1, 1), "top"),
+      instance(def("BED", 3, 5, bedrock()), "top"),
+    ]);
+    const atk = give(state, "top", def("ATK", 1, 1));
+    state.players.top.energy = 1;
+    const resolved = playCard(state, atk.uid, 0, mulberry32(2)).state;
+    // Both candidate lanes still hold their immune BED; nothing fell off either.
+    expect(resolved.lanes[1].some((c) => c?.def.id === "BED")).toBe(true);
+    expect(resolved.lanes[2].some((c) => c?.def.id === "BED")).toBe(true);
+    expect(resolved.destroyedPower).toBe(0);
   });
 });
 
@@ -406,20 +450,19 @@ describe("Siren Eyes push lane", () => {
     expect(after.players.top.hand.some((c) => c.def.id === "PHX")).toBe(true);
   });
 
-  it("stops mid-chain at a shielded enemy card (own cards behind still unaffected)", () => {
+  it("does not destroy a pushImmune enemy card at the far edge, but does not block the lane", () => {
     const state = emptyGame("bottom");
-    const shieldedFoe = instance(def("BED", 3, 5, bedrock()), "top");
-    shieldedFoe.shieldedUntil = state.players.top.turns + 10; // active now
-    // bottom far edge is cell 0. Put the shielded foe at the far edge so the shove hits it first.
-    setLane(state, 0, [
-      shieldedFoe,
-      instance(def("MINE", 1, 1), "bottom"),
-      null,
-    ]);
+    const immuneFoe = instance(def("BED", 3, 5, bedrock()), "top");
+    // bottom far edge is cell 0. Put the immune foe at the far edge so the shove hits it first,
+    // with an own card behind it at cell 1.
+    setLane(state, 0, [immuneFoe, instance(def("MINE", 1, 1), "bottom"), null]);
     const after = play(state, "bottom", def("SIREN", 4, 2, siren()), 0);
-    // The shielded enemy card at the far edge blocks the shove: nothing is destroyed.
+    // The immune card survives at its far-edge cell; nothing is destroyed.
     expect(after.destroyedPower).toBe(0);
     expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(true);
+    expect(after.lanes[0][0]?.def.id).toBe("BED"); // stays at the far edge (acts as a wall)
+    // The card behind it cannot advance into the wall cell: it stays put at cell 1.
+    expect(after.lanes[0][1]?.def.id).toBe("MINE");
   });
 
   it("ignores anchor and shoves an anchored lane", () => {
@@ -455,18 +498,30 @@ describe("Laser Eyes destroy lane", () => {
     expect(after.destroyedPower).toBe(5); // 3 + 2
   });
 
-  it("ignores a shield and triggers an enemy Phoenix revive into the ENEMY hand", () => {
+  it("triggers an enemy Phoenix revive into the ENEMY hand", () => {
     const state = emptyGame("bottom");
-    const shieldedPhoenix = instance(def("PHX", 4, 4, phoenix()), "top");
-    shieldedPhoenix.shieldedUntil = state.players.top.turns + 10;
-    setLane(state, 0, [shieldedPhoenix, null, null]);
+    const enemyPhoenix = instance(def("PHX", 4, 4, phoenix()), "top");
+    setLane(state, 0, [enemyPhoenix, null, null]);
     const after = play(state, "bottom", def("LASER", 4, 4, laser()), 0);
-    // Laser ignores shields: Phoenix is destroyed, reviving to the enemy hand (not tallied).
+    // Laser destroys the Phoenix, reviving it to the enemy hand (not tallied).
     expect(onBoard(after).some((c) => c.def.id === "PHX")).toBe(false);
     expect(
       after.players.top.hand.some((c) => c.def.id === "PHX" && c.bonus === 4),
     ).toBe(true);
     expect(after.destroyedPower).toBe(0);
+  });
+
+  it("destroys a pushImmune card (immunity is to being pushed off, not destruction)", () => {
+    const state = emptyGame("bottom");
+    setLane(state, 0, [
+      instance(def("BED", 3, 5, bedrock()), "top"),
+      null,
+      null,
+    ]);
+    const after = play(state, "bottom", def("LASER", 4, 4, laser()), 0);
+    // Push immunity does not protect against Laser's destroy: BED is gone and tallied.
+    expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(false);
+    expect(after.destroyedPower).toBe(5);
   });
 
   it("emits a single summary event and an empty-lane guard when alone", () => {

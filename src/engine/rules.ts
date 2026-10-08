@@ -1,7 +1,7 @@
 import type { Rng } from "../util/rng";
 import { mulberry32, pick, shuffle } from "../util/rng";
-import { hasContinuous } from "./abilities";
-import { entryCell, pushInto, pushMovers, wouldPush } from "./push";
+import { hasContinuous, isPushImmune } from "./abilities";
+import { entryCell, pushInto, wouldPush } from "./push";
 import {
   assertNever,
   BALANCE_START,
@@ -192,23 +192,6 @@ function applyStartOfTurnDrains(state: GameState, events: GameEvent[]): void {
   }
 }
 
-/** True while the card is still protected from the enemy's pushes by Bedrock's shield. */
-export const isShielded = (card: CardInstance, state: GameState): boolean =>
-  card.shieldedUntil !== undefined &&
-  state.players[opponentOf(card.owner)].turns <= card.shieldedUntil;
-
-/** True if a push by `seat` into `cells` would displace a shielded enemy card. */
-function pushHitsShieldedEnemy(
-  state: GameState,
-  cells: readonly Cell[],
-  seat: Seat,
-): boolean {
-  return pushMovers(cells, seat).some((i) => {
-    const c = cells[i];
-    return c != null && c.owner !== seat && isShielded(c, state);
-  });
-}
-
 type DestroyCause = "push" | "siren" | "laser";
 
 /**
@@ -293,8 +276,9 @@ function applyTransforms(state: GameState, events: GameEvent[]): void {
 
 /**
  * Siren: an extra push step on the whole lane toward the far edge (away from `seat`). Visits cells far-edge
- * first so each card moves into an already-vacated slot. A shielded enemy card stops the shove (it and
- * everything behind it stay put). At most one card falls off the far edge and is routed through `destroyCard`.
+ * first so each card moves into an already-vacated slot. A push-immune card at the far edge is never
+ * destroyed: it stays in place and acts as a WALL (cards whose destination is its cell stay put). At most
+ * one non-immune card falls off the far edge and is routed through `destroyCard`.
  */
 function sirenPush(
   state: GameState,
@@ -312,16 +296,23 @@ function sirenPush(
   const farEdge = seat === "bottom" ? 0 : CELLS - 1;
   const order: number[] = [];
   for (let k = 0; k < CELLS; k++) order.push(farEdge - step * k); // far edge first, near edge last
-  let blocked = false;
   let destroyed: CardInstance | null = null;
+  let blockedAt: number | null = null; // cell index of an immune card that walls the shove
   for (const i of order) {
     const occupant = cells[i];
     if (!occupant) continue;
-    if (occupant.owner !== seat && isShielded(occupant, state)) {
-      blocked = true;
-      break;
-    }
     const dest = i + step;
+    // Immune card at the far edge: it stays, and it becomes a wall for the cards behind it.
+    if ((dest < 0 || dest >= CELLS) && isPushImmune(occupant.def)) {
+      blockedAt = i;
+      continue;
+    }
+    // A card whose destination is the wall cannot advance: it stays put and extends the wall by one
+    // cell (so the next card behind it also cannot advance into the occupied cell it left).
+    if (blockedAt !== null && dest === blockedAt) {
+      blockedAt = i;
+      continue;
+    }
     if (dest < 0 || dest >= CELLS) {
       cells[i] = null;
       destroyed = occupant; // at most one card falls off a single-step shove
@@ -345,9 +336,7 @@ function sirenPush(
     type: "ability",
     seat,
     card: sirenDef,
-    text: blocked
-      ? "pushed the lane, blocked by a shielded card"
-      : "pushed the lane",
+    text: "pushed the lane",
   });
   // Reflecting answers each displaced snapshot (after the Siren log line).
   fireReflecting(
@@ -484,7 +473,7 @@ export type PlayCheck =
   | { ok: true }
   | {
       ok: false;
-      reason: "over" | "not-in-hand" | "energy" | "anchored" | "shielded";
+      reason: "over" | "not-in-hand" | "energy" | "anchored";
     };
 
 export function canPlay(
@@ -501,11 +490,6 @@ export function canPlay(
   const cells = state.lanes[lane];
   if (isAnchored(cells) && wouldPush(cells, state.active))
     return { ok: false, reason: "anchored" };
-  if (
-    wouldPush(cells, state.active) &&
-    pushHitsShieldedEnemy(state, cells, state.active)
-  )
-    return { ok: false, reason: "shielded" };
   return { ok: true };
 }
 
@@ -543,7 +527,7 @@ function hasContinuousKind(
 }
 
 /**
- * Moves `card` (same uid/owner/bonus/shield — the whole instance by reference) into `toLane` at the
+ * Moves `card` (same uid/owner/bonus — the whole instance by reference) into `toLane` at the
  * entry cell for the card's owner, emitting a `moved` event. precondition: toLane is empty — this does a
  * DIRECT placement at entryCell(owner) with NO occupancy check, so the caller must verify the target
  * lane is empty (Phasing's emptyLanes guard). The caller must already have removed the card from its
@@ -645,12 +629,24 @@ function phantomPush(
   const step = actor === "bottom" ? -1 : 1;
   const farEdge = actor === "bottom" ? 0 : CELLS - 1;
   let destroyed: CardInstance | null = null;
+  let blockedAt: number | null = null; // cell index of an immune card that walls the shove
   // Visit the far edge first (like sirenPush) so each card slides into a vacated slot.
   for (let k = 0; k < CELLS; k++) {
     const i = farEdge - step * k;
     const occupant = cells[i];
     if (!occupant) continue;
     const dest = i + step;
+    // Immune card at the far edge: it stays, and it becomes a wall for the cards behind it.
+    if ((dest < 0 || dest >= CELLS) && isPushImmune(occupant.def)) {
+      blockedAt = i;
+      continue;
+    }
+    // A card whose destination is the wall cannot advance: it stays put and extends the wall by one
+    // cell (so the next card behind it also cannot advance into the occupied cell it left).
+    if (blockedAt !== null && dest === blockedAt) {
+      blockedAt = i;
+      continue;
+    }
     if (dest < 0 || dest >= CELLS) {
       cells[i] = null;
       destroyed = occupant; // at most one card falls off a single-step shove
@@ -878,10 +874,6 @@ function applyActive(
       card.bonus = state.destroyedPower;
       say(`gained ${state.destroyedPower} power from destroyed cards`);
       break;
-    case "shield":
-      card.shieldedUntil = state.players[opponentOf(seat)].turns + 1;
-      say("cannot be pushed by the enemy this turn");
-      break;
     case "pushLane":
       sirenPush(state, lane, seat, card.def, events, rng, fires);
       break;
@@ -915,18 +907,19 @@ function applyActive(
       );
       break;
     }
-    case "buffLaneAll": {
-      // Oracle buffs EVERY card in the lane, both seats, including itself (no uid/owner exclusion).
+    case "buffRowAll": {
+      // Oracle buffs EVERY card in the ROW — the same cell index across all 3 lanes — both seats,
+      // including itself (no uid/owner exclusion). Oracle's row cell is its own landing cell.
+      const rowCell = state.lanes[lane].findIndex((c) => c?.uid === card.uid);
       let buffed = 0;
-      for (const occupant of state.lanes[lane]) {
+      for (let l = 0; l < LANES; l++) {
+        const occupant = state.lanes[l][rowCell];
         if (occupant) {
           occupant.bonus += effect.amount;
           buffed += 1;
         }
       }
-      say(
-        `gave +${effect.amount} power to every card in this lane (${buffed})`,
-      );
+      say(`gave +${effect.amount} power to every card in this row (${buffed})`);
       break;
     }
     default:

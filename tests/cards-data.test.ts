@@ -30,7 +30,7 @@ const DESIGNED: CardDef[] = [
     cost: 3,
     power: 5,
     faction: "the-eyes",
-    ability: { timing: "active", effect: { kind: "shield" } },
+    ability: { timing: "continuous", effect: { kind: "pushImmune" } },
   },
   {
     id: "phoenix-eyes",
@@ -46,7 +46,7 @@ const DESIGNED: CardDef[] = [
     name: "Venom Eyes",
     rarity: "bargain",
     cost: 5,
-    power: 8,
+    power: 6,
     faction: "the-eyes",
     ability: {
       timing: "continuous",
@@ -233,7 +233,7 @@ describe("parseAbility validation", () => {
   });
 
   it("throws when an amount is given to a none-token", () => {
-    expect(() => parseAbility("shield 2", "Bedrock Eyes")).toThrow(
+    expect(() => parseAbility("pushImmune 2", "Bedrock Eyes")).toThrow(
       /takes no amount/,
     );
   });

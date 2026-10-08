@@ -15,17 +15,15 @@ export function abilityText(ability: Ability | undefined): string {
         return `Active: Your other cards in this lane get +${effect.amount} power.`;
       case "destroyedPower":
         return "Active: Gain power equal to the total power of all cards destroyed this match.";
-      case "shield":
-        return "Active: Cannot be pushed by the enemy until the end of their next turn.";
       case "pushLane":
         return "Active: Push this lane one step away from you; cards forced off the edge are destroyed.";
       case "destroyLane":
         return "Active: Destroy every other card in this lane.";
       case "shuffleRedraw":
         return "Active: Shuffle your hand into your deck, then draw that many cards.";
-      case "buffLaneAll":
-        // No "other": Oracle buffs the whole lane including itself (design Part E.2).
-        return `Active: Every card in this lane gets +${effect.amount} power.`;
+      case "buffRowAll":
+        // No "other": Oracle buffs the whole row including itself (design Part 2).
+        return `Active: Every card in this row gets +${effect.amount} power.`;
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -39,6 +37,8 @@ export function abilityText(ability: Ability | undefined): string {
         return "Passive: Your cards in this lane deal double damage.";
       case "anchor":
         return "Passive: This lane cannot be pushed.";
+      case "pushImmune":
+        return "Passive: Cannot be destroyed by being pushed.";
       case "drainStartOfTurn":
         return `Passive: At the start of each turn, every other card loses ${effect.amount} power.`;
       case "transformAt":
@@ -82,6 +82,11 @@ export const hasContinuous = (
   kind: "laneDouble" | "anchor",
 ): boolean =>
   card.ability?.timing === "continuous" && card.ability.effect.kind === kind;
+
+/** True if `card` carries the continuous `pushImmune` effect (Bedrock): never destroyed by a push. */
+export const isPushImmune = (card: CardDef): boolean =>
+  card.ability?.timing === "continuous" &&
+  card.ability.effect.kind === "pushImmune";
 
 export const hasOnDestroy = (card: CardDef): boolean =>
   card.ability?.timing === "onDestroy";

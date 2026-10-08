@@ -21,14 +21,14 @@ export type ActiveEffect =
   | { kind: "energy"; amount: number }
   | { kind: "buffLane"; amount: number }
   | { kind: "destroyedPower" } // Stella: set bonus so effective power = destroyedPower tally
-  | { kind: "shield" } // Bedrock: shield self from enemy pushes this turn
   | { kind: "pushLane" } // Siren: extra push step on the lane, far direction
   | { kind: "destroyLane" } // Laser: destroy every other card in the lane
   | { kind: "shuffleRedraw" } // Phantom: shuffle hand+deck together, redraw to the post-play hand size
-  | { kind: "buffLaneAll"; amount: number }; // Oracle: +amount power to EVERY card in the lane, both seats (self included)
+  | { kind: "buffRowAll"; amount: number }; // Oracle: +amount power to EVERY card in the row (same cell index across all 3 lanes), both seats (self included)
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
+  | { kind: "pushImmune" } // Bedrock: a push that would carry this off the far edge leaves it at the edge instead of destroying it
   | { kind: "drainStartOfTurn"; amount: number } // Venom: -amount power to every other card each turn start
   | { kind: "transformAt"; count: number; into: string } // Bò SPD: transform into `into` once `count` cards have been destroyed this match
   | { kind: "balanceCoefficient"; k: number } // Bò SPD: contributes `k` to the single global tide coefficient (§6)
@@ -80,11 +80,6 @@ export interface CardInstance {
   owner: Seat;
   /** Permanent power changes from abilities. */
   bonus: number;
-  /**
-   * Enemy pushes cannot displace this card while `state.players[opponentOf(owner)].turns <= shieldedUntil`.
-   * Set by Bedrock Eyes. Omitted/undefined means no shield.
-   */
-  shieldedUntil?: number;
 }
 
 export interface PlayerState {

@@ -19,7 +19,7 @@ const phantom = (): Ability => ({
 });
 const oracle = (amount = 2): Ability => ({
   timing: "active",
-  effect: { kind: "buffLaneAll", amount },
+  effect: { kind: "buffRowAll", amount },
 });
 const phasing = (): Ability => ({
   timing: "continuous",
@@ -138,19 +138,25 @@ describe("Gentle Eyes / effectiveCost", () => {
 
 // --- Oracle Eyes --------------------------------------------------------------
 
-describe("Oracle Eyes / buffLaneAll", () => {
-  it("gives +2 to every card in the lane including itself and the enemy, leaving other lanes untouched", () => {
+describe("Oracle Eyes / buffRowAll", () => {
+  it("gives +2 to every card in the ROW (same cell index across lanes) including itself and the enemy, leaving other cells untouched", () => {
     const state = emptyGame();
     state.active = "bottom";
-    // Lane 1: one own card + one enemy card already present.
-    setLane(state, 1, [
-      instance(def("E1", 1, 5), "top"),
+    // Oracle plays bottom into lane 1 → lands at cell 2 (bottom entry). The buffed ROW is cell 2
+    // across all three lanes. Put positive probes at cell 2 in the two OTHER lanes (no entry push
+    // there): one own (lane 0), one enemy (lane 2). Lane 0 also carries a negative probe at cell 0.
+    setLane(state, 0, [
+      instance(def("OTHER_CELL", 1, 1), "bottom"), // cell 0: different cell index → not in the row
       null,
-      instance(def("P1", 1, 4), "bottom"),
+      instance(def("ROW_OWN", 1, 1), "bottom"), // cell 2: in the row → buffed
     ]);
-    // Other lanes carry cards that must NOT be touched.
-    setLane(state, 0, [null, null, instance(def("O0", 1, 1), "bottom")]);
-    setLane(state, 2, [instance(def("O2", 1, 1), "top"), null, null]);
+    setLane(state, 2, [null, null, instance(def("ROW_FOE", 1, 1), "top")]);
+    // In Oracle's OWN lane (lane 1), a card at cell 0 (not shoved to cell 2) must NOT be buffed.
+    setLane(state, 1, [
+      instance(def("OWN_LANE_C0", 1, 1), "bottom"),
+      null,
+      null,
+    ]);
 
     const { state: after } = play(
       state,
@@ -159,20 +165,26 @@ describe("Oracle Eyes / buffLaneAll", () => {
       1,
     );
 
-    const e1 = onBoard(after).find((c) => c.def.id === "E1")!;
-    const p1 = onBoard(after).find((c) => c.def.id === "P1")!;
+    const rowOwn = onBoard(after).find((c) => c.def.id === "ROW_OWN")!;
+    const rowFoe = onBoard(after).find((c) => c.def.id === "ROW_FOE")!;
     const ora = onBoard(after).find((c) => c.def.id === "ORA")!;
-    expect(e1.bonus).toBe(2); // enemy buffed too
-    expect(p1.bonus).toBe(2);
-    expect(ora.bonus).toBe(2); // Oracle buffs itself
+    expect(rowOwn.bonus).toBe(2); // own card at cell 2 in another lane
+    expect(rowFoe.bonus).toBe(2); // enemy card at cell 2 buffed too
+    expect(ora.bonus).toBe(2); // Oracle buffs itself (cell 2 of its own lane)
 
-    expect(onBoard(after).find((c) => c.def.id === "O0")!.bonus).toBe(0);
-    expect(onBoard(after).find((c) => c.def.id === "O2")!.bonus).toBe(0);
+    // Different cell index in another lane: not in the row, not buffed.
+    expect(onBoard(after).find((c) => c.def.id === "OTHER_CELL")!.bonus).toBe(
+      0,
+    );
+    // Oracle's own lane, cell 0: not in the row, not buffed (inverts the old whole-column buff).
+    expect(onBoard(after).find((c) => c.def.id === "OWN_LANE_C0")!.bonus).toBe(
+      0,
+    );
   });
 
   it("renders the mandatory Oracle active text", () => {
     expect(abilityText(oracle(2))).toBe(
-      "Active: Every card in this lane gets +2 power.",
+      "Active: Every card in this row gets +2 power.",
     );
   });
 });
