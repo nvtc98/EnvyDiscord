@@ -291,13 +291,15 @@ export async function createImageRenderer({
       const handCardW = Math.round(w * HAND_CARD_SCALE);
       const handCardH = Math.round(h * HAND_CARD_SCALE);
 
-      // Vertical layout: the lane-header + board block is centred in the space above the bottom hand band.
+      // Vertical layout: the board block is centred in the space above the bottom hand band. The
+      // board's top row, the enemy avatar/identity, and the TURN/energy readout all share this same
+      // top y (BOARD_Y) so they line up; lane status tags are drawn just ABOVE the top row.
       const HAND_BAND_H = handCardH + HAND_MARGIN;
-      const BOARD_BLOCK_H = LANE_HEADER_H + LANE_HEADER_GAP + BOARD_H;
       const availableAbove = SCENE - HAND_BAND_H;
-      const blockTop = Math.round((availableAbove - BOARD_BLOCK_H) / 2);
-      const LANE_HEADER_Y = Math.max(TOP_PAD, blockTop);
-      const BOARD_Y = LANE_HEADER_Y + LANE_HEADER_H + LANE_HEADER_GAP;
+      const BOARD_Y = Math.max(
+        TOP_PAD,
+        Math.round((availableAbove - BOARD_H) / 2),
+      );
 
       // Horizontal layout: left rail, centred board channel, right gutter.
       const railRight = MARGIN + RAIL_W;
@@ -322,7 +324,7 @@ export async function createImageRenderer({
 
       // --- Left rail: enemy identity (top), Eye Privilege meter (middle), player identity (bottom). ---
       const RAIL_X = MARGIN;
-      const enemyCenterY = LANE_HEADER_Y + AVATAR_SIZE / 2;
+      const enemyCenterY = BOARD_Y + AVATAR_SIZE / 2;
       drawAvatar(
         ctx,
         RAIL_X + AVATAR_SIZE / 2,
@@ -385,14 +387,14 @@ export async function createImageRenderer({
       ctx.fillText(
         `TURN ${turnNo} / ${MAX_TURNS}`,
         SCENE - MARGIN,
-        LANE_HEADER_Y + 12,
+        BOARD_Y + 12,
       );
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
       drawEnergyPips(
         ctx,
         SCENE - MARGIN,
-        LANE_HEADER_Y + 34,
+        BOARD_Y + 34,
         yourTurn ? me.energy : 0,
       );
 
@@ -412,9 +414,10 @@ export async function createImageRenderer({
             tags.push(seat === viewer ? "YOU x2" : "ENEMY x2");
         }
         ctx.save();
-        ctx.translate(x, LANE_HEADER_Y);
-        // Lane names (LEFT/MIDDLE/RIGHT) are dropped; keep the header only for status tags
-        // (ANCHORED, YOU x2, ENEMY x2) so lane modifiers stay visible.
+        // Status tags (ANCHORED, YOU x2, ENEMY x2) sit just ABOVE the top card so the board's top
+        // row lines up with the enemy avatar / TURN readout. Lane names are dropped. Tags are rare,
+        // so when present they tuck into the small strip above the top row.
+        ctx.translate(x, BOARD_Y - LANE_HEADER_H + 2);
         drawLaneHeader(ctx, "", tags, cellW);
         ctx.restore();
 
