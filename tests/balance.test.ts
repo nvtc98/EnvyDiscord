@@ -59,7 +59,7 @@ describe("single global balance coefficient (super reactionary)", () => {
   // A coefficient card via the CardDef.coefficient field (Cards B/C's carrier).
   const coeffField = (k: number) => ({ ...def(`f${k}`, 1, 0), coefficient: k });
 
-  it("the worked example: balance 40, A 10 / B 5, one k=2 card → k=3, delta +15 → 55", () => {
+  it("the worked example: balance 40, A 10 / B 5, one H=2 card → k=2, delta +10 → 50", () => {
     const state = emptyGame();
     state.balance = 40;
     setLane(state, 0, [
@@ -67,11 +67,25 @@ describe("single global balance coefficient (super reactionary)", () => {
       instance(coeffAbility(2), "bottom"),
       instance(def("P", 1, 10), "bottom"),
     ]);
-    // bottom total = 10 (the k-card has 0 power); top total = 5; diff = +5; k = 1 + 2 = 3.
+    // bottom total = 10 (the H-card has 0 power); top total = 5; diff = +5.
+    // k = 1 + (H-1) = 1 + 1 = 2 (an H=2 card doubles the swing). delta = 5 * 2 = 10.
     expect(totalPower(state, "bottom") - totalPower(state, "top")).toBe(5);
     const { state: after, events } = endTurn(state, mulberry32(0));
-    expect(after.balance).toBe(55);
-    expect(tide(events)).toMatchObject({ delta: 15, balance: 55 });
+    expect(after.balance).toBe(50);
+    expect(tide(events)).toMatchObject({ delta: 10, balance: 50 });
+  });
+
+  it("a lone H=1 card leaves the swing unchanged (k=1, 'normally')", () => {
+    const state = emptyGame();
+    setLane(state, 0, [
+      instance(def("E", 1, 3), "top"),
+      instance(coeffField(1), "bottom"),
+      instance(def("P", 1, 8), "bottom"),
+    ]);
+    // diff +5; an H=1 card adds (1-1)=0, so k stays 1; delta = 5.
+    expect(tide(endTurn(state, mulberry32(0)).events)).toMatchObject({
+      delta: 5,
+    });
   });
 
   it("no coefficient cards keeps the baseline k=1 (delta = Pb - Pt)", () => {
@@ -85,7 +99,7 @@ describe("single global balance coefficient (super reactionary)", () => {
     expect(tide(events)).toMatchObject({ delta: 5 });
   });
 
-  it("a k=2 card gives the identical delta whichever seat owns it (ownership-independent)", () => {
+  it("an H=2 card gives the identical delta whichever seat owns it (ownership-independent)", () => {
     const build = (owner: "bottom" | "top") => {
       const state = emptyGame();
       state.balance = 40;
@@ -96,16 +110,17 @@ describe("single global balance coefficient (super reactionary)", () => {
       ]);
       return endTurn(state, mulberry32(0));
     };
-    expect(tide(build("bottom").events)).toMatchObject({ delta: 15 });
-    expect(tide(build("top").events)).toMatchObject({ delta: 15 });
+    // diff +5, k = 1 + (2-1) = 2 → delta 10, regardless of owner.
+    expect(tide(build("bottom").events)).toMatchObject({ delta: 10 });
+    expect(tide(build("top").events)).toMatchObject({ delta: 10 });
   });
 
-  it("coefficients from both seats add into one k (additive)", () => {
+  it("coefficient bonuses from both seats add into one k (additive)", () => {
     const state = emptyGame();
-    // bottom has a k=1 field-carrier, top has a k=2 ability-carrier → k = 1 + 1 + 2 = 4.
+    // top has an H=2 card (+1), bottom has an H=3 card (+2) → k = 1 + 1 + 2 = 4.
     setLane(state, 0, [
       instance(coeffAbility(2), "top"),
-      instance(coeffField(1), "bottom"),
+      instance(coeffField(3), "bottom"),
       instance(def("P", 1, 5), "bottom"),
     ]);
     // bottom total = 5, top total = 0 → diff +5, k = 4 → delta +20.
@@ -121,9 +136,9 @@ describe("single global balance coefficient (super reactionary)", () => {
       instance(coeffField(2), "bottom"),
       instance(def("P", 1, 10), "bottom"),
     ]);
-    // With the k=2 card: diff +5, k=3 → delta +15.
+    // With the H=2 card: diff +5, k = 1 + (2-1) = 2 → delta +10.
     expect(tide(endTurn(state, mulberry32(0)).events)).toMatchObject({
-      delta: 15,
+      delta: 10,
     });
     // Remove it: diff +5, k=1 → delta +5.
     setLane(state, 0, [

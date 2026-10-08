@@ -40,24 +40,32 @@ const coefficientOf = (card: CardInstance): number => {
   return card.def.coefficient ?? 0;
 };
 
-/** Sum of every coefficient card on the board, BOTH seats combined (ownership-independent, §6). */
-const sumCoefficients = (state: GameState): number => {
+/**
+ * Extra multiplier a coefficient card adds to the global EP factor. A card's own coefficient H means
+ * "multiply by H", so a card contributes `H - 1` on top of the baseline (H=1 adds 0 — "normally",
+ * H=2 adds 1, H=3 adds 2). Cards with no coefficient (H=0) contribute nothing. Summed over BOTH seats'
+ * boards (ownership-independent, §6).
+ */
+const sumCoefficientBonus = (state: GameState): number => {
   let total = 0;
   for (let lane = 0; lane < LANES; lane++)
     for (let i = 0; i < CELLS; i++) {
       const card = state.lanes[lane][i];
-      if (card) total += coefficientOf(card);
+      if (!card) continue;
+      const h = coefficientOf(card);
+      if (h > 0) total += h - 1;
     }
   return total;
 };
 
 /**
  * The single global multiplier applied to this turn's signed board-power difference before it moves
- * the balance: `k = BASE_COEFFICIENT + Σ coefficientOf(card)` over every card on the board, both seats
- * (the "super reactionary" rule, §6). With no coefficient cards, `k = BASE_COEFFICIENT = 1`.
+ * the balance: `k = BASE_COEFFICIENT + Σ (H - 1)` over every coefficient card on the board, both seats
+ * (the "super reactionary" rule, §6). With no coefficient cards (or only H=1 cards) `k = BASE_COEFFICIENT = 1`
+ * — a lone Cấp 1 (H=1) leaves the swing unchanged ("normally"); a Cấp 2 doubles it; a Cấp 3 triples it.
  */
 function balanceFactor(state: GameState): number {
-  return BASE_COEFFICIENT + sumCoefficients(state);
+  return BASE_COEFFICIENT + sumCoefficientBonus(state);
 }
 
 /** Shuffles both decks, deals the opening hands, and starts the first player's first turn. */
