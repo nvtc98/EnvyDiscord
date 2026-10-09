@@ -142,7 +142,7 @@ describe("Stella Eyes", () => {
 });
 
 describe("Bedrock Eyes push immunity", () => {
-  it("an entry push that would carry it off the far edge leaves it on the far-edge cell and destroys nothing", () => {
+  it("a full lane whose far-edge card is immune cannot be played into (the lane is blocked)", () => {
     const state = emptyGame("bottom");
     // bottom's far edge is cell 0. Full lane with the immune BED at the far edge.
     setLane(state, 0, [
@@ -150,12 +150,24 @@ describe("Bedrock Eyes push immunity", () => {
       instance(def("MID", 1, 1), "top"),
       instance(def("MINE", 1, 1), "bottom"),
     ]);
-    const after = play(state, "bottom", def("X", 1, 1), 0);
-    // The immune card absorbs the push: nothing moves, nothing is destroyed.
+    const x = give(state, "bottom", def("X", 1, 1));
+    state.players.bottom.energy = 1;
+    // The push would carry BED off the far edge; it is immune, so the push is absorbed and the card
+    // cannot enter — the lane offers no legal placement.
+    expect(canPlay(state, x.uid, 0)).toEqual({ ok: false, reason: "blocked" });
+  });
+
+  it("an immune card NOT yet at the far edge can still be pushed one step (lane stays playable)", () => {
+    const state = emptyGame("bottom");
+    // BED at cell 2 (bottom's entry side), gap ahead: a bottom play shoves it toward cell 1, no block.
+    const bed = instance(def("BED", 3, 5, bedrock()), "bottom");
+    setLane(state, 0, [null, null, bed]);
+    const x = give(state, "bottom", def("X", 1, 1));
+    state.players.bottom.energy = 1;
+    expect(canPlay(state, x.uid, 0).ok).toBe(true);
+    const after = playCard(state, x.uid, 0).state;
     expect(after.destroyedPower).toBe(0);
-    const bed = after.lanes[0].find((c) => c?.def.id === "BED");
-    expect(bed).toBeDefined();
-    expect(after.lanes[0][0]?.def.id).toBe("BED"); // stays at its far-edge cell
+    expect(after.lanes[0][1]?.def.id).toBe("BED"); // slid one step, not destroyed
   });
 
   it("an enemy play into a lane holding a pushImmune card is legal, and the immune card is not destroyed", () => {
@@ -169,13 +181,12 @@ describe("Bedrock Eyes push immunity", () => {
     ]);
     const y = give(state, "top", def("Y", 1, 1));
     state.players.top.energy = 1;
-    expect(canPlay(state, y.uid, 0).ok).toBe(true);
-    const after = playCard(state, y.uid, 0).state;
-    expect(after.destroyedPower).toBe(0);
-    expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(true);
+    // The push into this lane would carry BED (immune) off the far edge, so it is absorbed and the
+    // played card could not enter — the lane is forbidden (no legal placement).
+    expect(canPlay(state, y.uid, 0)).toEqual({ ok: false, reason: "blocked" });
   });
 
-  it("an OWNER push that would carry it off the far edge also leaves it in place (immunity is ownership-agnostic)", () => {
+  it("an OWNER push that would carry its own immune card off the far edge is also blocked (immunity is ownership-agnostic)", () => {
     const state = emptyGame("bottom");
     // bottom's far edge is cell 0: a full OWN lane with the immune BED at the far edge.
     setLane(state, 0, [
@@ -185,11 +196,8 @@ describe("Bedrock Eyes push immunity", () => {
     ]);
     const x = give(state, "bottom", def("X", 1, 1));
     state.players.bottom.energy = 1;
-    // The owner may still play into the lane, but cannot shove its own immune card off.
-    expect(canPlay(state, x.uid, 0).ok).toBe(true);
-    const after = playCard(state, x.uid, 0).state;
-    expect(after.destroyedPower).toBe(0);
-    expect(onBoard(after).some((c) => c.def.id === "BED")).toBe(true);
+    // The owner cannot shove its own immune card off, so this lane is forbidden too.
+    expect(canPlay(state, x.uid, 0)).toEqual({ ok: false, reason: "blocked" });
   });
 
   it("a pushImmune card mid-lane with a gap ahead still slides one step when pushed", () => {

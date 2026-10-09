@@ -48,3 +48,28 @@ export function pushInto(
 /** A push is needed when the entry cell is already taken. */
 export const wouldPush = (lane: readonly Cell[], seat: Seat): boolean =>
   lane[entryCell(seat)] !== null;
+
+/**
+ * True if a `seat` push into this lane would be ABSORBED by a push-immune (Bedrock) card: the chain
+ * from the entry cell runs unbroken (no empty gap) to the far edge, and the card sitting at the far
+ * edge is push-immune. In that case `pushInto` leaves the lane unchanged and the played card never
+ * enters — so the play must be forbidden (there is no legal placement). Mirrors `pushInto`'s absorb
+ * check without needing a carried card. The immunity is checked inline (no abilities.ts import).
+ */
+export const pushAbsorbed = (lane: readonly Cell[], seat: Seat): boolean => {
+  const step = seat === "bottom" ? -1 : 1;
+  let i = entryCell(seat);
+  for (;;) {
+    const occupant = lane[i];
+    if (!occupant) return false; // a gap absorbs the push harmlessly; the card enters
+    const next = i + step;
+    if (next < 0 || next >= CELLS) {
+      // occupant is at the far edge and would be shoved off; absorbed iff it is push-immune
+      return (
+        occupant.def.ability?.timing === "continuous" &&
+        occupant.def.ability.effect.kind === "pushImmune"
+      );
+    }
+    i = next;
+  }
+};

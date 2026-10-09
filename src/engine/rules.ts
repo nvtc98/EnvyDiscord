@@ -1,7 +1,7 @@
 import type { Rng } from "../util/rng";
 import { mulberry32, pick, shuffle } from "../util/rng";
 import { hasContinuous, isPushImmune } from "./abilities";
-import { entryCell, pushInto, wouldPush } from "./push";
+import { entryCell, pushAbsorbed, pushInto, wouldPush } from "./push";
 import {
   assertNever,
   BALANCE_START,
@@ -473,7 +473,7 @@ export type PlayCheck =
   | { ok: true }
   | {
       ok: false;
-      reason: "over" | "not-in-hand" | "energy" | "anchored";
+      reason: "over" | "not-in-hand" | "energy" | "anchored" | "blocked";
     };
 
 export function canPlay(
@@ -490,6 +490,10 @@ export function canPlay(
   const cells = state.lanes[lane];
   if (isAnchored(cells) && wouldPush(cells, state.active))
     return { ok: false, reason: "anchored" };
+  // A push that a Bedrock (push-immune) at the far edge would absorb leaves no legal placement:
+  // the played card can't enter and nothing moves, so forbid the lane entirely.
+  if (wouldPush(cells, state.active) && pushAbsorbed(cells, state.active))
+    return { ok: false, reason: "blocked" };
   return { ok: true };
 }
 
