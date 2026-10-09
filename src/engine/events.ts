@@ -30,6 +30,10 @@ export function describeEvent(event: GameEvent, viewer: Seat): string | null {
     }
     case "transformed":
       return `${event.from.name} became ${event.into.name}.`;
+    case "cloned": {
+      const lane = LANE_NAMES[event.lane];
+      return `${who(event.seat)} ${event.card.name} spawned a copy in the ${lane} lane.`;
+    }
     case "tide_shifted": {
       if (event.rawDelta === 0) return "The Eye Privilege holds.";
       // The Eye Privilege is a BURDEN: it is pulled toward whoever had the weaker board this turn.

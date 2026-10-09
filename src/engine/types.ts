@@ -24,7 +24,11 @@ export type ActiveEffect =
   | { kind: "pushLane" } // Siren: extra push step on the lane, far direction
   | { kind: "destroyLane" } // Laser: destroy every other card in the lane
   | { kind: "shuffleRedraw" } // Phantom: shuffle hand+deck together, redraw to the post-play hand size
-  | { kind: "buffRowAll"; amount: number }; // Oracle: +amount power to EVERY card in the row (same cell index across all 3 lanes), both seats (self included)
+  | { kind: "buffRowAll"; amount: number } // Oracle: +amount power to EVERY card in the row (same cell index across all 3 lanes), both seats (self included)
+  | { kind: "cloneBoard" } // Spectra: clone self into every empty cell on the whole board
+  | { kind: "cloneLane" } // Echo: clone self into every empty cell in the played lane
+  | { kind: "cloneMirror" } // Dual: if played in a side lane, clone self into the other side lane
+  | { kind: "nexusSum" }; // Nexus: if played in the middle lane, gain the current power of both side-lane cards in its row
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -37,12 +41,22 @@ export type ContinuousEffect =
   | { kind: "reflecting" } // Reflecting: an enemy push that displaces it shoves a random other lane one step
   | { kind: "costReduction"; amount: number }; // Gentle: owner's cards cost `amount` less while this is on the board
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
-export type EndOfRoundEffect = { kind: "oceanReturn"; amount: number }; // Ocean: +amount to friendlies, then return to deck (phase 2)
-export type OnDestroyEffect = { kind: "rebirth"; amount: number }; // Phoenix: return to hand with +amount
+export type EndOfRoundEffect =
+  | { kind: "oceanReturn"; amount: number } // Ocean: +amount to friendlies, then return to deck (phase 2)
+  | { kind: "teamBuffEndOfTurn"; amount: number }; // Cosmic: at every end of turn, +amount to the owner's OTHER on-board cards
+export type OnDestroyEffect =
+  | { kind: "rebirth"; amount: number } // Phoenix: return to hand with +amount
+  | { kind: "glacialSpawn"; drop: number }; // Glacial: when pushed off the edge (push OR siren), spawn a (power − drop) clone into each other lane, stopping once spawn power ≤ 0
+export type OnPlayEffect = {
+  kind: "earlyBuff";
+  amount: number;
+  byTurn: number;
+}; // Doran's: on play, if turn ≤ byTurn, gain +amount power permanently
 
 /** Active: once, when the card is played. Passive: while on the board, either always or at the end of each round. */
 export type Ability =
   | { timing: "active"; effect: ActiveEffect }
+  | { timing: "onPlay"; effect: OnPlayEffect }
   | { timing: "continuous"; effect: ContinuousEffect }
   | { timing: "endOfRound"; effect: EndOfRoundEffect }
   | { timing: "onDestroy"; effect: OnDestroyEffect };
@@ -144,6 +158,14 @@ export type GameEvent =
       uid: number;
       from: CardDef;
       into: CardDef;
+    }
+  | {
+      type: "cloned";
+      seat: Seat; // owner of the clone (= source owner)
+      uid: number; // the clone instance's new uid
+      card: CardDef; // the shared def, for the log sentence
+      lane: LaneIndex;
+      cell: number;
     }
   | {
       type: "tide_shifted";

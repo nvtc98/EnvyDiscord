@@ -195,6 +195,58 @@ function applyStartOfTurnDrains(state: GameState, events: GameEvent[]): void {
 type DestroyCause = "push" | "siren" | "laser";
 
 /**
+ * Places a fresh clone of `source` into the (caller-verified EMPTY) cell `lanes[lane][cell]`.
+ * The clone shares the source's def (so name/art/description render identically) and owner, gets
+ * a new uid, and has `bonus` set so its CURRENT power equals `targetPower`
+ * (bonus = targetPower - def.power). A clone is PLACED, never "played": applyActive is NEVER
+ * run for it, so active clone chains cannot recurse (Spectra/Echo/Dual/Nexus clones never clone
+ * again). Passive effects on the shared def still apply to the clone (this matters only for
+ * Glacial's onDestroy chain, which carries its own termination guard). Emits a `cloned` event.
+ * precondition: lanes[lane][cell] === null (verified by the caller).
+ */
+function cloneInto(
+  state: GameState,
+  source: CardInstance,
+  lane: LaneIndex,
+  cell: number,
+  targetPower: number,
+  events: GameEvent[],
+): CardInstance {
+  const clone: CardInstance = {
+    uid: state.nextUid++,
+    def: source.def,
+    owner: source.owner,
+    bonus: targetPower - source.def.power,
+  };
+  state.lanes[lane][cell] = clone;
+  events.push({
+    type: "cloned",
+    seat: source.owner,
+    uid: clone.uid,
+    card: source.def,
+    lane,
+    cell,
+  });
+  return clone;
+}
+
+/**
+ * The first empty cell in `lane` scanned from `owner`'s entry edge inward (owner's edge first),
+ * or null if the lane has no empty cell. For bottom that is cell 2 → 1 → 0; for top, 0 → 1 → 2.
+ */
+function nearestEmptyCell(
+  state: GameState,
+  lane: LaneIndex,
+  owner: Seat,
+): number | null {
+  const start = entryCell(owner); // bottom → 2, top → 0
+  const step = owner === "bottom" ? -1 : 1;
+  for (let i = start; i >= 0 && i < CELLS; i += step)
+    if (state.lanes[lane][i] === null) return i;
+  return null;
+}
+
+/**
  * Resolves "card is destroyed." Phoenix (onDestroy: rebirth) intercepts: the card returns to its owner's
  * hand as a fresh instance with `bonus += amount`, and its power is NOT added to the tally. Otherwise the
  * card's actual power at this moment (`Math.max(0, def.power + bonus)`) is added to `state.destroyedPower`.
@@ -204,7 +256,8 @@ function destroyCard(
   state: GameState,
   card: CardInstance,
   events: GameEvent[],
-  _cause: DestroyCause,
+  cause: DestroyCause,
+  lane: LaneIndex,
 ): void {
   const ability = card.def.ability;
   if (ability?.timing === "onDestroy" && ability.effect.kind === "rebirth") {
@@ -235,8 +288,43 @@ function destroyCard(
     });
     return; // NOT counted into destroyedPower or destroyedCount
   }
+  if (
+    ability?.timing === "onDestroy" &&
+    ability.effect.kind === "glacialSpawn"
+  ) {
+    // Count Glacial's power into the tally FIRST (it is really destroyed; unlike Phoenix it does not
+    // dodge the tally), then spawn the next generation on a push/siren off-edge destruction.
+    state.destroyedPower += Math.max(0, card.def.power + card.bonus);
+    state.destroyedCount += 1;
+    if (cause === "push" || cause === "siren")
+      spawnGlacial(state, card, ability.effect.drop, lane, events);
+    return;
+  }
   state.destroyedPower += Math.max(0, card.def.power + card.bonus);
   state.destroyedCount += 1;
+}
+
+/**
+ * Glacial's onDestroy chain: spawn one clone into EACH of the two lanes OTHER than Glacial's own
+ * lane, each carrying `card`'s power-at-death minus `drop`, into the empty cell nearest the owner's
+ * side. A lane with no empty cell is skipped. The chain TERMINATES because spawn power strictly
+ * decreases by `drop` (≥1) each generation and we never spawn when it would be ≤ 0.
+ */
+function spawnGlacial(
+  state: GameState,
+  card: CardInstance,
+  drop: number,
+  myLane: LaneIndex,
+  events: GameEvent[],
+): void {
+  const spawnPower = card.def.power + card.bonus - drop;
+  if (spawnPower <= 0) return; // termination guard
+  for (let l = 0; l < LANES; l++) {
+    if (l === myLane) continue;
+    const cell = nearestEmptyCell(state, l as LaneIndex, card.owner);
+    if (cell === null) continue; // lane full → skip
+    cloneInto(state, card, l as LaneIndex, cell, spawnPower, events);
+  }
 }
 
 /**
@@ -596,7 +684,7 @@ function resolvePushedOffCard(
       return true;
     }
   }
-  destroyCard(state, card, events, cause);
+  destroyCard(state, card, events, cause, fromLane);
   return false;
 }
 
@@ -821,6 +909,7 @@ export function playCard(
   const ability = card.def.ability;
   if (ability?.timing === "active")
     applyActive(state, card, lane, events, rng, fires);
+  if (ability?.timing === "onPlay") applyOnPlay(state, card, events);
 
   // Wicked reads every `moved` event emitted in this action (entry/Siren Phasing relocations).
   applyMoveReactions(state, events);
@@ -889,7 +978,7 @@ function applyActive(
         if (occupant && occupant.uid !== card.uid) {
           cells[i] = null;
           destroyedNames.push(occupant.def.name);
-          destroyCard(state, occupant, events, "laser");
+          destroyCard(state, occupant, events, "laser", lane);
         }
       }
       say(
@@ -926,8 +1015,100 @@ function applyActive(
       say(`gave +${effect.amount} power to every card in this row (${buffed})`);
       break;
     }
+    case "cloneBoard": {
+      const p = card.def.power + card.bonus; // Spectra's current power
+      let n = 0;
+      for (let l = 0; l < LANES; l++)
+        for (let i = 0; i < CELLS; i++)
+          if (state.lanes[l][i] === null) {
+            cloneInto(state, card, l as LaneIndex, i, p, events);
+            n += 1;
+          }
+      say(`spawned ${n} ${n === 1 ? "copy" : "copies"}`);
+      break;
+    }
+    case "cloneLane": {
+      const p = card.def.power + card.bonus;
+      let n = 0;
+      for (let i = 0; i < CELLS; i++)
+        if (state.lanes[lane][i] === null) {
+          cloneInto(state, card, lane, i, p, events);
+          n += 1;
+        }
+      say(`spawned ${n} ${n === 1 ? "copy" : "copies"}`);
+      break;
+    }
+    case "cloneMirror": {
+      // Only side lanes mirror. Lane 0 ↔ lane 2; the middle lane (1) does nothing.
+      const other: LaneIndex | null = lane === 0 ? 2 : lane === 2 ? 0 : null;
+      if (other === null) {
+        say("found no side lane to mirror");
+        break;
+      }
+      const p = card.def.power + card.bonus;
+      // nearestEmptyCell starts the scan AT the owner's entry cell and moves inward, so it already
+      // returns the entry cell when that cell is empty and the next-nearest toward the owner otherwise.
+      const target = nearestEmptyCell(state, other, seat);
+      if (target === null) {
+        say("found no room to mirror");
+        break;
+      }
+      cloneInto(state, card, other, target, p, events);
+      say("spawned a copy in the other lane");
+      break;
+    }
+    case "nexusSum": {
+      if (lane !== 1) {
+        say("found no neighbors to draw from");
+        break;
+      }
+      // Nexus's row = its own cell index in the middle lane.
+      const row = state.lanes[1].findIndex((c) => c?.uid === card.uid);
+      const neighbor = (l: LaneIndex): number => {
+        const c = state.lanes[l][row];
+        return c ? Math.max(0, c.def.power + c.bonus) : 0;
+      };
+      const gain = neighbor(0) + neighbor(2);
+      card.bonus += gain;
+      say(`gained ${gain} power from its neighbors`);
+      break;
+    }
     default:
       assertNever(effect);
+  }
+}
+
+/**
+ * Runs an `onPlay` passive once at play time for the PLAYED card only (clones are placed, never
+ * played, so a cloned onPlay card never re-fires). Doran's `earlyBuff`: if the current turn is within
+ * `byTurn`, add `amount` permanent power.
+ */
+function applyOnPlay(
+  state: GameState,
+  card: CardInstance,
+  events: GameEvent[],
+): void {
+  const ability = card.def.ability!;
+  if (ability.timing !== "onPlay") return;
+  const effect = ability.effect;
+  // OnPlayEffect has a single kind (earlyBuff). TS 7 does not narrow a single-member discriminated
+  // type to `never`, so `assertNever` cannot cap this switch; the typed `effect.kind` literal still
+  // forces any future kind to be handled here.
+  if (effect.kind === "earlyBuff") {
+    // The turn the player sees, pinned to the renderer's expression.
+    const turn = Math.min(
+      state.turnsPlayed + (state.winner ? 0 : 1),
+      MAX_TURNS,
+    );
+    if (turn <= effect.byTurn) {
+      card.bonus += effect.amount;
+      events.push({
+        type: "ability",
+        seat: card.owner,
+        card: card.def,
+        text: `gained +${effect.amount} power for an early play`,
+      });
+    }
   }
 }
 
@@ -959,9 +1140,49 @@ export function endTurn(prev: GameState, rng: Rng): Step {
   return { state, events };
 }
 
+/**
+ * Cosmic (endOfRound teamBuffEndOfTurn): at every end of turn, each on-board Cosmic gives +amount
+ * power to every OTHER card of ITS OWN owner on the board (not the enemy, not itself, not other
+ * Cosmics' effect on itself). Multiple Cosmics stack per the generic scan. Seat-scoped by owner.
+ */
+function applyCosmicBuff(state: GameState, events: GameEvent[]): void {
+  for (let lane = 0; lane < LANES; lane++)
+    for (let i = 0; i < CELLS; i++) {
+      const cosmic = state.lanes[lane][i];
+      const ab = cosmic?.def.ability;
+      if (
+        !cosmic ||
+        ab?.timing !== "endOfRound" ||
+        ab.effect.kind !== "teamBuffEndOfTurn"
+      )
+        continue;
+      const amount = ab.effect.amount;
+      let n = 0;
+      for (let l = 0; l < LANES; l++)
+        for (let j = 0; j < CELLS; j++) {
+          const other = state.lanes[l][j];
+          if (
+            other &&
+            other.owner === cosmic.owner &&
+            other.uid !== cosmic.uid
+          ) {
+            other.bonus += amount;
+            n += 1;
+          }
+        }
+      events.push({
+        type: "ability",
+        seat: cosmic.owner,
+        card: cosmic.def,
+        text: `gave +${amount} power to ${n} allied card${n === 1 ? "" : "s"}`,
+      });
+    }
+}
+
 function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   // 1. Read board power -> 2. apply tide shift -> 3. bump turnsPlayed -> 4. knockout
   // -> 5. cap -> 6. Ocean pass (only if the game continues).
+  applyCosmicBuff(state, events); // Cosmic's +1 lands before the tide is read this turn
   const k = balanceFactor(state);
   const delta = (totalPower(state, "bottom") - totalPower(state, "top")) * k;
   const before = state.balance;

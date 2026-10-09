@@ -10,9 +10,9 @@ interface TokenSpec {
   timing: Timing;
   kind: string;
   /** Which field a single numeric amount is written to. Mutually exclusive with `args`. */
-  amountField?: "amount" | "count" | "k";
+  amountField?: "amount" | "count" | "k" | "drop";
   /** Multi-arg form, e.g. ["count:int", "into:id"]. Mutually exclusive with `amountField`. */
-  args?: ReadonlyArray<"count:int" | "into:id">;
+  args?: ReadonlyArray<"count:int" | "into:id" | "amount:int" | "byTurn:int">;
 }
 
 const TOKENS: Record<string, TokenSpec> = {
@@ -56,6 +56,25 @@ const TOKENS: Record<string, TokenSpec> = {
     amountField: "amount",
   },
   rebirth: { timing: "onDestroy", kind: "rebirth", amountField: "amount" },
+  cloneBoard: { timing: "active", kind: "cloneBoard" },
+  cloneLane: { timing: "active", kind: "cloneLane" },
+  cloneMirror: { timing: "active", kind: "cloneMirror" },
+  nexusSum: { timing: "active", kind: "nexusSum" },
+  glacialSpawn: {
+    timing: "onDestroy",
+    kind: "glacialSpawn",
+    amountField: "drop",
+  },
+  teamBuffEndOfTurn: {
+    timing: "endOfRound",
+    kind: "teamBuffEndOfTurn",
+    amountField: "amount",
+  },
+  earlyBuff: {
+    timing: "onPlay",
+    kind: "earlyBuff",
+    args: ["amount:int", "byTurn:int"],
+  },
 };
 
 /** Parses an ability shorthand into an Ability, throwing a clear Error naming the card on any problem. */
@@ -76,18 +95,32 @@ export function parseAbility(shorthand: string, cardName: string): Ability {
       throw new Error(
         `cards.json: card "${cardName}" ability "${token}" requires ${spec.args.length} arguments`,
       );
-    const count = Number(parts[1]);
-    if (!Number.isInteger(count) || count <= 0)
-      throw new Error(
-        `cards.json: card "${cardName}" ability "${token}" needs a positive integer count, got "${parts[1]}"`,
-      );
-    const into = parts[2];
-    if (!into)
-      throw new Error(
-        `cards.json: card "${cardName}" ability "${token}" needs a non-empty target id`,
-      );
-    effect.count = count;
-    effect.into = into;
+    spec.args.forEach((argSpec, idx) => {
+      const [field, kind] = argSpec.split(":") as [string, "int" | "id"];
+      const raw = parts[idx + 1];
+      if (kind === "id") {
+        if (!raw)
+          throw new Error(
+            `cards.json: card "${cardName}" ability "${token}" needs a non-empty target id`,
+          );
+        effect[field] = raw;
+        return;
+      }
+      const n = Number(raw);
+      // count:int keeps its ORIGINAL stricter rule (positive integer); amount:int/byTurn:int
+      // require only an integer. This preserves transformAt's existing error exactly.
+      if (field === "count") {
+        if (!Number.isInteger(n) || n <= 0)
+          throw new Error(
+            `cards.json: card "${cardName}" ability "${token}" needs a positive integer count, got "${raw}"`,
+          );
+      } else if (!Number.isInteger(n)) {
+        throw new Error(
+          `cards.json: card "${cardName}" ability "${token}" needs an integer ${field}`,
+        );
+      }
+      effect[field] = n;
+    });
   } else if (spec.amountField) {
     if (parts.length !== 2)
       throw new Error(

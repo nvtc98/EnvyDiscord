@@ -202,8 +202,10 @@
   {
     "name": "Cosmic Eyes",
     "rarity": "bargain",
-    "cost": 4,
-    "power": 12
+    "cost": 6,
+    "power": 8,
+    "ability": "teamBuffEndOfTurn 1",
+    "note": "Bị động cuối MỖI lượt: +1 power cho MỌI thẻ KHÁC của PHE TA trên sân (không gồm địch, không gồm chính Cosmic). Có hiệu lực ngay từ lượt tung ra (được cộng trước khi tính EP lượt đó)."
   },
   {
     "name": "Craving Eyes",
@@ -316,8 +318,10 @@
   {
     "name": "Doran's Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 1,
+    "power": 2,
+    "ability": "earlyBuff 4 6",
+    "note": "Bị động khi ra sân: nếu lượt hiện tại ≤ 6 thì +4 power vĩnh viễn; từ lượt 7 trở đi không được gì. Tính một lần lúc ra bài. Lượt tính theo bộ đếm người chơi thấy (Math.min(turnsPlayed + (winner?0:1), 18))."
   },
   {
     "name": "Dragon Eyes",
@@ -352,14 +356,18 @@
   {
     "name": "Dual Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 4,
+    "power": 6,
+    "ability": "cloneMirror",
+    "note": "Khi ra sân: nếu ra ở làn BÊN (trái=0 hoặc phải=2), tạo 1 bản sao ở làn bên còn lại — ưu tiên ô vào quân của chủ, nếu bận thì ô trống gần phía chủ nhất; làn giữa thì không làm gì. Bản sao mang power hiện tại của Dual."
   },
   {
     "name": "Echo Eyes",
     "rarity": "common",
     "cost": 3,
-    "power": 9
+    "power": 3,
+    "ability": "cloneLane",
+    "note": "Khi ra sân: tạo bản sao vào mọi ô trống TRONG CÙNG LÀN (cột dọc Echo vừa ra). Bản sao mang power hiện tại của Echo. Không kích hoạt lại active."
   },
   {
     "name": "Eden's Eyes",
@@ -411,7 +419,7 @@
   },
   {
     "name": "Evil Eyes",
-    "rarity": "bargain",
+    "rarity": "eternal",
     "cost": 4,
     "power": 12
   },
@@ -480,8 +488,10 @@
   {
     "name": "Glacial Eyes",
     "rarity": "bargain",
-    "cost": 5,
-    "power": 15
+    "cost": 4,
+    "power": 6,
+    "ability": "glacialSpawn 2",
+    "note": "Bị động: khi bị ĐẨY rơi khỏi mép sân mà chết, tạo 1 bản sao vào MỖI làn trong 2 làn CÒN LẠI với power = power-lúc-chết trừ 2, đặt vào ô trống gần phía chủ nhất (làn đầy thì bỏ qua). Bản sao cũng là Glacial nên khi CHÚNG chết lại tạo tiếp power-2. Chuỗi DỪNG khi power tạo ra ≤ 0 (ví dụ 5 → 3 → 1 → dừng). Kích hoạt khi bị đẩy rơi khỏi mép — gồm cả đẩy thường LẪN Siren (Siren cũng là đẩy); KHÔNG tính Laser (Laser hủy trực tiếp, không phải đẩy)."
   },
   {
     "name": "Glazed Eyes",
@@ -741,7 +751,9 @@
     "name": "Nexus Eyes",
     "rarity": "bargain",
     "cost": 4,
-    "power": 12
+    "power": 4,
+    "ability": "nexusSum",
+    "note": "Khi ra sân: nếu ra ở làn GIỮA (1), +power bằng tổng power hiện tại của 2 thẻ cùng HÀNG (cùng chỉ số ô) ở làn trái (0) và phải (2); ô trống = 0. Vĩnh viễn. Ra làn bên thì không làm gì."
   },
   {
     "name": "Noble Eyes",
@@ -1078,8 +1090,10 @@
   {
     "name": "Spectra Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 5,
+    "power": 2,
+    "ability": "cloneBoard",
+    "note": "Khi ra sân: tạo một bản sao của chính nó vào MỌI ô trống trên toàn sân (cả 3 làn × 3 ô). Bản sao mang đúng power hiện tại của Spectra lúc đó. Bản sao KHÔNG kích hoạt lại chiêu active."
   },
   {
     "name": "Spectral Eyes",

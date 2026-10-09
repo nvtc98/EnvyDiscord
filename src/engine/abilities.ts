@@ -24,12 +24,26 @@ export function abilityText(ability: Ability | undefined): string {
       case "buffRowAll":
         // No "other": Oracle buffs the whole row including itself (design Part 2).
         return `Active: Every card in this row gets +${effect.amount} power.`;
+      case "cloneBoard":
+        return "Active: Place a copy of this card into every empty cell on the board.";
+      case "cloneLane":
+        return "Active: Place a copy of this card into every empty cell in this lane.";
+      case "cloneMirror":
+        return "Active: If played in a side lane, place a copy of this card in the other side lane.";
+      case "nexusSum":
+        return "Active: If played in the middle lane, gain power equal to the two cards beside it in the same row.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
         // active kind to be handled here.
         return assertNever(effect);
     }
+  }
+  if (timing === "onPlay") {
+    // OnPlayEffect has a single kind (earlyBuff). TS 7 does not narrow a single-member
+    // discriminated type to `never` in a switch/if default, so `assertNever` cannot be used
+    // here; the typed `effect.kind` literal still forces any future kind to be handled.
+    return `Passive: If played by turn ${effect.byTurn}, gain +${effect.amount} power.`;
   }
   if (timing === "continuous") {
     switch (effect.kind) {
@@ -65,10 +79,21 @@ export function abilityText(ability: Ability | undefined): string {
     switch (effect.kind) {
       case "oceanReturn":
         return `Passive: At the end of the round, give allies +${effect.amount} power, then shuffle back into your deck.`;
+      case "teamBuffEndOfTurn":
+        return `Passive: At the end of every turn, give your other cards +${effect.amount} power.`;
+      default:
+        return assertNever(effect);
     }
   }
   // onDestroy
-  return `Passive: When destroyed, return to your hand with +${effect.amount} power.`;
+  switch (effect.kind) {
+    case "rebirth":
+      return `Passive: When destroyed, return to your hand with +${effect.amount} power.`;
+    case "glacialSpawn":
+      return `Passive: When pushed off the board, spawn a copy with ${effect.drop} less power into each of the other two lanes.`;
+    default:
+      return assertNever(effect);
+  }
 }
 
 export const cardText = (card: CardDef): string =>
