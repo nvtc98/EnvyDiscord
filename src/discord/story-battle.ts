@@ -6,15 +6,19 @@ import { NPC_INDEX, npcDeck } from "../data/npcs";
 import { applyBattleResult, type Outcome } from "../game/rewards";
 import { resolveStoryBattle } from "../story/engine";
 import type { StoryBattleState } from "../story/types";
+import { TUTORIAL_INTRO_LINE, tutorialLineFor } from "../story/tutorial";
 import { renderBattle, renderBattleEnd } from "./battle-view";
 import {
   animateOpeningTurn,
   opponentOpens,
+  runBattleStartBeat,
   sessions,
   startBattle,
   toStoryBattleState,
   withImage,
   type AnimationSurface,
+  type BattleDm,
+  type OnBeat,
   type Session,
 } from "./battle-session";
 import type { AppContext } from "./command";
@@ -22,6 +26,7 @@ import {
   deliverScene,
   recordLive,
   storyContext,
+  storyTypingPause,
   type DmChannel,
 } from "./commands/story";
 
@@ -82,6 +87,53 @@ function makeOnStoryEnd(ctx: AppContext, dm: DmChannel) {
 }
 
 /**
+ * The {@link BattleDm} the battle's re-anchor uses: `send` posts a fresh board and records its id as
+ * the live board (via recordLive) so the battle's board id and the story's stale-button guard track
+ * the SAME id (the re-anchor single-id invariant). `deleteMessage` wraps the DM channel delete, which
+ * already swallows benign "already gone" errors inside `asDmChannel`.
+ */
+function buildBattleDm(
+  dm: DmChannel,
+  userId: string,
+  player: Player,
+): BattleDm {
+  return {
+    async send(payload) {
+      const sent = await dm.send(payload);
+      recordLive(userId, sent.id, player);
+      return sent;
+    },
+    deleteMessage: (messageId) => dm.deleteMessage(messageId),
+  };
+}
+
+/**
+ * Builds the in-battle tutorial `onBeat`. It talks (one or more DM bubbles) then re-anchors the board
+ * to the bottom — but ONLY on a beat with a lesson left to teach; a say-nothing beat returns early
+ * (the fast path: no send, no reanchor, board updates in place). It NEVER touches `ev.interaction` —
+ * the battle owns the single ack. Per-player teach-once flags live in `player.story.tutorial`, flipped
+ * inside `tutorialLineFor`; we persist the player after setting them so a mid-battle restart does not
+ * re-teach. Any throw here is caught + swallowed by the battle (the hook is auxiliary chatter).
+ */
+function makeTutorialOnBeat(
+  ctx: AppContext,
+  dm: DmChannel,
+  player: Player,
+): OnBeat {
+  return async (ev) => {
+    const lines = tutorialLineFor(ev, player); // may flip flags; null = silent this beat
+    if (!lines || lines.length === 0) return; // fast path: no send, no reanchor
+    for (const content of lines) {
+      await dm.sendTyping();
+      await storyTypingPause(content);
+      await dm.send({ content, allowedMentions: { parse: [] } });
+    }
+    await ctx.repo.save(player); // persist the teach-once flag(s) just set
+    await ev.reanchor(); // pull the board back below the lines
+  };
+}
+
+/**
  * Launches (or resumes) the cave battle inside the DM. Called from deliverScene when the player enters
  * `cave_battle`. Branches RESUME (an unfinished saved game: rebuild the session verbatim) vs FRESH
  * (first entry, or a retry after a lost/cleared snapshot: resolve decks, start a new game).
@@ -97,6 +149,12 @@ export async function launchStoryBattle(
   const boSpd = NPC_INDEX.get("bo-spd");
   if (!boSpd) throw new Error('story cave battle: NPC "bo-spd" is not defined');
 
+  // The in-battle tutorial attaches ONLY on the FIRST cave duel. `caveWon` flips true on the first win
+  // (resolveStoryBattle), so a "Fight again" replay and any future /battle never attach dm/onBeat and
+  // never post the intro line. Per-player teach-once flags (story.tutorial) additionally prevent any
+  // lesson repeating across beats/resumes within that first duel.
+  const tutorial = !player.story?.caveWon;
+
   // Already battling in memory — just re-send the current board.
   const live = sessions.get(user.id);
   if (live && live.origin === "story") {
@@ -106,6 +164,12 @@ export async function launchStoryBattle(
     live.opponentName ??= boSpd.name;
     const sent = await dm.send(renderBattle(await withImage(ctx, live)));
     recordLive(user.id, sent.id, player);
+    // LIVE-REUSE path: re-attach the tutorial hook after an in-memory reuse so chatter continues.
+    if (tutorial) {
+      live.dm = buildBattleDm(dm, user.id, player);
+      live.boardMessageId = sent.id;
+      live.onBeat = makeTutorialOnBeat(ctx, dm, player);
+    }
     await ctx.repo.save(player);
     return;
   }
@@ -126,6 +190,14 @@ export async function launchStoryBattle(
     // Resume never animates: a rebuilt snapshot is already on the human's turn. Just re-send the board.
     const sent = await dm.send(renderBattle(await withImage(ctx, session)));
     recordLive(user.id, sent.id, player);
+    // RESUME path: re-attach the hook so chatter continues mid-fight. Do NOT re-send the intro line and
+    // do NOT re-fire battle-start — that already happened on the fresh launch, and the per-player
+    // teach-once flags guard it anyway.
+    if (tutorial) {
+      session.dm = buildBattleDm(dm, user.id, player);
+      session.boardMessageId = sent.id;
+      session.onBeat = makeTutorialOnBeat(ctx, dm, player);
+    }
     await ctx.repo.save(player);
     return;
   }
@@ -161,12 +233,32 @@ export async function launchStoryBattle(
 
   const screen = renderBattle(await withImage(ctx, session));
   const opening = opponentOpens(session);
+  // FRESH tutorial: the reassurance line is sent BEFORE the first board, so the player reads "I will
+  // teach thee" first, then sees the board, then the battle-start lessons sit above it.
+  if (tutorial) {
+    await dm.sendTyping();
+    await storyTypingPause(TUTORIAL_INTRO_LINE);
+    await dm.send({
+      content: TUTORIAL_INTRO_LINE,
+      allowedMentions: { parse: [] },
+    });
+  }
   // Post the opening board CONTROL-LESS when the opponent opens (no button flash); otherwise WITH controls.
   const sent = await dm.send(opening ? { ...screen, components: [] } : screen);
   const liveId = sent.id;
   recordLive(user.id, liveId, player);
   // Pre-opening save: a crash DURING the animation still leaves a resumable (enemy-start) snapshot.
   await ctx.repo.save(player);
+
+  // FRESH tutorial wiring: attach dm/boardMessageId/onBeat, THEN fire battle-start ONCE — before the
+  // opening animation, so the battle-start lessons precede Bò SPD's opening move. runBattleStartBeat
+  // requires dm + boardMessageId already set (its re-anchor target).
+  if (tutorial) {
+    session.dm = buildBattleDm(dm, user.id, player);
+    session.boardMessageId = liveId;
+    session.onBeat = makeTutorialOnBeat(ctx, dm, player);
+    await runBattleStartBeat(ctx, session);
+  }
 
   if (opening) {
     const surface: AnimationSurface = {

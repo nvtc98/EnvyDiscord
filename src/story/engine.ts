@@ -24,6 +24,7 @@ export const freshStory = (): StoryState => ({
   chapter: null,
   battle: null,
   caveWon: false,
+  tutorial: {},
 });
 
 /** Starts the story for a player who has none. Returns the events that happened. */
@@ -33,6 +34,7 @@ export function ensureStory(player: Player, ctx: StoryContext): StoryEvent[] {
     player.story.chapter ??= null;
     player.story.battle ??= null;
     player.story.caveWon ??= false;
+    player.story.tutorial ??= {};
     return [];
   }
   player.story = freshStory();

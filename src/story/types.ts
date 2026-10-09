@@ -46,6 +46,18 @@ export interface StoryState {
   battle: StoryBattleState | null;
   /** Set once the cave duel has been won, so the chapter closes and does not restart. */
   caveWon: boolean;
+  /**
+   * In-battle tutorial "already taught" flags, each set the first time the matching lesson is
+   * delivered so the bot never re-teaches it on a later beat. Only the first cave duel attaches the
+   * tutorial, so these are only ever set then. Optional + back-filled to `{}` on load.
+   */
+  tutorial?: {
+    goal?: boolean;
+    play?: boolean;
+    push?: boolean;
+    endTurn?: boolean;
+    tideSeen?: boolean;
+  };
 }
 
 /** A story-driven battle, serialisable, saved on the player so a resume can rebuild the board. */

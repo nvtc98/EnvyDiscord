@@ -345,6 +345,7 @@ export function unlockDaily(ctx: AppContext, userId: string): void {
     chapter: null,
     battle: null,
     caveWon: false,
+    tutorial: {},
   };
   void ctx.repo.save(player);
 }

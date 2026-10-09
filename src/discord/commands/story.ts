@@ -66,6 +66,12 @@ export interface DmChannel {
    * failure (message deleted / too old / gone) is swallowed so a dropped frame never breaks the launch.
    */
   edit(messageId: string, payload: object): Promise<void>;
+  /**
+   * Delete a previously-sent message by id. Used by the in-battle tutorial's board re-anchor (post a
+   * fresh board, then delete the stale one). Best-effort: a benign "already gone" failure (message
+   * deleted / too old / channel gone / no access) is swallowed so a double-delete never throws.
+   */
+  deleteMessage(messageId: string): Promise<void>;
 }
 
 /**
@@ -75,11 +81,16 @@ export interface DmChannel {
 interface RawDmChannel {
   send(payload: StoryMessage | object): Promise<{ id: string }>;
   sendTyping(): Promise<void>;
-  messages: { edit(messageId: string, payload: object): Promise<unknown> };
+  messages: {
+    edit(messageId: string, payload: object): Promise<unknown>;
+    delete(messageId: string): Promise<unknown>;
+  };
   /** Present when the channel already implements the DmChannel seam directly (e.g. a test mock). */
   clearComponents?(messageId: string): Promise<void>;
   /** Present when the channel already implements the edit seam directly (e.g. a test mock). */
   edit?(messageId: string, payload: object): Promise<void>;
+  /** Present when the channel already implements the delete seam directly (e.g. a test mock). */
+  deleteMessage?(messageId: string): Promise<void>;
 }
 
 /**
@@ -99,6 +110,10 @@ function asDmChannel(raw: RawDmChannel, log: Logger): DmChannel {
     ? (id: string, payload: object) => raw.edit!(id, payload)
     : (id: string, payload: object) =>
         raw.messages.edit(id, payload).then(() => {});
+  // Mirror the mock-vs-raw split for the re-anchor delete.
+  const rawDelete = raw.deleteMessage
+    ? (id: string) => raw.deleteMessage!(id)
+    : (id: string) => raw.messages.delete(id).then(() => {});
   return {
     send: (payload) => raw.send(payload),
     sendTyping: () => raw.sendTyping(),
@@ -126,6 +141,22 @@ function asDmChannel(raw: RawDmChannel, log: Logger): DmChannel {
           log.message("error", {
             messageId,
             error: `benign edit error swallowed while animating: ${
+              (error as { code?: unknown }).code ?? "unknown"
+            }`,
+          });
+          return;
+        }
+        throw error;
+      }
+    },
+    async deleteMessage(messageId: string): Promise<void> {
+      try {
+        await rawDelete(messageId);
+      } catch (error) {
+        if (isBenignEditError(error)) {
+          log.message("error", {
+            messageId,
+            error: `benign delete error swallowed while re-anchoring board: ${
               (error as { code?: unknown }).code ?? "unknown"
             }`,
           });
@@ -200,6 +231,15 @@ let sleep: Sleep = defaultSleep;
 /** Test seam: replace the pacing sleep (e.g. with a recording no-op). Call with no args to reset. */
 export function setStorySleep(replacement: Sleep = defaultSleep): void {
   sleep = replacement;
+}
+
+/**
+ * Wait the story "typing" pause proportional to a line's length, behind the SAME `sleep` seam the
+ * scene delivery uses — so a test that calls `setStorySleep(async () => {})` silences the in-battle
+ * tutorial pacing too. Exported for the tutorial callback in story-battle.ts to reuse.
+ */
+export function storyTypingPause(text: string): Promise<void> {
+  return sleep(typingDelay(text));
 }
 
 /** The text a plain message carries, used to size its typing delay. */

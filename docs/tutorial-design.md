@@ -159,3 +159,23 @@ Gợi ý các cờ story lưu trên người chơi (bên story quản, battle kh
 
 - `taughtGoal`, `taughtPlay`, `taughtPush`, `taughtAbility`, `taughtEndTurn`, `taughtReset`
 - Mỗi cờ bật khi đã dạy xong mốc tương ứng, để các lượt sau bot không giảng lại.
+
+---
+
+## 6. Trạng thái triển khai (đã làm, story side)
+
+Tutorial đã được dựng ở lớp story (consume hook `onBeat`, KHÔNG đụng battle/engine):
+
+- **Nội dung + chọn bài học**: `src/story/tutorial.ts` — `tutorialLineFor(ev, player)` trả `string[] | null`
+  (null = im lặng), và `TUTORIAL_INTRO_LINE` (câu trấn an gửi trước khi board hiện).
+- **Cờ "đã dạy" per-player**: `StoryState.tutorial` trong `src/story/types.ts`
+  (`{ goal, play, push, endTurn, tideSeen }`), back-fill `{}` trong `ensureStory`/`freshStory` ở
+  `src/story/engine.ts`. Mỗi cờ bật ngay khi `tutorialLineFor` trả lời cho mốc đó.
+- **Wiring**: `src/discord/story-battle.ts` — `buildBattleDm` + `makeTutorialOnBeat` gắn vào session ở
+  cả 3 nhánh (fresh / resume / live-reuse). Nhánh fresh gửi `TUTORIAL_INTRO_LINE` trước board, rồi
+  `runBattleStartBeat` một lần trước opening animation.
+- **Gate**: chỉ gắn khi `!player.story.caveWon` (trận hang đầu tiên). "Fight again" (caveWon=true) và
+  `/battle` không gắn. Cờ teach-once chống giảng lại khi resume giữa trận.
+- **Metaphor cán cân** dùng trong tutorial: **The Tide** (theo lựa chọn của người chơi).
+- Tests: `tests/story-tutorial.test.ts` (nội dung) + phần "in-battle tutorial wiring" trong
+  `tests/story-battle-flow.test.ts` (gắn hook, teach-once, fast path, gate replay/resume).

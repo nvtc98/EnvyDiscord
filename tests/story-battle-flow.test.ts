@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { battleCommand } from "../src/discord/commands/battle";
 import {
   resetLiveGateMessages,
@@ -282,5 +282,170 @@ describe("story -> cave battle integration", () => {
     expect(dm.sent.length).toBeGreaterThan(beforeResume);
     expect(sessions.get("resume")?.origin).toBe("story");
     expect(ctx.repo.get("resume").story!.node).toBe("cave_battle");
+  });
+});
+
+/** A fake beat driving a session's onBeat directly: only phase + a spy reanchor matter here. */
+function fakeBeat(session: any, phase: string) {
+  const reanchor = vi.fn(async () => {});
+  return {
+    ev: { session, phase, interaction: null, reanchor } as unknown as never,
+    reanchor,
+  };
+}
+
+describe("in-battle tutorial wiring (first cave duel only)", () => {
+  it("attaches onBeat/dm/boardMessageId on a FRESH first duel and sends the intro line before the board", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "tut");
+    const { sessions } = await import("../src/discord/battle-session");
+    const session = sessions.get("tut")!;
+    expect(session.onBeat).toBeDefined();
+    expect(session.dm).toBeDefined();
+    // boardMessageId points at a posted board (kept current by battle-start's re-anchor).
+    expect(session.boardMessageId).toBeTruthy();
+
+    // The reassurance line was sent, and BEFORE the first battle board (ordering via dm.sent).
+    const introIdx = dm.sent.findIndex(
+      (p) => typeof p.content === "string" && p.content.includes("teach thee"),
+    );
+    const firstBoardIdx = dm.sent.findIndex((p) =>
+      buttons(p).some((b: any) => (b.custom_id ?? "").startsWith("battle:")),
+    );
+    const anyBoardIdx = dm.sent.findIndex(
+      (p) =>
+        // the opening board is posted control-less, so match on the embed/attachment board instead
+        Array.isArray(p.embeds) || Array.isArray(p.files),
+    );
+    expect(introIdx).toBeGreaterThanOrEqual(0);
+    const boardIdx = firstBoardIdx >= 0 ? firstBoardIdx : anyBoardIdx;
+    expect(boardIdx).toBeGreaterThanOrEqual(0);
+    expect(introIdx).toBeLessThan(boardIdx);
+    // battle-start fired at launch, so the goal lesson flag is set.
+    expect(ctx.repo.get("tut").story!.tutorial!.goal).toBe(true);
+  });
+
+  it("onBeat sends + reanchors on a taught beat, and is silent (no send/no reanchor) on a repeat", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "beat");
+    const { sessions } = await import("../src/discord/battle-session");
+    const session = sessions.get("beat")!;
+    // after-player-play has NOT been taught yet (only battle-start + after-enemy-turn fired at launch),
+    // so the first drive teaches it; the second is silent (teach-once).
+    const sentBefore = dm.sent.length;
+    const b1 = fakeBeat(session, "after-player-play");
+    await session.onBeat!(b1.ev);
+    // A taught beat sent at least one bubble and re-anchored.
+    expect(dm.sent.length).toBeGreaterThan(sentBefore);
+    expect(b1.reanchor).toHaveBeenCalledTimes(1);
+
+    const sentAfterFirst = dm.sent.length;
+    const b2 = fakeBeat(session, "after-player-play");
+    await session.onBeat!(b2.ev);
+    // The repeat is silent: nothing sent, no re-anchor.
+    expect(dm.sent.length).toBe(sentAfterFirst);
+    expect(b2.reanchor).not.toHaveBeenCalled();
+  });
+
+  it("onBeat stays silent (no send, no reanchor) on an optional/no-lesson beat", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "quiet");
+    const { sessions } = await import("../src/discord/battle-session");
+    const session = sessions.get("quiet")!;
+    const sentBefore = dm.sent.length;
+    const b = fakeBeat(session, "tide-shifted");
+    await session.onBeat!(b.ev);
+    expect(dm.sent.length).toBe(sentBefore);
+    expect(b.reanchor).not.toHaveBeenCalled();
+  });
+
+  it("does NOT attach the tutorial on a replay after the cave is won (Fight again / caveWon)", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "replay");
+    const { sessions } = await import("../src/discord/battle-session");
+    // Simulate a prior win: the chapter is done, the snapshot cleared, caveWon set — then re-enter the
+    // cave_battle node (Fight again) and relaunch FRESH.
+    const player = ctx.repo.players.get("replay")!;
+    player.story!.caveWon = true;
+    player.story!.battle = null;
+    player.story!.node = "cave_battle";
+    player.story!.tutorial = {};
+    await ctx.repo.save(player);
+    sessions.delete("replay");
+
+    const sentBefore = dm.sent.length;
+    const { launchStoryBattle } = await import("../src/discord/story-battle");
+    const fresh = ctx.repo.get("replay");
+    await launchStoryBattle(
+      ctx,
+      { id: "replay", username: "userreplay" },
+      fresh,
+      dm as never,
+      null,
+    );
+    const session = sessions.get("replay")!;
+    expect(session.onBeat).toBeUndefined();
+    expect(session.dm).toBeUndefined();
+    expect(session.boardMessageId).toBeFalsy();
+    // No intro line on a replay.
+    expect(
+      dm.sent
+        .slice(sentBefore)
+        .some(
+          (p) =>
+            typeof p.content === "string" && p.content.includes("teach thee"),
+        ),
+    ).toBe(false);
+  });
+
+  it("re-attaches onBeat/dm on resume WITHOUT re-firing battle-start (teach-once guards the goal lesson)", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "res2");
+    const { sessions } = await import("../src/discord/battle-session");
+    // battle-start fired on the fresh launch -> goal already taught.
+    expect(ctx.repo.get("res2").story!.tutorial!.goal).toBe(true);
+    // Drop the in-memory session (restart), keep the snapshot (mid-fight).
+    sessions.delete("res2");
+
+    const call = {
+      user: {
+        id: "res2",
+        username: "userres2",
+        displayAvatarURL: () => "https://cdn.example/res2.png",
+        createDM: async () => dm,
+      },
+      options: { getString: () => null, getBoolean: () => null },
+      client: {
+        application: { fetch: async () => ({ owner: { id: "res2" } }) },
+      },
+      reply: async () => undefined,
+      deferReply: async () => undefined,
+      editReply: async () => undefined,
+    };
+    await storyCommand.execute(call as never, ctx);
+    const sentBefore = dm.sent.length;
+    await pressGate(ctx, dm, GATE.resumeYes, "res2");
+
+    const session = sessions.get("res2")!;
+    expect(session.onBeat).toBeDefined();
+    expect(session.dm).toBeDefined();
+    expect(session.boardMessageId).toBeTruthy();
+    // No battle-start bubble re-sent on resume (goal flag already set; no runBattleStartBeat fired).
+    const goalLessonResent = dm.sent
+      .slice(sentBefore)
+      .some(
+        (p) =>
+          typeof p.content === "string" && p.content.includes("three lanes"),
+      );
+    expect(goalLessonResent).toBe(false);
+    // No intro line on resume either.
+    expect(
+      dm.sent
+        .slice(sentBefore)
+        .some(
+          (p) =>
+            typeof p.content === "string" && p.content.includes("teach thee"),
+        ),
+    ).toBe(false);
   });
 });
