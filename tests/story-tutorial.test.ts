@@ -89,8 +89,8 @@ describe("tutorialLineFor — teach-once content selection", () => {
     const first = tutorialLineFor(beat("after-enemy-turn"), player)!;
     expect(first).not.toBeNull();
     const joined = first.join(" ");
-    // The Tide-shift gloss AND the card lesson both fire on first after-enemy-turn.
-    expect(joined).toMatch(/The Tide/);
+    // The Eye Privilege gloss AND the card lesson both fire on first after-enemy-turn.
+    expect(joined).toMatch(/The Eye Privilege/);
     expect(joined).toMatch(/Active/);
     expect(joined).toMatch(/Passive/);
     // Names SPD's turn-1 card and warns about the transform-on-destroy caution.
@@ -111,11 +111,11 @@ describe("tutorialLineFor — teach-once content selection", () => {
       expect(tutorialLineFor(beat("after-push"), player)).toBeNull();
   });
 
-  it("mentions The Tide (never 'balance') in the goal lesson", () => {
+  it("mentions The Eye Privilege (never 'balance') in the goal lesson", () => {
     const player = tutorialPlayer();
     const lines = tutorialLineFor(beat("battle-start"), player)!;
     const joined = lines.join(" ");
-    expect(joined).toMatch(/The Tide/);
+    expect(joined).toMatch(/The Eye Privilege/);
     expect(joined).not.toMatch(/balance/i);
   });
 

@@ -8,8 +8,9 @@ import type { Player } from "../game/player";
 // here makes the teaching order unit-testable without any Discord mocks.
 //
 // Voice: single stranger, archaic-but-clear (per .kiro/steering/voice-and-tone.md). Narration leans
-// old; the mechanic nouns the player must act on stay plain — lane, cost, power, energy, The Tide.
-// "The Tide" is the chosen in-story name for the balance meter (user's call); never "balance"/"EP".
+// old; the mechanic nouns the player must act on stay plain — lane, cost, power, energy.
+// "The Eye Privilege" is the in-game name of the balance meter (matches the battle log); it is a
+// BURDEN dragged toward the weaker field each turn — drive it onto the enemy to win. Never "The Tide".
 
 /** The fallback opponent name when the session has none; the npc file is the real source of truth. */
 const OPPONENT_FALLBACK = "SPD";
@@ -42,7 +43,7 @@ export function tutorialLineFor(
       t.goal = true;
       return [
         "Behold the board — three lanes, each three cells deep. Thy cards rise from thy side; his from his.",
-        "Between you flows The Tide. It leans toward whoever holds the stronger field. Lean it fully to thy side, or lead when the duel ends, and thou hast won.",
+        "Between you hangs The Eye Privilege — a burden, not a boon. Each turn it is dragged toward whoever's field is the weaker. Keep thy side the stronger and drive it onto him; press it fully upon him, or leave it leaning his way when the duel ends, and thou hast won.",
         `${opponent} moves first, so he holds three cards; thou movest after, and holdest four. Watch, then answer.`,
       ];
 
@@ -54,7 +55,7 @@ export function tutorialLineFor(
       if (!t.tideSeen) {
         t.tideSeen = true;
         bubbles.push(
-          "There — seest thou The Tide shift? It stirs only when a turn ends. Now it has spoken.",
+          "There — seest thou The Eye Privilege shift? It moves only when a turn ends, dragged toward the weaker field. Now it has spoken.",
         );
       }
       if (!t.ability) {
@@ -85,7 +86,7 @@ export function tutorialLineFor(
     case "after-player-end-turn":
       if (t.endTurn) return null;
       t.endTurn = true;
-      return [`Now watch The Tide move — then ${opponent} answers.`];
+      return [`Now watch The Eye Privilege move — then ${opponent} answers.`];
 
     // before-finish and every other (optional) beat: stay quiet. The END screen + chapter_end scene
     // carry the closing, so a tutorial one-liner here would only clash with them.
