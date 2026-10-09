@@ -1,5 +1,5 @@
 import { grantCard, type Player } from "../game/player";
-import { STARTER_SIZE, drawStarterPack } from "../game/starter";
+import { STARTER_SIZE, drawStarterPackBalanced } from "../game/starter";
 import {
   cleanFreeName,
   cleanStem,
@@ -108,7 +108,7 @@ function showPack(
   const previous = new Set(s.pack?.cards ?? []);
   let ids: string[] = [];
   for (let attempt = 0; attempt < 10; attempt++) {
-    ids = drawStarterPack(ctx.cards, ctx.rng).map((c) => c.id);
+    ids = drawStarterPackBalanced(ctx.cards, ctx.rng).map((c) => c.id);
     if (previous.size === 0 || ids.some((id) => !previous.has(id))) break;
   }
   const rerolls = (s.pack?.rerolls ?? 0) + (reroll ? 1 : 0);
@@ -743,6 +743,138 @@ export const NODES: Record<string, NodeDef> = {
       story(p).battle = null;
       return "cave_battle";
     },
+  },
+
+  // ---- Post-victory: the stranger congratulates, hands off to SPD, and teaches the commands ----
+
+  victory_praise: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "It is done — and I knew thou couldst do it. I trusted thee from the first step on the old road.",
+        ),
+        // SPD is written plain; BOLD_NAMES bolds it at render.
+        stranger("Now then — SPD, lead us on."),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "victory_tools_intro",
+  },
+
+  victory_tools_intro: {
+    view: (p) => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          `Fear not, **${who(p)}** — this is but the beginning. Let me show thee the tools at thy hand...`,
+        ),
+      ],
+      choices: [
+        { label: "Listen", style: "primary" },
+        { label: "Skip", style: "secondary" },
+      ],
+    }),
+    choose: (_p, index) => (index === 0 ? "tools_daily" : "victory_roster"),
+  },
+
+  tools_daily: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "/daily — say it once each day and thou shalt get new cards and gold. Try not to miss a day.",
+        ),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "tools_collection",
+  },
+
+  tools_collection: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger("/collection — there thou canst see every card you own."),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "tools_deck",
+  },
+
+  tools_deck: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "/deck — with it you choose the twelve you carry into battle.",
+        ),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "tools_shop",
+  },
+
+  tools_shop: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "/shop — there you spend thy gold on a new card, or a new variant.",
+        ),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "tools_variants",
+  },
+
+  tools_variants: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          "And variants — the colour-forms a card can wear. Buy them or earn them, and thy cards take on new hues.",
+        ),
+      ],
+      choices: go("Continue"),
+    }),
+    choose: () => "victory_roster",
+  },
+
+  victory_roster: {
+    view: (p) => ({
+      title: TRIBE,
+      lines: [
+        stranger(
+          `A perfect addition to our forces, **${who(p)}** — our strength is complete.`,
+        ),
+        stranger(
+          "Now — speak /daily, and claim thy cards and gold. I shall wait here while thou dost.",
+        ),
+      ],
+      // A single plain fallback button for the player who already claimed daily today, so the story
+      // never gets stuck. The daily command advances the story on a FRESH claim; this button advances
+      // it with NO second claim (no gold farming).
+      choices: [{ label: "I've already claimed today", style: "secondary" }],
+    }),
+    onEnter: (p) => {
+      story(p).awaitingDaily = true;
+    },
+    choose: () => "victory_daily_done",
+  },
+
+  victory_daily_done: {
+    view: () => ({
+      title: TRIBE,
+      lines: [
+        stranger("Well done. Do this each day, and thy strength will grow."),
+      ],
+      choices: go("Continue"),
+    }),
+    onEnter: (p) => {
+      story(p).awaitingDaily = false;
+    },
+    choose: () => "chapter_end",
   },
 
   chapter_end: {

@@ -1,11 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CARDS, COLLECTIBLE_CARDS } from "../src/data/cards";
 import { collectionCommand } from "../src/discord/commands/collection";
 import { dailyCommand } from "../src/discord/commands/daily";
 import { deckCommand } from "../src/discord/commands/deck";
 import { cardCommand } from "../src/discord/commands/card";
 import { shopCommand } from "../src/discord/commands/shop";
+import { profileCommand } from "../src/discord/commands/profile";
+import {
+  resetLiveGateMessages,
+  setStorySleep,
+  storyCommand,
+} from "../src/discord/commands/story";
 import { SHOP_CARD_PRICE, SHOP_VARIANT_PRICE } from "../src/game/shop";
+import { DAILY_COINS, todayKey } from "../src/game/gacha";
 import { DECK_SIZE } from "../src/engine/types";
 import { CARD_INDEX } from "../src/data/cards";
 import {
@@ -38,6 +45,12 @@ describe("/daily", () => {
     await dailyCommand.execute(first as never, ctx);
     expect(embedOf(lastPayload(first.reply)).description).toMatch(/🆕/);
     expect(Object.keys(ctx.repo.get("u").cards)).toHaveLength(3);
+    expect(ctx.repo.get("u").coins).toBe(DAILY_COINS);
+    expect(DAILY_COINS).toBe(20);
+    // The footer reads in gold, with no "coin" wording.
+    const footer = embedOf(lastPayload(first.reply)).footer.text as string;
+    expect(footer).toMatch(/gold/);
+    expect(footer).not.toMatch(/coin/i);
     expect(
       ctx.log.entries.find((e) => e.type === "daily_claimed"),
     ).toBeDefined();
@@ -55,6 +68,123 @@ describe("/daily", () => {
     await dailyCommand.execute(call as never, ctx);
     expect(lastPayload(call.reply).content).toMatch(/collection is complete/);
     expect(ctx.repo.get("u").coins).toBe(0);
+  });
+});
+
+describe("/daily -> post-victory story hook", () => {
+  beforeEach(() => {
+    resetLiveGateMessages();
+    setStorySleep(async () => {}); // no real typing timers
+  });
+  afterEach(() => {
+    setStorySleep();
+  });
+
+  /** A player parked at victory_roster waiting on /daily (starter claimed so /daily is open). */
+  function parkAtRoster(ctx: ReturnType<typeof makeCtx>, userId = "u"): void {
+    const player = ctx.repo.get(userId);
+    player.story = {
+      node: "victory_roster",
+      name: "Abyss Eyes",
+      isEye: true,
+      knowsTribe: true,
+      nameAttempts: [],
+      pendingName: null,
+      notice: null,
+      pack: null,
+      starterClaimed: true,
+      liveMessageId: null,
+      chapter: "bo-tuoi",
+      battle: null,
+      caveWon: true,
+      awaitingDaily: true,
+      tutorial: {},
+    };
+    void ctx.repo.save(player);
+  }
+
+  /** The DM messages that carry text content (the story bubbles). */
+  const dmTexts = (dm: ReturnType<typeof slashInteraction>["dm"]): string[] =>
+    (dm?.sent ?? [])
+      .map((p: any) => p.content)
+      .filter((c: any): c is string => typeof c === "string");
+
+  it("a successful claim while parked grants 3 cards + 20 gold AND advances the story once", async () => {
+    const ctx = makeCtx(2);
+    parkAtRoster(ctx, "u");
+    const call = slashInteraction("u");
+    await dailyCommand.execute(call as never, ctx);
+
+    const player = ctx.repo.get("u");
+    expect(Object.keys(player.cards)).toHaveLength(3);
+    expect(player.coins).toBe(DAILY_COINS);
+    // The story advanced to victory_daily_done and the flag cleared.
+    expect(player.story!.node).toBe("victory_daily_done");
+    expect(player.story!.awaitingDaily).toBe(false);
+    // A story DM bubble was delivered carrying the victory_daily_done line.
+    expect(dmTexts(call.dm).some((t) => /do this each day/i.test(t))).toBe(
+      true,
+    );
+  });
+
+  it("a normal /daily on a non-parked player delivers NO story DM", async () => {
+    const ctx = makeCtx(2);
+    unlockDaily(ctx, "u"); // node: chapter_end, awaitingDaily unset
+    const call = slashInteraction("u");
+    await dailyCommand.execute(call as never, ctx);
+
+    const player = ctx.repo.get("u");
+    expect(Object.keys(player.cards)).toHaveLength(3);
+    expect(player.story!.node).toBe("chapter_end"); // untouched
+    expect(dmTexts(call.dm).some((t) => /do this each day/i.test(t))).toBe(
+      false,
+    );
+  });
+
+  it("the hook fires only once: a second same-day claim is blocked and never re-advances", async () => {
+    const ctx = makeCtx(2);
+    parkAtRoster(ctx, "u");
+    const first = slashInteraction("u");
+    await dailyCommand.execute(first as never, ctx);
+    expect(ctx.repo.get("u").story!.node).toBe("victory_daily_done");
+
+    // Advance the player off the daily_done node so we can prove a later daily does not re-trigger.
+    const mid = ctx.repo.get("u");
+    mid.story!.node = "chapter_end";
+    void ctx.repo.save(mid);
+
+    const second = slashInteraction("u");
+    await dailyCommand.execute(second as never, ctx);
+    expect(lastPayload(second.reply).content).toMatch(/already claimed/);
+    // Still on chapter_end; the already-claimed path never runs the hook.
+    expect(ctx.repo.get("u").story!.node).toBe("chapter_end");
+  });
+
+  it("already-claimed-today: the fallback button advances with no second claim (gold unchanged)", async () => {
+    const ctx = makeCtx(2);
+    parkAtRoster(ctx, "u");
+    // Pretend the player already claimed earlier today.
+    const player = ctx.repo.get("u");
+    player.lastDaily = todayKey(new Date(), ctx.timezone);
+    player.coins = 55;
+    void ctx.repo.save(player);
+
+    // /daily returns already-claimed and the hook never runs.
+    const call = slashInteraction("u");
+    await dailyCommand.execute(call as never, ctx);
+    expect(lastPayload(call.reply).content).toMatch(/already claimed/);
+    expect(ctx.repo.get("u").story!.node).toBe("victory_roster"); // still parked
+    expect(ctx.repo.get("u").coins).toBe(55);
+
+    // The fallback button on victory_roster advances the story with no claim.
+    const press = buttonInteraction("u", "story:victory_roster:c:0");
+    (press as any).message = { id: "x" };
+    (press as any).channel = call.dm;
+    await storyCommand.component!(press as never, ctx);
+    const advanced = ctx.repo.get("u");
+    expect(advanced.story!.node).toBe("victory_daily_done");
+    expect(advanced.story!.awaitingDaily).toBe(false);
+    expect(advanced.coins).toBe(55); // no gold farmed
   });
 });
 
@@ -242,7 +372,7 @@ describe("/shop", () => {
     void ctx.repo.save(player);
   }
 
-  it("shows the coin balance and two in-voice buttons (no subcommand)", async () => {
+  it("shows the gold balance and two in-voice buttons (no subcommand)", async () => {
     const json = shopCommand.data.toJSON() as any;
     expect(json.options ?? []).toEqual([]); // no subcommands/options left
 
@@ -251,7 +381,8 @@ describe("/shop", () => {
     const call = slashInteraction("u");
     await shopCommand.execute(call as never, ctx);
     const payload = lastPayload(call.reply);
-    expect(payload.content).toMatch(/250 coins/);
+    expect(payload.content).toMatch(/250 gold/);
+    expect(payload.content).not.toMatch(/coin/i);
     const buttons = rows(payload)[0].components;
     expect(buttons.map((b: any) => b.custom_id)).toEqual([
       "shop:summon",
@@ -260,6 +391,10 @@ describe("/shop", () => {
     // The card button reads plainly as "Buy a card".
     expect(buttons[0].label).toMatch(/Buy/i);
     expect(buttons[0].label).not.toMatch(/Summon/i);
+    // Both button labels read in gold, never coins.
+    expect(buttons[0].label).toMatch(/gold/);
+    expect(buttons[1].label).toMatch(/gold/);
+    expect(buttons.every((b: any) => !/coin/i.test(b.label))).toBe(true);
   });
 
   it("summons a card via the button, deducting coins and saving it", async () => {
@@ -272,9 +407,14 @@ describe("/shop", () => {
     const press = buttonInteraction("u", "shop:summon");
     await shopCommand.component!(press as never, ctx);
     expect(embedOf(lastPayload(press.reply)).title).toMatch(/bought/);
+    // The result footer reads in gold, with no "coin" wording.
+    const cardFooter = embedOf(lastPayload(press.reply)).footer.text as string;
+    expect(cardFooter).toMatch(/gold/);
+    expect(cardFooter).not.toMatch(/coin/i);
     const saved = ctx.repo.get("u");
     expect(Object.keys(saved.cards).length).toBe(before + 1);
     expect(saved.coins).toBe(500 - SHOP_CARD_PRICE);
+    expect(SHOP_CARD_PRICE).toBe(100);
     expect(ctx.log.entries.find((e) => e.type === "shop_card")).toBeDefined();
   });
 
@@ -311,9 +451,15 @@ describe("/shop", () => {
     expect(embedOf(lastPayload(pickVariant.update)).description).toMatch(
       /Blue/,
     );
+    // The variant result footer reads in gold, with no "coin" wording.
+    const variantFooter = embedOf(lastPayload(pickVariant.update)).footer
+      .text as string;
+    expect(variantFooter).toMatch(/gold/);
+    expect(variantFooter).not.toMatch(/coin/i);
     const saved = ctx.repo.get("u");
     expect(saved.cards[abyss.id].variants).toContain("blue");
     expect(saved.coins).toBe(500 - SHOP_VARIANT_PRICE);
+    expect(SHOP_VARIANT_PRICE).toBe(40);
     expect(
       ctx.log.entries.find((e) => e.type === "shop_variant"),
     ).toBeDefined();
@@ -378,5 +524,24 @@ describe("/shop", () => {
     await shopCommand.component!(pick as never, ctx);
     expect(lastPayload(pick.update).content).toMatch(/need/);
     expect(ctx.repo.get("u").cards[abyss.id].variants).toEqual(["metal"]);
+  });
+});
+
+describe("/profile currency wording", () => {
+  it("labels the balance field 'Gold', never 'Coins'", async () => {
+    const ctx = makeCtx();
+    const player = ctx.repo.get("u");
+    player.coins = 123;
+    void ctx.repo.save(player);
+    const call = slashInteraction("u");
+    await profileCommand.execute(call as never, ctx);
+    const fields = embedOf(lastPayload(call.reply)).fields as {
+      name: string;
+      value: string;
+    }[];
+    const balance = fields.find((f) => /gold/i.test(f.name));
+    expect(balance).toBeDefined();
+    expect(balance!.value).toBe("123");
+    expect(fields.every((f) => !/coin/i.test(f.name))).toBe(true);
   });
 });

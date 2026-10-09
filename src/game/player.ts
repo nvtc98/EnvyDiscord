@@ -7,7 +7,7 @@ import {
 } from "../data/variants";
 
 /**
- * Coins refunded when a duplicate arrives but the player already owns every variant of that card. Placeholder
+ * Gold refunded when a duplicate arrives but the player already owns every variant of that card. Placeholder
  * value, tuned later. Defined here (not in shop.ts) so player.ts can use it without a circular import; shop.ts
  * re-exports it next to its own price constants.
  */
@@ -49,7 +49,7 @@ export function createPlayer(id: string): Player {
   };
 }
 
-/** True once a player has done anything: started the story, owns cards, battled, or earned coins. */
+/** True once a player has done anything: started the story, owns cards, battled, or earned gold. */
 export function hasPlayed(player: Player): boolean {
   return (
     player.story !== null ||
@@ -93,7 +93,7 @@ export interface GrantResult {
   kind: "new" | "variant-unlocked" | "duplicate-refunded";
   /** The variant granted ('new' and 'variant-unlocked'); absent when the grant was refunded. */
   variant?: VariantId;
-  /** Coins refunded ('duplicate-refunded' only). */
+  /** Gold refunded ('duplicate-refunded' only). */
   refund?: number;
 }
 
@@ -101,7 +101,7 @@ export interface GrantResult {
  * Gives a card:
  * - a brand new card starts at `metal`;
  * - a duplicate unlocks the next not-yet-owned variant in registry order;
- * - a duplicate of a card whose variants are all owned refunds a small amount of coins.
+ * - a duplicate of a card whose variants are all owned refunds a small amount of gold.
  */
 export function grantCard(player: Player, card: CardDef): GrantResult {
   const owned = player.cards[card.id];

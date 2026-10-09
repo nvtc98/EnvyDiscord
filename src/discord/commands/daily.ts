@@ -2,10 +2,12 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import { DEFAULT_VARIANT, type VariantId } from "../../data/variants";
 import { claimDaily, todayKey } from "../../game/gacha";
 import type { GrantResult } from "../../game/player";
+import { advanceParkedDaily } from "../../story/engine";
 import { EMBED_COLOR } from "../../render/theme";
 import { slash, type Command } from "../command";
 import { attach, tryRender } from "../images";
 import { cardSummary, variantLabel } from "../render";
+import { deliverScene, resolveDm, storyContext } from "./story";
 
 /** The variant a grant should be drawn with: the one it granted, or metal when a duplicate was refunded. */
 const grantVariant = (grant: GrantResult): VariantId =>
@@ -16,7 +18,7 @@ function describeGrant(grant: GrantResult): string {
     return `🆕 **${grant.card.name}** · ${cardSummary(grant.card)}`;
   if (grant.kind === "variant-unlocked")
     return `🎨 **${grant.card.name}** revealed its **${variantLabel(grant.variant!)}** variant`;
-  return `💰 **${grant.card.name}** came up again · **${grant.refund}** coins refunded`;
+  return `💰 **${grant.card.name}** came up again · **${grant.refund}** gold refunded`;
 }
 
 export const dailyCommand: Command = {
@@ -63,8 +65,8 @@ export const dailyCommand: Command = {
     const refunded = result.grants.reduce((sum, g) => sum + (g.refund ?? 0), 0);
     const footer =
       refunded > 0
-        ? `+${result.coins} coins (+${refunded} refunded) · In all: ${player.coins} coins`
-        : `+${result.coins} coins · In all: ${player.coins} coins`;
+        ? `+${result.coins} gold (+${refunded} refunded) · In all: ${player.coins} gold`
+        : `+${result.coins} gold · In all: ${player.coins} gold`;
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR.daily)
       .setTitle("🎁 Your daily pack")
@@ -89,5 +91,22 @@ export const dailyCommand: Command = {
       embeds: [embed],
       files: image ? [attach(image, "daily.png")] : [],
     });
+
+    // Post-victory story: if the player is parked waiting on /daily, this successful claim advances
+    // the story once (to victory_daily_done). Fires only when parked, so a normal later /daily is a
+    // no-op. The story advance is a separate DM message (the daily reply surface may be a guild
+    // channel), delivered via resolveDm. A closed DM is fine — the node already moved on save, so the
+    // player sees victory_daily_done the next time they open the DM (e.g. a /story resume).
+    if (advanceParkedDaily(player, storyContext(ctx))) {
+      await ctx.repo.save(player);
+      const dm = await resolveDm(interaction.user, ctx.log);
+      if (dm)
+        await deliverScene(
+          ctx,
+          { id: interaction.user.id, username: interaction.user.username },
+          player,
+          dm,
+        );
+    }
   },
 };

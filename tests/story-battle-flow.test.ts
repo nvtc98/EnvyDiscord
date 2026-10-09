@@ -271,7 +271,7 @@ describe("story -> cave battle integration", () => {
     expect(liveBattle(dm)).toBeDefined();
   });
 
-  it("winning the battle delivers chapter_end, records one win and clears the saved battle", async () => {
+  it("winning the battle delivers victory_praise, records one win and clears the saved battle", async () => {
     const ctx = makeCtx(3);
     const dm = await walkToBattle(ctx, "win");
     const { sessions } = await import("../src/discord/battle-session");
@@ -293,14 +293,15 @@ describe("story -> cave battle integration", () => {
     await session.onStoryEnd!(session, "won", fakeInteraction as never);
 
     const player = ctx.repo.get("win");
-    expect(player.story!.node).toBe("chapter_end");
+    // The win now lands on the post-victory chapter's entry node (victory_praise), not chapter_end.
+    expect(player.story!.node).toBe("victory_praise");
     expect(player.wins).toBe(1);
     expect(player.losses).toBe(0);
     expect(player.story!.caveWon).toBe(true);
     expect(player.story!.battle).toBeNull();
-    // chapter_end's closing line was delivered to the DM; it is a dead-end scene (no new choices).
+    // victory_praise's congratulation line was delivered to the DM.
     expect(
-      dm.sent.some((p) => content(p)?.match(/the tale continues anon/i)),
+      dm.sent.some((p) => content(p)?.match(/I knew thou couldst do it/i)),
     ).toBe(true);
     expect(
       ctx.log.entries.find((e) => e.type === "battle_ended")?.data,

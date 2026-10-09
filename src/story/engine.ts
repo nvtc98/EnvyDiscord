@@ -24,6 +24,7 @@ export const freshStory = (): StoryState => ({
   chapter: null,
   battle: null,
   caveWon: false,
+  awaitingDaily: false,
   tutorial: {},
 });
 
@@ -34,6 +35,7 @@ export function ensureStory(player: Player, ctx: StoryContext): StoryEvent[] {
     player.story.chapter ??= null;
     player.story.battle ??= null;
     player.story.caveWon ??= false;
+    player.story.awaitingDaily ??= false;
     player.story.tutorial ??= {};
     return [];
   }
@@ -121,7 +123,7 @@ export function resolveStoryBattle(
     return { ok: false, reason: "invalid" };
 
   story.notice = null;
-  const next = outcome === "won" ? "chapter_end" : "cave_loss";
+  const next = outcome === "won" ? "victory_praise" : "cave_loss";
   if (outcome === "won") {
     story.caveWon = true;
     story.battle = null;
@@ -130,4 +132,21 @@ export function resolveStoryBattle(
   const events: StoryEvent[] = [{ type: "node", node: next }];
   NODES[next].onEnter?.(player, ctx, events);
   return { ok: true, events };
+}
+
+/**
+ * When the player is parked at `victory_roster` waiting on /daily, advance the story once to
+ * `victory_daily_done` (running its onEnter, which clears the wait flag). Returns true only when it
+ * actually advanced, so a normal later /daily — on a player no longer parked (node moved past
+ * `victory_roster`, or the flag already false) — is a no-op and never re-triggers the story.
+ */
+export function advanceParkedDaily(player: Player, ctx: StoryContext): boolean {
+  const story = player.story;
+  if (!story || story.node !== "victory_roster" || !story.awaitingDaily)
+    return false;
+  story.notice = null;
+  story.node = "victory_daily_done";
+  const events: StoryEvent[] = [{ type: "node", node: "victory_daily_done" }];
+  NODES["victory_daily_done"].onEnter?.(player, ctx, events); // clears awaitingDaily
+  return true;
 }

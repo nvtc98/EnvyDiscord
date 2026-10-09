@@ -34,7 +34,7 @@ export const profileCommand: Command = {
       .setTitle(`👤 ${target.displayName}'s profile`)
       .setThumbnail(avatarUrl)
       .addFields(
-        { name: "💰 Coins", value: String(player.coins), inline: true },
+        { name: "💰 Gold", value: String(player.coins), inline: true },
         {
           name: "🏆 Wins / Losses",
           value: `${player.wins} / ${player.losses} (${rate})`,

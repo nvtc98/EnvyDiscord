@@ -10,9 +10,9 @@ import {
 } from "./player";
 import type { Rng } from "../util/rng";
 
-export const SHOP_CARD_PRICE = 50;
-/** Flat price of any purchasable variant. Placeholder value, tuned later. */
-export const SHOP_VARIANT_PRICE = 100;
+export const SHOP_CARD_PRICE = 100;
+/** Flat price of any purchasable variant. */
+export const SHOP_VARIANT_PRICE = 40;
 /** Re-exported so the shop's price constants live together; the value is defined in player.ts (no circular import). */
 export { DUPLICATE_REBATE };
 
@@ -61,7 +61,7 @@ export function buyCard(
 /**
  * Buy a specific purchasable variant for a card the player already owns. The variant is added permanently to the
  * card's owned set (kept registry order); the active variant is left as-is. Fails cleanly when the card is not
- * owned, the variant is unknown/not purchasable, the player already owns it, or coins are short.
+ * owned, the variant is unknown/not purchasable, the player already owns it, or gold is short.
  */
 export function buyVariant(
   player: Player,

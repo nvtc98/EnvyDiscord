@@ -34,13 +34,13 @@ async function buildCardResult(
       ? `🆕 **${grant.card.name}** · ${cardSummary(grant.card)}`
       : grant.kind === "variant-unlocked"
         ? `🎨 **${grant.card.name}** revealed its **${variantLabel(grant.variant!)}** variant`
-        : `💰 **${grant.card.name}** came up again · **${grant.refund}** coins refunded`;
+        : `💰 **${grant.card.name}** came up again · **${grant.refund}** gold refunded`;
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR.daily)
     .setTitle("🛒 Card bought")
     .setDescription(description)
     .setFooter({
-      text: `-${coinsSpent} coins · You now have ${coins} coins`,
+      text: `-${coinsSpent} gold · You now have ${coins} gold`,
     });
   const image = await tryRender(ctx, (r) =>
     r.cards([
@@ -63,22 +63,22 @@ async function buildCardResult(
 }
 
 export const shopCommand: Command = {
-  data: slash("shop", "Spend your coins on cards and variants"),
+  data: slash("shop", "Spend your gold on cards and variants"),
 
   async execute(interaction, ctx) {
     const player = ctx.repo.get(interaction.user.id);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId("shop:summon")
-        .setLabel(`Buy a card (${SHOP_CARD_PRICE} coins)`)
+        .setLabel(`Buy a card (${SHOP_CARD_PRICE} gold)`)
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId("shop:variant")
-        .setLabel(`Buy a variant (${SHOP_VARIANT_PRICE} coins)`)
+        .setLabel(`Buy a variant (${SHOP_VARIANT_PRICE} gold)`)
         .setStyle(ButtonStyle.Secondary),
     );
     await interaction.reply({
-      content: `You have **${player.coins} coins**. What would you like to buy?`,
+      content: `You have **${player.coins} gold**. What would you like to buy?`,
       components: [row],
       flags: MessageFlags.Ephemeral,
     });
@@ -93,7 +93,7 @@ export const shopCommand: Command = {
       if (!result.ok) {
         const msg =
           result.reason === "insufficient-coins"
-            ? `❌ You need **${SHOP_CARD_PRICE} coins** to buy a card. You have **${player.coins}**.`
+            ? `❌ You need **${SHOP_CARD_PRICE} gold** to buy a card. You have **${player.coins}**.`
             : "🏆 Your collection is complete — there's nothing left to buy.";
         await interaction.reply({
           content: msg,
@@ -186,7 +186,7 @@ export const shopCommand: Command = {
         .setPlaceholder("Pick a variant")
         .addOptions(options);
       await interaction.update({
-        content: `Pick a variant for **${card.name}** (${SHOP_VARIANT_PRICE} coins).`,
+        content: `Pick a variant for **${card.name}** (${SHOP_VARIANT_PRICE} gold).`,
         components: [
           new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
         ],
@@ -208,7 +208,7 @@ export const shopCommand: Command = {
       const result = buyVariant(player, card, variantId);
       if (!result.ok) {
         const msg: Record<string, string> = {
-          "insufficient-coins": `❌ You need **${SHOP_VARIANT_PRICE} coins** to buy a variant. You have **${player.coins}**.`,
+          "insufficient-coins": `❌ You need **${SHOP_VARIANT_PRICE} gold** to buy a variant. You have **${player.coins}**.`,
           "not-owned": `❌ You don't own **${card.name}** yet. Buy it first at the shop.`,
           "already-owned": `✨ You already own the **${variantLabel(variantId)}** variant of **${card.name}**.`,
           "not-purchasable": `❌ The **${variantLabel(variantId)}** variant can't be bought in the shop.`,
@@ -235,7 +235,7 @@ export const shopCommand: Command = {
           `🎨 **${card.name}** gained the **${variantLabel(result.variant)}** variant`,
         )
         .setFooter({
-          text: `-${result.coinsSpent} coins · You now have ${player.coins} coins`,
+          text: `-${result.coinsSpent} gold · You now have ${player.coins} gold`,
         });
       const image = await tryRender(ctx, (r) =>
         r.cards([

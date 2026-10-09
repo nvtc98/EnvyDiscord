@@ -772,10 +772,10 @@ async function finishBattle(
   });
   const summary =
     outcome === "won"
-      ? `You win! **+${coins} coins**`
+      ? `You win! **+${coins} gold**`
       : outcome === "draw"
-        ? `A draw. **+${coins} coins**`
-        : `You lose. **+${coins} coins** for your trouble.`;
+        ? `A draw. **+${coins} gold**`
+        : `You lose. **+${coins} gold** for your trouble.`;
   await send({
     ...renderBattleEnd(await withImage(ctx, session), summary),
     attachments: [],

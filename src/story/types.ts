@@ -47,6 +47,12 @@ export interface StoryState {
   /** Set once the cave duel has been won, so the chapter closes and does not restart. */
   caveWon: boolean;
   /**
+   * Set when the story is parked at `victory_roster` waiting for the player to run /daily; cleared the
+   * moment the story advances past the wait (the daily hook, or the already-claimed fallback button).
+   * Optional + back-filled to false on load, like the other late-added flags.
+   */
+  awaitingDaily?: boolean;
+  /**
    * In-battle tutorial "already taught" flags, each set the first time the matching lesson is
    * delivered so the bot never re-teaches it on a later beat. Only the first cave duel attaches the
    * tutorial, so these are only ever set then. Optional + back-filled to `{}` on load.

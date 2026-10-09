@@ -9,6 +9,7 @@ import type { CardDef } from "../src/engine/types";
 import { STARTER_SIZE, drawStarterPack } from "../src/game/starter";
 import { createPlayer, type Player } from "../src/game/player";
 import {
+  advanceParkedDaily,
   applyAction,
   currentView,
   ensureStory,
@@ -604,7 +605,7 @@ describe("story: the prologue", () => {
       expect(player.story!.node).toBe("cave_battle");
     });
 
-    it("resolveStoryBattle moves to chapter_end on a win (sets caveWon, clears battle)", () => {
+    it("resolveStoryBattle moves to victory_praise on a win (sets caveWon, clears battle)", () => {
       const { player } = toCave();
       player.story!.battle = {
         kind: "cave",
@@ -616,17 +617,150 @@ describe("story: the prologue", () => {
       };
       const result = resolveStoryBattle(player, "won", ctx());
       expect(result.ok).toBe(true);
-      expect(player.story!.node).toBe("chapter_end");
+      expect(player.story!.node).toBe("victory_praise");
       expect(player.story!.caveWon).toBe(true);
       expect(player.story!.battle).toBeNull();
+    });
+
+    it("the post-victory chapter (Listen) walks praise -> tools -> roster -> daily_done -> chapter_end", () => {
+      const { player } = toCave();
+      player.story!.battle = {
+        kind: "cave",
+        state: {} as never,
+        selectedUid: null,
+        log: [],
+        difficulty: "normal",
+        opponentPortrait: "boss-spd-battle",
+      };
+      resolveStoryBattle(player, "won", ctx());
+      expect(player.story!.node).toBe("victory_praise");
+
+      // praise -> tools_intro
+      applyAction(
+        player,
+        "victory_praise",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      expect(player.story!.node).toBe("victory_tools_intro");
+      expect(currentView(player, ctx()).choices.map((c) => c.label)).toEqual([
+        "Listen",
+        "Skip",
+      ]);
+
+      // Listen (index 0) walks the whole tool chain to victory_roster.
+      applyAction(
+        player,
+        "victory_tools_intro",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      for (const node of [
+        "tools_daily",
+        "tools_collection",
+        "tools_deck",
+        "tools_shop",
+        "tools_variants",
+      ]) {
+        expect(player.story!.node).toBe(node);
+        applyAction(player, node, { type: "choice", index: 0 }, ctx());
+      }
+      expect(player.story!.node).toBe("victory_roster");
+      // Parked, waiting on /daily.
+      expect(player.story!.awaitingDaily).toBe(true);
+      expect(currentView(player, ctx()).choices.map((c) => c.label)).toEqual([
+        "I've already claimed today",
+      ]);
+
+      // advanceParkedDaily fires exactly once.
+      const coinsBefore = player.coins;
+      expect(advanceParkedDaily(player, ctx())).toBe(true);
+      expect(player.story!.node).toBe("victory_daily_done");
+      expect(player.story!.awaitingDaily).toBe(false);
+      expect(player.coins).toBe(coinsBefore); // the engine advance does not grant gold
+      expect(advanceParkedDaily(player, ctx())).toBe(false); // not parked anymore
+
+      // daily_done -> chapter_end, Rest/Fight again unchanged.
+      applyAction(
+        player,
+        "victory_daily_done",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      expect(player.story!.node).toBe("chapter_end");
       expect(currentView(player, ctx()).choices.map((c) => c.label)).toEqual([
         "Rest",
         "Fight again",
       ]);
-      // Fight again clears the won snapshot and returns to the battle (farming allowed).
+      // Fight again clears the (null) snapshot and returns to the battle (farming allowed).
       applyAction(player, "chapter_end", { type: "choice", index: 1 }, ctx());
       expect(player.story!.node).toBe("cave_battle");
       expect(player.story!.battle).toBeNull();
+    });
+
+    it("Skip at the tools intro jumps straight to victory_roster", () => {
+      const { player } = toCave();
+      player.story!.battle = {
+        kind: "cave",
+        state: {} as never,
+        selectedUid: null,
+        log: [],
+        difficulty: "normal",
+        opponentPortrait: "boss-spd-battle",
+      };
+      resolveStoryBattle(player, "won", ctx());
+      applyAction(
+        player,
+        "victory_praise",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      // Skip (index 1)
+      applyAction(
+        player,
+        "victory_tools_intro",
+        { type: "choice", index: 1 },
+        ctx(),
+      );
+      expect(player.story!.node).toBe("victory_roster");
+      expect(player.story!.awaitingDaily).toBe(true);
+    });
+
+    it("the already-claimed fallback button advances to victory_daily_done with no gold change", () => {
+      const { player } = toCave();
+      player.story!.battle = {
+        kind: "cave",
+        state: {} as never,
+        selectedUid: null,
+        log: [],
+        difficulty: "normal",
+        opponentPortrait: "boss-spd-battle",
+      };
+      resolveStoryBattle(player, "won", ctx());
+      applyAction(
+        player,
+        "victory_praise",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      applyAction(
+        player,
+        "victory_tools_intro",
+        { type: "choice", index: 1 },
+        ctx(),
+      ); // Skip -> roster
+      expect(player.story!.node).toBe("victory_roster");
+      const coinsBefore = player.coins;
+      // Press the single fallback button (choice index 0).
+      applyAction(
+        player,
+        "victory_roster",
+        { type: "choice", index: 0 },
+        ctx(),
+      );
+      expect(player.story!.node).toBe("victory_daily_done");
+      expect(player.story!.awaitingDaily).toBe(false);
+      expect(player.coins).toBe(coinsBefore); // no second claim, no farming
     });
 
     it("resolveStoryBattle moves to cave_loss on a loss (keeps battle), and retry clears it and returns to the battle", () => {

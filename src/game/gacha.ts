@@ -3,7 +3,8 @@ import { shuffle, type Rng } from "../util/rng";
 import { grantCard, receivable, type GrantResult, type Player } from "./player";
 
 export const PACK_SIZE = 3;
-export const DAILY_COINS = 30;
+/** Gold granted by /daily (alongside PACK_SIZE cards). */
+export const DAILY_COINS = 20;
 
 /** `size` different cards chosen uniformly. */
 export function drawPack(
