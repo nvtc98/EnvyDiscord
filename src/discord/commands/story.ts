@@ -26,7 +26,7 @@ import type {
 } from "../../story/types";
 import { slash, type AppContext, type Command } from "../command";
 import { tryRender } from "../images";
-import { isBenignEditError } from "../interaction-errors";
+import { isBenignAckError, isBenignEditError } from "../interaction-errors";
 import type { Logger } from "../../log/logger";
 import { isOwner } from "../owner";
 import {
@@ -179,6 +179,66 @@ const liveGateMessages = new Map<string, string>();
 /** Test seam: clear the process-local live-message tracker so one test's ids don't leak into another. */
 export function resetLiveGateMessages(): void {
   liveGateMessages.clear();
+}
+
+/**
+ * The in-flight "Continue"-gate resolver for a user, keyed by userId. The in-battle tutorial callback
+ * (story-battle.ts) sends a spoken beat with a single "Continue" button, then blocks on a Promise
+ * stored here; pressing Continue (routed through `storyCommand.component` as `story:tut:continue`)
+ * resolves it so the callback can re-anchor the board. Process-local; one in-flight wait per user is
+ * enough because beats are strictly sequential (the battle awaits the whole callback before the next
+ * beat). NO timeout — the wait holds until the press arrives.
+ */
+const tutorialContinueResolvers = new Map<string, () => void>();
+
+/**
+ * Register a Continue wait for a user and return a Promise that resolves when Continue is pressed.
+ * Call this BEFORE awaiting the returned promise so a very fast press cannot arrive before the
+ * resolver exists. If a resolver already exists for the user (a leaked/overlapping wait), resolve the
+ * OLD one first so its parked callback unblocks and nothing leaks, then install the new resolver.
+ */
+export function registerTutorialContinue(userId: string): Promise<void> {
+  const existing = tutorialContinueResolvers.get(userId);
+  if (existing) {
+    tutorialContinueResolvers.delete(userId);
+    existing(); // unblock the stale parked callback so it cannot leak
+  }
+  return new Promise<void>((resolve) => {
+    tutorialContinueResolvers.set(userId, resolve);
+  });
+}
+
+/**
+ * Resolve a user's in-flight Continue wait, if any. Returns true when a resolver was found and
+ * called (deleting the entry); false when there was none — a stale/duplicate press, or a leftover
+ * Continue button pressed after a resume with no beat parked — in which case the caller just acks and
+ * no-ops.
+ */
+export function resolveTutorialContinue(userId: string): boolean {
+  const resolve = tutorialContinueResolvers.get(userId);
+  if (!resolve) return false;
+  tutorialContinueResolvers.delete(userId);
+  resolve();
+  return true;
+}
+
+/** Test seam: clear the process-local Continue-resolver registry so one test's waits don't leak. */
+export function resetTutorialContinue(): void {
+  tutorialContinueResolvers.clear();
+}
+
+/**
+ * The single-button row carried on the LAST bubble of a spoken tutorial beat: a plain "Continue" the
+ * player presses to pull the board back. Label is EXACTLY "Continue" (player-facing UI stays plain,
+ * no archaic tint). customId `story:tut:continue` routes through {@link storyCommand.component}.
+ */
+export function CONTINUE_ROW(): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("story:tut:continue")
+      .setLabel("Continue")
+      .setStyle(ButtonStyle.Primary),
+  );
 }
 
 /**
@@ -490,6 +550,30 @@ export const storyCommand: Command = {
     // The gate buttons (story:gate:*) are handled before any scene logic.
     if (nodeId === "gate") {
       await handleGate(interaction, ctx, kind);
+      return;
+    }
+
+    // The in-battle tutorial "Continue" gate (story:tut:continue). Handled BEFORE the player.story
+    // null-check and the stale guard: a Continue press is not tied to a story node, so the
+    // node/liveMessageId staleness logic must not run on it. Resolve the parked beat (if any), then
+    // ack by stripping the button off this message. A press with no parked resolver (stale/duplicate,
+    // or a leftover Continue pressed after a resume) is a benign no-op: still ack + strip, do nothing.
+    if (nodeId === "tut" && kind === "continue") {
+      resolveTutorialContinue(user.id);
+      try {
+        await interaction.update({ components: [] });
+      } catch (error) {
+        if (isBenignAckError(error)) {
+          ctx.log.message("error", {
+            userId: user.id,
+            error: `benign ack error swallowed on Continue press: ${
+              (error as { code?: unknown }).code ?? "unknown"
+            }`,
+          });
+          return;
+        }
+        throw error;
+      }
       return;
     }
 

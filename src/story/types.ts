@@ -57,6 +57,8 @@ export interface StoryState {
     push?: boolean;
     endTurn?: boolean;
     tideSeen?: boolean;
+    /** The turn-1 Active/Passive + push-destroy transform lesson, taught through SPD's Cấp 1 card. */
+    ability?: boolean;
   };
 }
 

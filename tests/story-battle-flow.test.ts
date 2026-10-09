@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { battleCommand } from "../src/discord/commands/battle";
+import { setBattleStepDelay } from "../src/discord/battle-session";
 import {
   resetLiveGateMessages,
+  resetTutorialContinue,
   setStorySleep,
   storyCommand,
 } from "../src/discord/commands/story";
@@ -124,8 +126,59 @@ async function walkToBattle(ctx: Ctx, userId = "u"): Promise<Dm> {
   await click(ctx, dm, "Enter the cave", userId); // curse_underground -> cave_mouth
   await click(ctx, dm, "Continue", userId); // cave_mouth -> reveal_face
   await click(ctx, dm, "I am ready", userId); // reveal_face -> cave_terms
-  await click(ctx, dm, "Accept", userId); // cave_terms -> cave_battle (launches)
+  // Accept launches the battle. On the FIRST (tutorial) duel the launch fires spoken beats
+  // (battle-start, then the opening after-enemy-turn), each of which now BLOCKS on a "Continue" gate.
+  // So the Accept handler does not resolve until those Continue presses arrive — drive the press loop
+  // concurrently until the launch settles.
+  const accepted = clickNoAwait(ctx, dm, "Accept", userId);
+  await drainContinues(ctx, dm, accepted, userId);
   return dm;
+}
+
+/** Like {@link click} but returns the handler promise without awaiting (so a Continue gate can block it). */
+function clickNoAwait(
+  ctx: Ctx,
+  dm: Dm,
+  label: string,
+  userId = "u",
+): Promise<void> {
+  const payload = live(dm);
+  const button = buttons(payload).find((b: any) => b.label === label);
+  if (!button)
+    throw new Error(
+      `No button "${label}" among: ${labels(payload).join(", ")}`,
+    );
+  const liveId = ctx.repo.get(userId).story!.liveMessageId!;
+  const press = dmButtonInteraction(userId, button.custom_id, liveId, dm);
+  return storyCommand.component!(press as never, ctx) as Promise<void>;
+}
+
+/**
+ * Press "Continue" whenever a tutorial beat is parked on the gate, until the given promise settles.
+ * Each loop: let microtasks drain, press Continue if a resolver is parked, repeat. A hard iteration
+ * cap guards against an infinite loop if the promise never resolves.
+ */
+async function drainContinues(
+  ctx: Ctx,
+  dm: Dm,
+  until: Promise<void>,
+  userId = "u",
+): Promise<void> {
+  let settled = false;
+  const done = until.then(() => {
+    settled = true;
+  });
+  const macrotask = () => new Promise<void>((r) => setTimeout(r, 0));
+  for (let i = 0; i < 200 && !settled; i++) {
+    // Yield a macrotask so the parked onBeat (and the animation's delay(0)) can run and register a
+    // resolver before we try to resolve it.
+    await macrotask();
+    if (settled) break;
+    await pressContinue(ctx, userId);
+    // Let the unblocked callback run its reanchor / fire the next beat before the next press.
+    await macrotask();
+  }
+  await done;
 }
 
 /** Presses a battle control; routes through the shared battle component handler. */
@@ -157,6 +210,9 @@ async function battlePress(
 beforeEach(() => {
   // The live-message tracker is process-local; clear it so ids from one test can't leak into another.
   resetLiveGateMessages();
+  // The Continue-gate resolver registry is likewise process-local; clear it between tests.
+  resetTutorialContinue();
+  setBattleStepDelay(0); // no real animation timers; keep the Continue-drain loop fast + deterministic
   setStorySleep(async () => {});
   setFetchAvatar(async () => null); // no network; player avatar -> placeholder
 });
@@ -294,6 +350,29 @@ function fakeBeat(session: any, phase: string) {
   };
 }
 
+/** Let pending microtasks/macrotasks drain so an async onBeat's bubble sends land before we assert. */
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/** True when a payload carries the single `story:tut:continue` Continue button. */
+const hasContinue = (payload: any): boolean =>
+  buttons(payload).some(
+    (b: any) => (b.custom_id ?? "") === "story:tut:continue",
+  );
+
+/**
+ * Simulate the player pressing the "Continue" gate button: route a `story:tut:continue` button press
+ * through the story component handler, as production does. Returns the press (so a test can inspect
+ * its `update` spy — the ack that strips the button).
+ */
+async function pressContinue(ctx: Ctx, userId = "u") {
+  const press = {
+    ...buttonInteraction(userId, "story:tut:continue"),
+    message: { id: "continue-msg" },
+  };
+  await storyCommand.component!(press as never, ctx);
+  return press;
+}
+
 describe("in-battle tutorial wiring (first cave duel only)", () => {
   it("attaches onBeat/dm/boardMessageId on a FRESH first duel and sends the intro line before the board", async () => {
     const ctx = makeCtx(3);
@@ -325,7 +404,7 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     expect(ctx.repo.get("tut").story!.tutorial!.goal).toBe(true);
   });
 
-  it("onBeat sends + reanchors on a taught beat, and is silent (no send/no reanchor) on a repeat", async () => {
+  it("onBeat sends + reanchors on a taught beat (after Continue is pressed), and is silent on a repeat", async () => {
     const ctx = makeCtx(3);
     const dm = await walkToBattle(ctx, "beat");
     const { sessions } = await import("../src/discord/battle-session");
@@ -334,26 +413,63 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     // so the first drive teaches it; the second is silent (teach-once).
     const sentBefore = dm.sent.length;
     const b1 = fakeBeat(session, "after-player-play");
-    await session.onBeat!(b1.ev);
-    // A taught beat sent at least one bubble and re-anchored.
+    // The callback now BLOCKS on the Continue gate: start it, don't await yet.
+    const parked = session.onBeat!(b1.ev);
+    await flush(); // let the bubble sends land
+    // A taught beat sent at least one bubble, but has NOT re-anchored (parked on the Continue wait).
     expect(dm.sent.length).toBeGreaterThan(sentBefore);
+    expect(b1.reanchor).not.toHaveBeenCalled();
+    // Press Continue, then the parked callback resolves and re-anchors exactly once.
+    await pressContinue(ctx, "beat");
+    await parked;
     expect(b1.reanchor).toHaveBeenCalledTimes(1);
 
     const sentAfterFirst = dm.sent.length;
     const b2 = fakeBeat(session, "after-player-play");
     await session.onBeat!(b2.ev);
-    // The repeat is silent: nothing sent, no re-anchor.
+    // The repeat is silent: nothing sent, no re-anchor, no Continue wait to resolve.
     expect(dm.sent.length).toBe(sentAfterFirst);
     expect(b2.reanchor).not.toHaveBeenCalled();
   });
 
-  it("onBeat stays silent (no send, no reanchor) on an optional/no-lesson beat", async () => {
+  it("a spoken beat attaches a Continue button to the last bubble and blocks until pressed", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "gate");
+    const { sessions } = await import("../src/discord/battle-session");
+    const session = sessions.get("gate")!;
+    const sentBefore = dm.sent.length;
+    const b = fakeBeat(session, "after-player-play");
+    const parked = session.onBeat!(b.ev);
+    // Let the bubbles flush (sendTyping/pause/send are async) before inspecting.
+    await flush();
+    // The LAST bubble carries the Continue button, and the board has NOT re-anchored yet.
+    const lastBubble = dm.sent.at(-1);
+    expect(hasContinue(lastBubble)).toBe(true);
+    expect(dm.sent.length).toBeGreaterThan(sentBefore);
+    expect(b.reanchor).not.toHaveBeenCalled();
+    // Press Continue: the handler strips the button (interaction.update) and resolves the wait.
+    const press = await pressContinue(ctx, "gate");
+    expect(press.update).toHaveBeenCalledWith({ components: [] });
+    await parked;
+    expect(b.reanchor).toHaveBeenCalledTimes(1);
+  });
+
+  it("a stale/duplicate Continue press with no pending resolver just acks and no-ops", async () => {
+    const ctx = makeCtx(3);
+    await walkToBattle(ctx, "stale");
+    // Nothing is parked; a Continue press just acks (strips) and does not throw.
+    const press = await pressContinue(ctx, "stale");
+    expect(press.update).toHaveBeenCalledWith({ components: [] });
+  });
+
+  it("a silent beat attaches no Continue button, does not wait, and does not re-anchor", async () => {
     const ctx = makeCtx(3);
     const dm = await walkToBattle(ctx, "quiet");
     const { sessions } = await import("../src/discord/battle-session");
     const session = sessions.get("quiet")!;
     const sentBefore = dm.sent.length;
     const b = fakeBeat(session, "tide-shifted");
+    // A silent beat resolves on its own (no Continue press needed) — await directly.
     await session.onBeat!(b.ev);
     expect(dm.sent.length).toBe(sentBefore);
     expect(b.reanchor).not.toHaveBeenCalled();

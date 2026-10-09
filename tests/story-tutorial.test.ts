@@ -81,7 +81,27 @@ describe("tutorialLineFor — teach-once content selection", () => {
     const b = beat("battle-start");
     (b.session as { opponentName?: string }).opponentName = undefined;
     const lines = tutorialLineFor(b, player);
-    expect(lines!.some((l) => l.includes("Bò SPD"))).toBe(true);
+    expect(lines!.some((l) => l.includes("SPD"))).toBe(true);
+  });
+
+  it("teaches the Active/Passive + transform lesson once at after-enemy-turn, then stays silent", () => {
+    const player = tutorialPlayer();
+    const first = tutorialLineFor(beat("after-enemy-turn"), player)!;
+    expect(first).not.toBeNull();
+    const joined = first.join(" ");
+    // The Tide-shift gloss AND the card lesson both fire on first after-enemy-turn.
+    expect(joined).toMatch(/The Tide/);
+    expect(joined).toMatch(/Active/);
+    expect(joined).toMatch(/Passive/);
+    // Names SPD's turn-1 card and warns about the transform-on-destroy caution.
+    expect(joined).toMatch(/Bò Siêu Phản Động Cấp 1/);
+    expect(joined).toMatch(/Bò Siêu Phản Động Cấp 2/);
+    expect(joined).toMatch(/destroy/i);
+    // Both teach-once flags are now set.
+    expect(player.story!.tutorial!.tideSeen).toBe(true);
+    expect(player.story!.tutorial!.ability).toBe(true);
+    // A second fire with both taught is silent.
+    expect(tutorialLineFor(beat("after-enemy-turn"), player)).toBeNull();
   });
 
   it("teaches a lesson only once even across many repeated beats", () => {

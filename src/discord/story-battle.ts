@@ -23,8 +23,10 @@ import {
 } from "./battle-session";
 import type { AppContext } from "./command";
 import {
+  CONTINUE_ROW,
   deliverScene,
   recordLive,
+  registerTutorialContinue,
   storyContext,
   storyTypingPause,
   type DmChannel,
@@ -122,14 +124,28 @@ function makeTutorialOnBeat(
 ): OnBeat {
   return async (ev) => {
     const lines = tutorialLineFor(ev, player); // may flip flags; null = silent this beat
-    if (!lines || lines.length === 0) return; // fast path: no send, no reanchor
-    for (const content of lines) {
+    if (!lines || lines.length === 0) return; // fast path: no send, no button, no wait, no reanchor
+    // Send each bubble; the LAST bubble carries a single "Continue" button so the player reads the
+    // whole beat before the board returns. Earlier bubbles are plain.
+    for (let i = 0; i < lines.length; i++) {
+      const content = lines[i];
+      const isLast = i === lines.length - 1;
       await dm.sendTyping();
       await storyTypingPause(content);
-      await dm.send({ content, allowedMentions: { parse: [] } });
+      await dm.send({
+        content,
+        allowedMentions: { parse: [] },
+        ...(isLast ? { components: [CONTINUE_ROW()] } : {}),
+      });
     }
     await ctx.repo.save(player); // persist the teach-once flag(s) just set
-    await ev.reanchor(); // pull the board back below the lines
+    // Register the Continue resolver BEFORE awaiting it, so a very fast press cannot arrive before
+    // the resolver exists. Hold here with NO timeout until the player presses Continue (which strips
+    // the button and resolves this promise via the story component handler). Only register when we
+    // actually spoke, so a silent beat never leaves a dangling resolver.
+    const wait = registerTutorialContinue(ev.session.userId);
+    await wait;
+    await ev.reanchor(); // only AFTER Continue: pull the board back below the lines
   };
 }
 

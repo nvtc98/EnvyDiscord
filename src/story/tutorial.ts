@@ -12,7 +12,7 @@ import type { Player } from "../game/player";
 // "The Tide" is the chosen in-story name for the balance meter (user's call); never "balance"/"EP".
 
 /** The fallback opponent name when the session has none; the npc file is the real source of truth. */
-const OPPONENT_FALLBACK = "Bò SPD";
+const OPPONENT_FALLBACK = "SPD";
 
 /**
  * The reassurance line sent as a normal story DM just before the first cave board appears, so the
@@ -28,7 +28,10 @@ export const TUTORIAL_INTRO_LINE =
  * on `player.story.tutorial` as a side effect, so the caller never has to know which flag a beat sets.
  * Each element is one DM bubble; the caller sends them in order, then re-anchors the board once.
  */
-export function tutorialLineFor(ev: BattleBeat, player: Player): string[] | null {
+export function tutorialLineFor(
+  ev: BattleBeat,
+  player: Player,
+): string[] | null {
   const t = player.story?.tutorial;
   if (!t) return null;
   const opponent = ev.session.opponentName ?? OPPONENT_FALLBACK;
@@ -43,12 +46,26 @@ export function tutorialLineFor(ev: BattleBeat, player: Player): string[] | null
         `${opponent} moves first, so he holds three cards; thou movest after, and holdest four. Watch, then answer.`,
       ];
 
-    case "after-enemy-turn":
-      if (t.tideSeen) return null;
-      t.tideSeen = true;
-      return [
-        "There — seest thou The Tide shift? It stirs only when a turn ends. Now it has spoken.",
-      ];
+    case "after-enemy-turn": {
+      // Two taught-once lessons share this beat: the Tide-shift gloss, then the Active/Passive +
+      // push-destroy transform warning drawn from SPD's turn-1 card. Each is said once, in reading
+      // order (Tide first, then the card lesson); when both are already taught, stay silent.
+      const bubbles: string[] = [];
+      if (!t.tideSeen) {
+        t.tideSeen = true;
+        bubbles.push(
+          "There — seest thou The Tide shift? It stirs only when a turn ends. Now it has spoken.",
+        );
+      }
+      if (!t.ability) {
+        t.ability = true;
+        bubbles.push(
+          "Mark his first card — **Bò Siêu Phản Động Cấp 1**. A card may bear an art: an *Active*, which wakes but once when it is played, or a *Passive*, ever at work while it holds the field.",
+          "This one bears a Passive, and a cruel one. Shove any card past the far edge and it is destroyed — but let a single card fall in this duel, his or thine, and the beast stirs: it transforms into a stronger form, **Bò Siêu Phản Động Cấp 2**. So striking cards from the field is mighty — yet beware, for the first to fall rouses him. Tread with care.",
+        );
+      }
+      return bubbles.length > 0 ? bubbles : null;
+    }
 
     case "after-player-play":
       if (t.play) return null;
