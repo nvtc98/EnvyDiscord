@@ -125,6 +125,11 @@ function makeTutorialOnBeat(
   return async (ev) => {
     const lines = tutorialLineFor(ev, player); // may flip flags; null = silent this beat
     if (!lines || lines.length === 0) return; // fast path: no send, no button, no wait, no reanchor
+    // Lock the board FIRST (before the lesson is even posted) so there is no window where the player
+    // can act on the live board while the tutorial is talking. Buttons are stripped; text/image stay.
+    // After Continue, the reanchor posts a fresh board WITH controls, so play resumes normally.
+    if (ev.session.boardMessageId)
+      await dm.clearComponents(ev.session.boardMessageId);
     // Send each bubble; the LAST bubble carries a single "Continue" button so the player reads the
     // whole beat before the board returns. Earlier bubbles are plain.
     for (let i = 0; i < lines.length; i++) {

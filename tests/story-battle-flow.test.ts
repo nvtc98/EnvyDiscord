@@ -454,6 +454,25 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     expect(b.reanchor).toHaveBeenCalledTimes(1);
   });
 
+  it("locks the board while a lesson is up: strips the live board's buttons until Continue", async () => {
+    const ctx = makeCtx(3);
+    const dm = await walkToBattle(ctx, "lock");
+    const { sessions } = await import("../src/discord/battle-session");
+    const session = sessions.get("lock")!;
+    const boardId = session.boardMessageId!;
+    const b = fakeBeat(session, "after-player-play");
+    const parked = session.onBeat!(b.ev);
+    await flush();
+    // While the lesson is up (before Continue), the live board's buttons were stripped: the tutorial
+    // called clearComponents on the tracked board id so the player can't act on it mid-lesson.
+    expect(dm.clearComponents).toHaveBeenCalledWith(boardId);
+    expect(b.reanchor).not.toHaveBeenCalled();
+    // After Continue, the parked callback re-anchors a fresh board (with controls) exactly once.
+    await pressContinue(ctx, "lock");
+    await parked;
+    expect(b.reanchor).toHaveBeenCalledTimes(1);
+  });
+
   it("a stale/duplicate Continue press with no pending resolver just acks and no-ops", async () => {
     const ctx = makeCtx(3);
     await walkToBattle(ctx, "stale");
