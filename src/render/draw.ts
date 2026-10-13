@@ -687,12 +687,14 @@ export function drawTideMeter(
   w: number,
   h: number,
   balance: number,
+  total = 100,
+  evenPoint = 50,
 ): void {
-  const clamped = Math.max(0, Math.min(100, balance));
-  // Boundary between the two fills. balance 100 -> boundary at the top (all blue/player);
+  const clamped = Math.max(0, Math.min(total, balance));
+  // Boundary between the two fills. balance = total -> boundary at the top (all blue/player);
   // balance 0 -> boundary at the bottom (all red/enemy). So the player's blue share grows from the
   // bottom as balance rises.
-  const boundaryY = y + (1 - clamped / 100) * h;
+  const boundaryY = y + (1 - clamped / total) * h;
 
   // Clip everything to the rounded bar so both fills share the rounded ends.
   ctx.save();
@@ -723,8 +725,8 @@ export function drawTideMeter(
   ctx.strokeStyle = "rgba(201,151,58,0.3)";
   ctx.stroke();
 
-  // Center tick (even point): a short faint-gold line slightly wider than the bar.
-  const midY = y + h / 2;
+  // Even-point tick: a short faint-gold line slightly wider than the bar, placed at the start HP.
+  const midY = y + (1 - evenPoint / total) * h;
   ctx.save();
   ctx.globalAlpha = 0.4;
   ctx.strokeStyle = PALETTE.gold;
@@ -739,7 +741,11 @@ export function drawTideMeter(
   // leads. Clamped so the glow stays on the bar at the extremes.
   const seamY = Math.max(y + 1, Math.min(y + h - 1, boundaryY));
   const lean =
-    clamped > 50 ? PALETTE.mine : clamped < 50 ? PALETTE.theirs : PALETTE.gold;
+    clamped > evenPoint
+      ? PALETTE.mine
+      : clamped < evenPoint
+        ? PALETTE.theirs
+        : PALETTE.gold;
   ctx.save();
   ctx.strokeStyle = lean;
   ctx.lineWidth = 2.5;

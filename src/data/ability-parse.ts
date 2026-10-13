@@ -12,7 +12,9 @@ interface TokenSpec {
   /** Which field a single numeric amount is written to. Mutually exclusive with `args`. */
   amountField?: "amount" | "count" | "k" | "drop";
   /** Multi-arg form, e.g. ["count:int", "into:id"]. Mutually exclusive with `amountField`. */
-  args?: ReadonlyArray<"count:int" | "into:id" | "amount:int" | "byTurn:int">;
+  args?: ReadonlyArray<
+    "count:int" | "into:id" | "amount:int" | "byTurn:int" | "percent:int"
+  >;
 }
 
 const TOKENS: Record<string, TokenSpec> = {
@@ -60,6 +62,7 @@ const TOKENS: Record<string, TokenSpec> = {
   cloneLane: { timing: "active", kind: "cloneLane" },
   cloneMirror: { timing: "active", kind: "cloneMirror" },
   nexusSum: { timing: "active", kind: "nexusSum" },
+  gentlePush: { timing: "active", kind: "gentlePush", args: ["percent:int"] },
   glacialSpawn: {
     timing: "onDestroy",
     kind: "glacialSpawn",

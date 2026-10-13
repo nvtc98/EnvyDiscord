@@ -10,7 +10,14 @@ import type {
 } from "../src/engine/types";
 import { mulberry32 } from "../src/util/rng";
 import { pushBeatFired } from "../src/discord/battle-session";
-import { def, emptyGame, give, instance, setLane } from "./engine-helpers";
+import {
+  deckOf,
+  def,
+  emptyGame,
+  give,
+  instance,
+  setLane,
+} from "./engine-helpers";
 
 // Ability constructors for the six new cards (mirror their shorthand in cards.json).
 const phantom = (): Ability => ({
@@ -199,17 +206,17 @@ describe("Phantom Eyes / shuffleRedraw", () => {
     // Hand (besides Phantom): 3 cards. Deck: 4 cards.
     const handDefs = [def("h1", 1, 1), def("h2", 1, 1), def("h3", 1, 1)];
     for (const d of handDefs) give(state, "bottom", d);
-    state.players.bottom.deck = [
+    state.players.bottom.deck = deckOf([
       def("d1", 1, 1),
       def("d2", 1, 1),
       def("d3", 1, 1),
       def("d4", 1, 1),
-    ];
+    ]);
     const phantomInst = give(state, "bottom", def("PHA", 3, 6, phantom()));
 
     const poolIds = [
       ...handDefs.map((d) => d.id),
-      ...state.players.bottom.deck.map((d) => d.id),
+      ...state.players.bottom.deck.map((d) => d.def.id),
     ].sort();
 
     const { state: after } = playCard(state, phantomInst.uid, 1, mulberry32(7));
@@ -219,7 +226,7 @@ describe("Phantom Eyes / shuffleRedraw", () => {
     // Deck+hand multiset preserved (Phantom itself is on the board, excluded).
     const afterIds = [
       ...after.players.bottom.hand.map((c) => c.def.id),
-      ...after.players.bottom.deck.map((d) => d.id),
+      ...after.players.bottom.deck.map((d) => d.def.id),
     ].sort();
     expect(afterIds).toEqual(poolIds);
     // Phantom is on the board, not in hand/deck.
@@ -231,7 +238,7 @@ describe("Phantom Eyes / shuffleRedraw", () => {
     state.active = "bottom";
     state.players.bottom.energy = 3;
     setLane(state, 0, [null, null, instance(def("BOARD", 1, 9), "bottom", 3)]);
-    state.players.bottom.deck = [def("d1", 1, 1), def("d2", 1, 1)];
+    state.players.bottom.deck = deckOf([def("d1", 1, 1), def("d2", 1, 1)]);
     const phantomInst = give(state, "bottom", def("PHA", 3, 6, phantom()));
 
     const { state: after } = playCard(state, phantomInst.uid, 1, mulberry32(5));
@@ -246,11 +253,11 @@ describe("Phantom Eyes / shuffleRedraw", () => {
       state.players.bottom.energy = 3;
       for (const d of [def("h1", 1, 1), def("h2", 1, 1)])
         give(state, "bottom", d);
-      state.players.bottom.deck = [
+      state.players.bottom.deck = deckOf([
         def("d1", 1, 1),
         def("d2", 1, 1),
         def("d3", 1, 1),
-      ];
+      ]);
       const p = give(state, "bottom", def("PHA", 3, 6, phantom()));
       return { state, uid: p.uid };
     };
@@ -261,8 +268,8 @@ describe("Phantom Eyes / shuffleRedraw", () => {
     expect(rb.players.bottom.hand.map((c) => c.def.id)).toEqual(
       ra.players.bottom.hand.map((c) => c.def.id),
     );
-    expect(rb.players.bottom.deck.map((d) => d.id)).toEqual(
-      ra.players.bottom.deck.map((d) => d.id),
+    expect(rb.players.bottom.deck.map((d) => d.def.id)).toEqual(
+      ra.players.bottom.deck.map((d) => d.def.id),
     );
   });
 

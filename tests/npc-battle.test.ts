@@ -94,7 +94,7 @@ describe("Bò SPD fixed deck + guaranteed opening", () => {
     // The top deck+hand multiset is exactly 11 bo-tuoi + 1 cap-1.
     const topAll = [
       ...topHand,
-      ...session.state.players.top.deck.map((d) => d.id),
+      ...session.state.players.top.deck.map((d) => d.def.id),
     ];
     expect(topAll.filter((id) => id === "bo-tuoi")).toHaveLength(11);
     expect(topAll.filter((id) => id === "bo-sieu-phan-ong-cap-1")).toHaveLength(
@@ -118,9 +118,9 @@ describe("Bò SPD fixed deck + guaranteed opening", () => {
     const enemyDeck = enemyDeckLog(ctx);
     expect(enemyDeck).toHaveLength(12);
     expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
-    expect(enemyDeck.filter((id) => id === "bo-sieu-phan-ong-cap-1")).toHaveLength(
-      1,
-    );
+    expect(
+      enemyDeck.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
+    ).toHaveLength(1);
     // No card outside the two Bò SPD ids ever appears in the enemy deck.
     const allowed = new Set(["bo-tuoi", "bo-sieu-phan-ong-cap-1"]);
     expect(enemyDeck.every((id) => allowed.has(id))).toBe(true);

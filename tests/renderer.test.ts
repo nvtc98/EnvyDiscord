@@ -279,12 +279,12 @@ describe("battle scene", () => {
     empty.players.bottom.hand = [];
     const full = structuredClone(fresh);
     while (full.players.bottom.deck.length > 0) {
-      const def = full.players.bottom.deck.shift()!;
+      const entry = full.players.bottom.deck.shift()!;
       full.players.bottom.hand.push({
         uid: full.nextUid++,
-        def,
+        def: entry.def,
         owner: "bottom",
-        bonus: 0,
+        bonus: entry.bonus,
       });
     }
     expect(full.players.bottom.hand).toHaveLength(12);

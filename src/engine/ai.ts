@@ -23,7 +23,10 @@ export function evaluate(state: GameState, me: Seat): number {
   // Board power advantage is what moves the tide every turn, so weight it heavily.
   // Then nudge toward the tide already favouring `me`: higher balance helps bottom, lower helps top.
   const powerEdge = (mine - theirs) * 3;
-  const tideEdge = me === "bottom" ? state.balance - 50 : 50 - state.balance;
+  const tideEdge =
+    me === "bottom"
+      ? state.balance - state.bottomStartHP
+      : state.bottomStartHP - state.balance;
   return powerEdge + tideEdge;
 }
 

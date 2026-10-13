@@ -17,7 +17,7 @@ const handIds = (state: GameState, seat: Seat): string[] =>
 /** Count of a given card id across hand + deck for a seat (the 12-card multiset). */
 const multiset = (state: GameState, seat: Seat, id: string): number =>
   handIds(state, seat).filter((x) => x === id).length +
-  state.players[seat].deck.filter((d) => d.id === id).length;
+  state.players[seat].deck.filter((d) => d.def.id === id).length;
 
 describe("seedGuaranteedOpening holds the guaranteed card deterministically", () => {
   it.each<Seat>(["top", "bottom"])(
@@ -71,9 +71,9 @@ describe("seedGuaranteedOpening holds the guaranteed card deterministically", ()
       "bottom",
       mulberry32(7),
     );
-    expect(() =>
-      seedGuaranteedOpening(state, "top", ["venom-eyes"]),
-    ).toThrow(/"venom-eyes" not found in top deck/);
+    expect(() => seedGuaranteedOpening(state, "top", ["venom-eyes"])).toThrow(
+      /"venom-eyes" not found in top deck/,
+    );
   });
 
   it("throws when guaranteed count exceeds the opening hand size", () => {

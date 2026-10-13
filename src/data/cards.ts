@@ -22,6 +22,8 @@ interface Entry {
   faction?: Faction;
   /** Balance-meter coefficient carrier for cards whose ability slot is otherwise used (§6). */
   coefficient?: number;
+  /** Classifies the rendered rules text: "active"/"passive". Omitted for vanilla cards. */
+  kind?: "active" | "passive";
   /** Designer-only Vietnamese note. Dropped on load; never reaches CardDef. */
   note?: string;
 }
@@ -43,7 +45,17 @@ const entries = JSON.parse(
 
 const seen = new Set<string>();
 export const CARDS: CardDef[] = entries.map(
-  ({ name, rarity, cost, power, ability, text, faction, coefficient }) => {
+  ({
+    name,
+    rarity,
+    cost,
+    power,
+    ability,
+    text,
+    faction,
+    coefficient,
+    kind,
+  }) => {
     const id = slugify(name);
     if (seen.has(id))
       throw new Error(
@@ -65,6 +77,7 @@ export const CARDS: CardDef[] = entries.map(
     if (ability !== undefined) card.ability = parseAbility(ability, name);
     if (text !== undefined) card.text = text;
     if (coefficient !== undefined) card.coefficient = coefficient;
+    if (kind !== undefined) card.kind = kind;
     return card;
   },
 );

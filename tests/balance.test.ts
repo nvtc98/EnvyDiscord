@@ -269,6 +269,123 @@ describe("every turn resolves", () => {
   });
 });
 
+describe("Gentle Eyes end-of-turn push", () => {
+  const gentle = (): ReturnType<typeof def> => ({
+    id: "GEN",
+    name: "GEN",
+    cost: 6,
+    power: 0,
+    kind: "active",
+    ability: { timing: "active", effect: { kind: "gentlePush", percent: 5 } },
+  });
+  const passive = (id: string): ReturnType<typeof def> => ({
+    id,
+    name: id,
+    cost: 1,
+    power: 0,
+    kind: "passive",
+  });
+
+  const tides = (events: ReturnType<typeof endTurn>["events"]) =>
+    events.filter((e) => e.type === "tide_shifted");
+
+  it("pushes 5% of enemy HP toward the enemy per friendly passive card (rounded)", () => {
+    // bottom board: Gentle + 2 passive cards, all 0 power so the main tide shift is 0 (balance 50).
+    const state = emptyGame("bottom");
+    setLane(state, 0, [
+      instance(passive("pa1"), "bottom"),
+      instance(gentle(), "bottom"),
+      instance(passive("pa2"), "bottom"),
+    ]);
+    const { state: after, events } = endTurn(state, mulberry32(0));
+    // Enemy HP snapshot = total - balance = 100 - 50 = 50. Per card: round(0.05 * 50) = round(2.5) = 3.
+    // Two friendly passives → push 6 toward the enemy (bottom owner → + balance).
+    expect(after.balance).toBe(56);
+    const t = tides(events);
+    // Main shift (delta 0) then Gentle's push (+6).
+    expect(t.at(-1)).toMatchObject({ delta: 6, rawDelta: 6, balance: 56 });
+  });
+
+  it("does nothing with zero friendly passive cards", () => {
+    const state = emptyGame("bottom");
+    setLane(state, 0, [null, instance(gentle(), "bottom"), null]);
+    const { state: after, events } = endTurn(state, mulberry32(0));
+    expect(after.balance).toBe(50);
+    // Only the main tide shift fired (delta 0); no Gentle event.
+    expect(tides(events)).toHaveLength(1);
+  });
+
+  it("pushes toward the bottom when a top-seat Gentle resolves on top's turn", () => {
+    const state = emptyGame("top");
+    state.active = "top";
+    setLane(state, 0, [
+      instance(passive("pa1"), "top"),
+      instance(gentle(), "top"),
+      null,
+    ]);
+    const { state: after } = endTurn(state, mulberry32(0));
+    // Enemy (bottom) HP snapshot = balance = 50. One passive → push round(2.5)=3 toward bottom.
+    // Top owner pushes the meter DOWN: 50 - 3 = 47.
+    expect(after.balance).toBe(47);
+  });
+
+  it("wins for the owner when the push drives the meter to the top edge", () => {
+    // A push large enough to reach `total` must knock out and hand the owner the game.
+    const gentle50 = (): ReturnType<typeof def> => ({
+      id: "GEN",
+      name: "GEN",
+      cost: 6,
+      power: 0,
+      kind: "active",
+      ability: {
+        timing: "active",
+        effect: { kind: "gentlePush", percent: 50 },
+      },
+    });
+    const state = emptyGame("bottom");
+    state.balance = 90; // enemy HP = 10, per card round(0.5 * 10) = 5
+    setLane(state, 0, [
+      instance(passive("p1"), "bottom"),
+      instance(gentle50(), "bottom"),
+      instance(passive("p2"), "bottom"),
+    ]);
+    // Two friendly passives → push 2 * 5 = 10 → 90 + 10 = 100 (the top edge): bottom wins.
+    const { state: after, events } = endTurn(state, mulberry32(0));
+    expect(after.balance).toBe(100);
+    expect(after.winner).toBe("bottom");
+    expect(events.at(-1)).toMatchObject({
+      type: "game_over",
+      winner: "bottom",
+      reason: "balance",
+    });
+  });
+
+  it("clamps the pushed meter within [0, total] and never overshoots the edge", () => {
+    const state = emptyGame("bottom");
+    state.balance = 80; // enemy HP = 20, per card round(0.05 * 20) = round(1.0) = 1
+    setLane(state, 0, [
+      instance(gentle(), "bottom"),
+      instance(passive("p1"), "bottom"),
+      instance(passive("p2"), "bottom"),
+    ]);
+    setLane(state, 1, [
+      instance(passive("p3"), "bottom"),
+      instance(passive("p4"), "bottom"),
+      instance(passive("p5"), "bottom"),
+    ]);
+    setLane(state, 2, [
+      instance(passive("p6"), "bottom"),
+      instance(passive("p7"), "bottom"),
+      instance(passive("p8"), "bottom"),
+    ]);
+    // 8 friendly passives, enemy HP 20 → push 8 * 1 = 8 → 80 + 8 = 88, still within [0, 100].
+    const { state: after } = endTurn(state, mulberry32(0));
+    expect(after.balance).toBe(88);
+    expect(after.balance).toBeLessThanOrEqual(100);
+    expect(after.winner).toBeNull();
+  });
+});
+
 describe("evaluate uses board power and tide, not HP", () => {
   it("scores a bigger board advantage and a favourable tide higher", () => {
     const state = emptyGame();

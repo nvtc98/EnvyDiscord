@@ -369,6 +369,8 @@ export async function createImageRenderer({
         METER_W,
         meterBottom - meterTop,
         state.balance,
+        state.bottomStartHP + state.topStartHP,
+        state.bottomStartHP,
       );
 
       // --- Right gutter: TURN counter (top) + energy pips (below). ---

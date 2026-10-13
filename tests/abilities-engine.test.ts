@@ -14,7 +14,14 @@ import type {
   LaneIndex,
 } from "../src/engine/types";
 import { mulberry32 } from "../src/util/rng";
-import { def, emptyGame, give, instance, setLane } from "./engine-helpers";
+import {
+  deckOf,
+  def,
+  emptyGame,
+  give,
+  instance,
+  setLane,
+} from "./engine-helpers";
 
 // Ability constructors for the seven designed cards (mirrors their shorthand in cards.json).
 const stella = (): Ability => ({
@@ -305,43 +312,100 @@ describe("Venom Eyes drain", () => {
   });
 });
 
-describe("Ocean Eyes end-of-round return", () => {
+describe("Ocean Eyes end-of-turn deck buff + return", () => {
   const setupOcean = (first: "bottom" | "top" = "bottom") => {
     const state = emptyGame(first);
-    state.players.bottom.deck = [def("D0", 1, 1), def("D1", 1, 1)];
+    state.players.bottom.deck = deckOf([def("D0", 1, 1), def("D1", 1, 1)]);
     return state;
   };
 
-  it("buffs allies +1 (excluding itself), returns to the deck, and resets bonus", () => {
+  it("buffs every remaining deck card +1 and returns itself to the deck with its own accumulated bonus", () => {
+    const state = setupOcean();
+    // Resolve on top's turn (first = top). The Ocean pass runs for every on-board Ocean regardless of
+    // whose turn it is, so a bottom-owned Ocean still returns and buffs bottom's deck. After top's turn
+    // bottom's startTurn draws one card, so a buffed card may be in hand — check deck+hand together.
+    state.first = "top";
+    state.active = "top";
+    setLane(state, 0, [
+      null,
+      null,
+      instance(def("OCE", 1, 2, ocean()), "bottom"),
+    ]);
+    const after = endTurn(state, mulberry32(0)).state;
+    // Ocean left the board.
+    expect(onBoard(after).some((c) => c.def.id === "OCE")).toBe(false);
+    // The bonus a card now carries, whether it sits in the deck (DeckCard.bonus) or was drawn (CardInstance.bonus).
+    const bonusOf = (id: string): number => {
+      const inDeck = after.players.bottom.deck.find((d) => d.def.id === id);
+      if (inDeck) return inDeck.bonus;
+      const inHand = after.players.bottom.hand.find((c) => c.def.id === id);
+      return inHand ? inHand.bonus : NaN;
+    };
+    // The two original deck cards each got +1.
+    expect(bonusOf("D0")).toBe(1);
+    expect(bonusOf("D1")).toBe(1);
+    // Ocean is back in the library carrying +1 (board bonus 0, grown by +1 "including itself").
+    expect(bonusOf("OCE")).toBe(1);
+  });
+
+  it("a drawn buffed deck card becomes a hand card whose power reflects the accumulated bonus", () => {
     const state = setupOcean();
     setLane(state, 0, [
       null,
+      null,
       instance(def("OCE", 1, 2, ocean()), "bottom"),
-      instance(def("ALLY", 1, 3), "bottom"),
     ]);
-    setLane(state, 1, [null, null, instance(def("FAR", 1, 1), "bottom")]); // another lane ally
+    // bottom ends its turn (buffs the deck), then top's turn, then bottom's startTurn draws a card.
     const after = endTurn(
       endTurn(state, mulberry32(0)).state,
       mulberry32(0),
     ).state;
-    // Ocean is gone from the board.
-    expect(onBoard(after).some((c) => c.def.id === "OCE")).toBe(false);
-    // Its def is back in the owner's library (deck, or hand if the next startTurn drew it).
-    const library = [
-      ...after.players.bottom.deck.map((d) => d.id),
-      ...after.players.bottom.hand.map((c) => c.def.id),
-    ];
-    expect(library).toContain("OCE");
-    // Allies across all lanes got +1.
-    const ally = onBoard(after).find((c) => c.def.id === "ALLY");
-    const far = onBoard(after).find((c) => c.def.id === "FAR");
-    expect(ally!.bonus).toBe(1);
-    expect(far!.bonus).toBe(1);
+    // Every card now in bottom's hand or deck that came from the buffed deck carries bonus 1 (OCE
+    // carries its +1 too). A freshly drawn buffed card keeps that bonus in hand.
+    const drawn = after.players.bottom.hand.filter(
+      (c) => c.def.id === "D0" || c.def.id === "D1" || c.def.id === "OCE",
+    );
+    for (const c of drawn) expect(c.bonus).toBe(1);
+    // And whatever remains in the deck still carries +1.
+    for (const entry of after.players.bottom.deck)
+      if (["D0", "D1", "OCE"].includes(entry.def.id))
+        expect(entry.bonus).toBe(1);
+  });
+
+  it("two Oceans in one end-of-turn each buff the deck, stacking the bonus (+2 total)", () => {
+    // Resolve on top's turn so both bottom-owned Oceans resolve before bottom draws. A deep deck keeps
+    // the sampled card in the deck after the single post-turn draw.
+    const state = emptyGame("top");
+    state.active = "top";
+    state.players.bottom.deck = deckOf([
+      def("D0", 1, 1),
+      def("D1", 1, 1),
+      def("D2", 1, 1),
+      def("D3", 1, 1),
+      def("D4", 1, 1),
+    ]);
+    setLane(state, 0, [
+      null,
+      instance(def("O1", 1, 2, ocean()), "bottom"),
+      instance(def("O2", 1, 2, ocean()), "bottom"),
+    ]);
+    const after = endTurn(state, mulberry32(0)).state;
+    const bonusOf = (id: string): number => {
+      const inDeck = after.players.bottom.deck.find((d) => d.def.id === id);
+      if (inDeck) return inDeck.bonus;
+      const inHand = after.players.bottom.hand.find((c) => c.def.id === id);
+      return inHand ? inHand.bonus : NaN;
+    };
+    // Each Ocean pass buffs the deck +1, so every original deck card ends at +2.
+    for (const id of ["D0", "D1", "D2", "D3", "D4"])
+      expect(bonusOf(id)).toBe(2);
   });
 
   it("inserts at a deterministic seeded position", () => {
     const build = () => {
       const s = setupOcean();
+      s.first = "top";
+      s.active = "top";
       setLane(s, 0, [
         null,
         null,
@@ -349,33 +413,36 @@ describe("Ocean Eyes end-of-round return", () => {
       ]);
       return s;
     };
-    // Resolve on the top player's endTurn (first = top), so bottom does not immediately draw
-    // the returned Ocean and we can read its exact deck slot.
-    const resolve = (seed: number) => {
-      const s = build();
-      s.first = "top";
-      s.active = "top";
-      return endTurn(s, mulberry32(seed)).state.players.bottom.deck.map(
-        (d) => d.id,
+    const resolve = (seed: number) =>
+      endTurn(build(), mulberry32(seed)).state.players.bottom.deck.map(
+        (d) => d.def.id,
       );
-    };
     // Same seed -> identical deck ordering (including Ocean's inserted slot).
     expect(resolve(42)).toEqual(resolve(42));
-    const seedA = endTurn(
-      endTurn(build(), mulberry32(0)).state,
-      mulberry32(42),
-    ).state;
-    const seedA2 = endTurn(
-      endTurn(build(), mulberry32(0)).state,
-      mulberry32(42),
-    ).state;
-    // Same seed -> same insertion index.
-    expect(seedA.players.bottom.deck.findIndex((d) => d.id === "OCE")).toBe(
-      seedA2.players.bottom.deck.findIndex((d) => d.id === "OCE"),
-    );
   });
 
-  it("handles the empty-deck case (Ocean becomes the only library card, then is drawn next turn)", () => {
+  it("buffs only the owner's deck and never touches the enemy deck", () => {
+    const state = setupOcean();
+    // Give the enemy (top) a deck of its own; a bottom-owned Ocean must leave it untouched.
+    state.players.top.deck = deckOf([def("T0", 1, 1), def("T1", 1, 1)]);
+    state.first = "top";
+    state.active = "top";
+    setLane(state, 0, [
+      null,
+      null,
+      instance(def("OCE", 1, 2, ocean()), "bottom"),
+    ]);
+    const after = endTurn(state, mulberry32(0)).state;
+    // Every enemy deck entry still carries bonus 0 — the Ocean pass only ever reads bottom's deck.
+    for (const entry of after.players.top.deck) expect(entry.bonus).toBe(0);
+    // And the enemy deck still holds exactly its two original cards (nothing inserted/removed).
+    expect(after.players.top.deck.map((d) => d.def.id).sort()).toEqual([
+      "T0",
+      "T1",
+    ]);
+  });
+
+  it("handles the empty-deck case (Ocean becomes the only deck card at +1, then is drawn next turn)", () => {
     const state = emptyGame("bottom");
     state.players.bottom.deck = [];
     setLane(state, 0, [
@@ -389,45 +456,15 @@ describe("Ocean Eyes end-of-round return", () => {
     ).state;
     // Ocean returned to the empty deck at index 0, so the next round's startTurn draws it to hand.
     const library = [
-      ...after.players.bottom.deck.map((d) => d.id),
+      ...after.players.bottom.deck.map((d) => d.def.id),
       ...after.players.bottom.hand.map((c) => c.def.id),
     ];
     expect(library).toEqual(["OCE"]);
-    // It returned clean: a freshly drawn instance has no bonus.
+    // It carries its +1 "including itself" buff wherever it now sits.
     const drawn = after.players.bottom.hand.find((c) => c.def.id === "OCE");
-    if (drawn) expect(drawn.bonus).toBe(0);
-  });
-
-  it("two Oceans produce an order-independent final state; Ocean-on-Ocean buff is discarded", () => {
-    const build = () => {
-      const s = emptyGame("bottom");
-      s.players.bottom.deck = [
-        def("D0", 1, 1),
-        def("D1", 1, 1),
-        def("D2", 1, 1),
-      ];
-      setLane(s, 0, [
-        null,
-        instance(def("O1", 1, 2, ocean()), "bottom"),
-        instance(def("O2", 1, 2, ocean()), "bottom"),
-      ]);
-      return s;
-    };
-    const after = endTurn(
-      endTurn(build(), mulberry32(0)).state,
-      mulberry32(7),
-    ).state;
-    // Both Oceans left the board and are back in the owner's library (deck + hand), returned clean.
-    expect(
-      onBoard(after).some((c) => c.def.id === "O1" || c.def.id === "O2"),
-    ).toBe(false);
-    const library = [
-      ...after.players.bottom.deck.map((d) => d.id),
-      ...after.players.bottom.hand.map((c) => c.def.id),
-    ];
-    expect(library.filter((id) => id === "O1" || id === "O2")).toHaveLength(2);
-    for (const c of after.players.bottom.hand)
-      if (c.def.id === "O1" || c.def.id === "O2") expect(c.bonus).toBe(0);
+    if (drawn) expect(drawn.bonus).toBe(1);
+    const inDeck = after.players.bottom.deck.find((d) => d.def.id === "OCE");
+    if (inDeck) expect(inDeck.bonus).toBe(1);
   });
 });
 

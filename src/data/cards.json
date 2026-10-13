@@ -75,7 +75,10 @@
     "name": "Astral Eyes",
     "rarity": "eternal",
     "cost": 5,
-    "power": 15
+    "power": 15,
+    "ability": "costReduction 1",
+    "kind": "passive",
+    "note": "Bị động: khi còn trên sân, mọi thẻ của phe ta giảm 1 cost (tối thiểu 0). Rời sân thì không còn tính."
   },
   {
     "name": "Aura Eyes",
@@ -101,6 +104,7 @@
     "cost": 3,
     "power": 5,
     "ability": "pushImmune",
+    "kind": "passive",
     "note": "Bị động: không thể bị đẩy hủy — vẫn trượt trong hàng nhưng không bao giờ rơi khỏi mép mà chết."
   },
   {
@@ -205,6 +209,7 @@
     "cost": 6,
     "power": 8,
     "ability": "teamBuffEndOfTurn 1",
+    "kind": "passive",
     "note": "Bị động cuối MỖI lượt: +1 power cho MỌI thẻ KHÁC của PHE TA trên sân (không gồm địch, không gồm chính Cosmic). Có hiệu lực ngay từ lượt tung ra (được cộng trước khi tính EP lượt đó)."
   },
   {
@@ -321,6 +326,7 @@
     "cost": 1,
     "power": 2,
     "ability": "earlyBuff 4 6",
+    "kind": "passive",
     "note": "Bị động khi ra sân: nếu lượt hiện tại ≤ 6 thì +4 power vĩnh viễn; từ lượt 7 trở đi không được gì. Tính một lần lúc ra bài. Lượt tính theo bộ đếm người chơi thấy (Math.min(turnsPlayed + (winner?0:1), 18))."
   },
   {
@@ -359,6 +365,7 @@
     "cost": 4,
     "power": 6,
     "ability": "cloneMirror",
+    "kind": "active",
     "note": "Khi ra sân: nếu ra ở làn BÊN (trái=0 hoặc phải=2), tạo 1 bản sao ở làn bên còn lại — ưu tiên ô vào quân của chủ, nếu bận thì ô trống gần phía chủ nhất; làn giữa thì không làm gì. Bản sao mang power hiện tại của Dual."
   },
   {
@@ -367,6 +374,7 @@
     "cost": 3,
     "power": 3,
     "ability": "cloneLane",
+    "kind": "active",
     "note": "Khi ra sân: tạo bản sao vào mọi ô trống TRONG CÙNG LÀN (cột dọc Echo vừa ra). Bản sao mang power hiện tại của Echo. Không kích hoạt lại active."
   },
   {
@@ -479,11 +487,13 @@
   },
   {
     "name": "Gentle Eyes",
-    "rarity": "eternal",
+    "rarity": "bargain",
     "cost": 6,
-    "power": 4,
-    "ability": "costReduction 1",
-    "note": "Khi còn trên sân, mọi thẻ của phe ta giảm 1 cost (tối thiểu 0). Rời sân thì không còn tính."
+    "power": 6,
+    "ability": "gentlePush 5",
+    "kind": "active",
+    "text": "Active: At the end of your turn, push The Eye Privilege 5% toward the enemy for each of your other passive cards on the board.",
+    "note": "Cuối lượt của phe ta (tuy ghi Active nhưng tính lúc kết thúc lượt): với MỖI thẻ bị động (kind passive) của phe ta đang trên sân, đẩy The Eye Privilege về phía địch 5% HP hiện tại của địch (làm tròn). Gentle là active nên không tự tính mình. Không có thẻ bị động nào thì không làm gì."
   },
   {
     "name": "Glacial Eyes",
@@ -491,6 +501,7 @@
     "cost": 4,
     "power": 6,
     "ability": "glacialSpawn 2",
+    "kind": "passive",
     "note": "Bị động: khi bị ĐẨY rơi khỏi mép sân mà chết, tạo 1 bản sao vào MỖI làn trong 2 làn CÒN LẠI với power = power-lúc-chết trừ 2, đặt vào ô trống gần phía chủ nhất (làn đầy thì bỏ qua). Bản sao cũng là Glacial nên khi CHÚNG chết lại tạo tiếp power-2. Chuỗi DỪNG khi power tạo ra ≤ 0 (ví dụ 5 → 3 → 1 → dừng). Kích hoạt khi bị đẩy rơi khỏi mép — gồm cả đẩy thường LẪN Siren (Siren cũng là đẩy); KHÔNG tính Laser (Laser hủy trực tiếp, không phải đẩy)."
   },
   {
@@ -619,6 +630,7 @@
     "cost": 4,
     "power": 3,
     "ability": "destroyLane",
+    "kind": "active",
     "note": "Hủy toàn bộ lane hiện tại (trừ bản thân)."
   },
   {
@@ -753,6 +765,7 @@
     "cost": 4,
     "power": 4,
     "ability": "nexusSum",
+    "kind": "active",
     "note": "Khi ra sân: nếu ra ở làn GIỮA (1), +power bằng tổng power hiện tại của 2 thẻ cùng HÀNG (cùng chỉ số ô) ở làn trái (0) và phải (2); ô trống = 0. Vĩnh viễn. Ra làn bên thì không làm gì."
   },
   {
@@ -785,7 +798,8 @@
     "cost": 1,
     "power": 2,
     "ability": "oceanReturn 1",
-    "note": "Cuối lượt: +1 power cho đồng minh trên sân rồi trở về vị trí ngẫu nhiên trong deck."
+    "kind": "passive",
+    "note": "Cuối lượt: Ocean trở về vị trí ngẫu nhiên trong deck của chủ VÀ +1 power vĩnh viễn cho MỌI thẻ trong deck của chủ, GỒM CẢ chính nó (bonus tích lũy nên Ocean rút lại sẽ mạnh hơn). Chỉ ảnh hưởng deck của chủ, không đụng deck địch."
   },
   {
     "name": "Odd Eyes",
@@ -835,6 +849,7 @@
     "cost": 3,
     "power": 2,
     "ability": "buffRowAll 2",
+    "kind": "active",
     "note": "Khi ra sân: +2 power cho MỌI thẻ cùng hàng ngang (cùng chỉ số ô trên cả 3 làn, cả ta lẫn địch, kể cả chính nó)."
   },
   {
@@ -885,6 +900,7 @@
     "cost": 3,
     "power": 6,
     "ability": "shuffleRedraw",
+    "kind": "active",
     "note": "Khi ra sân: trộn toàn bộ hand + deck lại rồi rút lại đúng số lá bằng hand sau khi đã ra Phantom."
   },
   {
@@ -893,6 +909,7 @@
     "cost": 2,
     "power": 3,
     "ability": "phasing",
+    "kind": "passive",
     "note": "Khi địch đẩy hủy thẻ này mà có cột trống, dịch chuyển sang một cột trống ngẫu nhiên thay vì bị hủy."
   },
   {
@@ -901,6 +918,7 @@
     "cost": 4,
     "power": 4,
     "ability": "rebirth 4",
+    "kind": "passive",
     "note": "Mỗi lần bị hủy, trở lại trên tay với power +4."
   },
   {
@@ -945,6 +963,7 @@
     "cost": 4,
     "power": 6,
     "ability": "reflecting",
+    "kind": "passive",
     "note": "Khi địch đẩy làm xê dịch thẻ này, đẩy ngẫu nhiên 1 trong 2 cột còn lại đi 1 bước."
   },
   {
@@ -1061,6 +1080,7 @@
     "cost": 4,
     "power": 2,
     "ability": "pushLane",
+    "kind": "active",
     "note": "Đẩy lane hiện tại."
   },
   {
@@ -1093,6 +1113,7 @@
     "cost": 5,
     "power": 2,
     "ability": "cloneBoard",
+    "kind": "active",
     "note": "Khi ra sân: tạo một bản sao của chính nó vào MỌI ô trống trên toàn sân (cả 3 làn × 3 ô). Bản sao mang đúng power hiện tại của Spectra lúc đó. Bản sao KHÔNG kích hoạt lại chiêu active."
   },
   {
@@ -1149,6 +1170,7 @@
     "cost": 5,
     "power": 0,
     "ability": "destroyedPower",
+    "kind": "active",
     "note": "Nhận power bằng tổng power của mọi thẻ đã bị hủy trong trận (cả hai phe)."
   },
   {
@@ -1265,6 +1287,7 @@
     "cost": 5,
     "power": 6,
     "ability": "drainStartOfTurn 1",
+    "kind": "passive",
     "note": "Đầu mỗi lượt, giảm 1 power của mọi thẻ khác trên sân (tối đa về 0)."
   },
   {
@@ -1367,8 +1390,9 @@
     "name": "Wicked Eyes",
     "rarity": "eternal",
     "cost": 4,
-    "power": 7,
+    "power": 5,
     "ability": "wicked",
+    "kind": "passive",
     "note": "Mỗi khi có bất kỳ thẻ nào di chuyển (hiệu ứng move), thẻ này +1 power."
   },
   {
@@ -1419,6 +1443,7 @@
     "cost": 2,
     "power": 4,
     "text": "Passive: We are Bò Tuôi",
+    "kind": "passive",
     "note": "Thẻ bò gốc của phe Bò Tuôi. Không có chiêu — chỉ có khí chất. Text hiển thị đúng câu 'We are Bò Tuôi'."
   },
   {
@@ -1429,6 +1454,7 @@
     "ability": "transformAt 1 bo-sieu-phan-ong-cap-2",
     "coefficient": 1,
     "text": "Passive: Pulls The Eye Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
+    "kind": "passive",
     "note": "Dạng cấp 1 của Bò SPD. The Tide coefficient +1 (field coefficient:1). Hóa thành Cấp 2 khi tổng số lá bị hủy trong trận chạm 1. Text player-facing tiếng Anh, prefix Passive. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-2' (slugify bỏ chữ đ)."
   },
   {
@@ -1439,6 +1465,7 @@
     "ability": "transformAt 2 bo-sieu-phan-ong-cap-3",
     "coefficient": 2,
     "text": "Passive: Pulls The Eye Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
+    "kind": "passive",
     "note": "Dạng cấp 2. Hệ số cán cân = 2 (field coefficient:2). Hóa thành Cấp 3 khi tổng số lá bị hủy trong trận chạm 2. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-3'."
   },
   {
@@ -1448,6 +1475,7 @@
     "power": 6,
     "ability": "balanceCoefficient 3",
     "text": "Passive: Pulls The Eye Privilege 3 times harder.",
+    "kind": "passive",
     "note": "Dạng cuối. Hệ số cán cân = 3 (ability balanceCoefficient 3). Không hóa thêm."
   }
 ]

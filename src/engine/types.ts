@@ -6,6 +6,8 @@ export const MAX_TURNS = 18;
 export const BALANCE_START = 50;
 export const BALANCE_MIN = 0;
 export const BALANCE_MAX = 100;
+/** Default starting HP for each seat. The meter total = both seats' HP; the start = the bottom seat's HP. */
+export const DEFAULT_SEAT_HP = 50;
 export const DECK_SIZE = 12;
 /** Cards drawn before the first turn; every turn then starts with one more draw. */
 export const OPENING_HAND = { first: 2, second: 3 } as const;
@@ -28,7 +30,8 @@ export type ActiveEffect =
   | { kind: "cloneBoard" } // Spectra: clone self into every empty cell on the whole board
   | { kind: "cloneLane" } // Echo: clone self into every empty cell in the played lane
   | { kind: "cloneMirror" } // Dual: if played in a side lane, clone self into the other side lane
-  | { kind: "nexusSum" }; // Nexus: if played in the middle lane, gain the current power of both side-lane cards in its row
+  | { kind: "nexusSum" } // Nexus: if played in the middle lane, gain the current power of both side-lane cards in its row
+  | { kind: "gentlePush"; percent: number }; // Gentle: at end of the owner's turn, push the meter `percent`% of the enemy's HP toward the enemy per friendly passive card
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -80,6 +83,12 @@ export interface CardDef {
   faction?: Faction;
   /** Per-card balance-meter coefficient (§6). Absent → 0 (no contribution). */
   coefficient?: number;
+  /**
+   * Classifies the card's rendered rules text: "active" when it starts with "Active:", "passive" when
+   * it starts with "Passive:". Absent on vanilla cards (no ability and no explicit text). Source of
+   * truth for counting passive cards (e.g. Gentle's end-of-turn push). Must match the prefix cardText prints.
+   */
+  kind?: "active" | "passive";
 }
 
 /** Narrows an exhaustive switch: a reachable call means a union member has no case. */
@@ -96,12 +105,22 @@ export interface CardInstance {
   bonus: number;
 }
 
+/**
+ * One card sitting in a player's draw pile. Carries an accumulated permanent power `bonus` so a buff
+ * applied to a card while it is still in the deck (Ocean's whole-deck buff) travels onto the hand
+ * CardInstance when the card is drawn. A freshly built deck has `bonus: 0` on every entry.
+ */
+export interface DeckCard {
+  def: CardDef;
+  bonus: number;
+}
+
 export interface PlayerState {
   energy: number;
   /** Turns this player has started, counting the current one. */
   turns: number;
-  /** Remaining cards, next draw first. */
-  deck: CardDef[];
+  /** Remaining cards, next draw first. Each entry carries its accumulated power bonus (see DeckCard). */
+  deck: DeckCard[];
   hand: CardInstance[];
 }
 
@@ -114,7 +133,15 @@ export interface GameState {
   first: Seat;
   active: Seat;
   round: number;
-  /** Tug-of-war meter, 0..100. Higher = bottom (human) winning; 50 = even. */
+  /** Bottom (player) seat's starting HP. The meter starts here and the even point sits here. */
+  bottomStartHP: number;
+  /** Top (enemy) seat's starting HP. */
+  topStartHP: number;
+  /**
+   * Tug-of-war meter = the bottom (player) seat's remaining HP, in [0, bottomStartHP + topStartHP].
+   * The top seat's remaining HP is `total - balance`. Higher = bottom winning; the even point is
+   * `bottomStartHP`. With both seats at 50 (today's default) this is the old 0..100 meter starting at 50.
+   */
   balance: number;
   /** Count of turns that have ended and resolved so far (the cap source of truth). */
   turnsPlayed: number;
@@ -172,12 +199,13 @@ export type GameEvent =
       /** The applied, clamped shift this turn: new balance minus old balance (what the meter actually moved). */
       delta: number;
       /**
-       * The full shift this turn before clamping to 0..100: (bottom power - top power) * k. The battle log
-       * shows this so a card's stated pull reads true even when the meter is pinned at an edge. Sign matches
-       * `delta`: positive = bottom's board was stronger this turn, negative = top's.
+       * The full shift this turn before clamping to [0, total] (total = bottomStartHP + topStartHP):
+       * (bottom power - top power) * k. The battle log shows this so a card's stated pull reads true even
+       * when the meter is pinned at an edge. Sign matches `delta`: positive = bottom's board was stronger
+       * this turn, negative = top's.
        */
       rawDelta: number;
-      /** The balance after this shift, 0..100. */
+      /** The balance after this shift, in [0, total] (total = bottomStartHP + topStartHP). */
       balance: number;
       /** turnsPlayed after this resolution (1..18). */
       turn: number;

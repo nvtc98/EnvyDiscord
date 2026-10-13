@@ -27,7 +27,7 @@ export function seedGuaranteedOpening(
   for (const id of guaranteed) {
     if (player.hand.some((c) => c.def.id === id)) continue; // already guaranteed
 
-    const deckIndex = player.deck.findIndex((def) => def.id === id);
+    const deckIndex = player.deck.findIndex((entry) => entry.def.id === id);
     if (deckIndex < 0)
       throw new Error(
         `seedGuaranteedOpening: "${id}" not found in ${seat} deck`,
@@ -43,13 +43,14 @@ export function seedGuaranteedOpening(
       );
 
     const [evicted] = player.hand.splice(evictIndex, 1);
-    const [guaranteedDef] = player.deck.splice(deckIndex, 1);
-    player.deck.unshift(evicted.def); // keep the 12-card multiset; it is the next natural draw
+    const [guaranteed] = player.deck.splice(deckIndex, 1);
+    // Keep the 12-card multiset; the evicted hand card becomes the next natural draw (bonus discarded).
+    player.deck.unshift({ def: evicted.def, bonus: 0 });
     const instance: CardInstance = {
       uid: state.nextUid++,
-      def: guaranteedDef,
+      def: guaranteed.def,
       owner: seat,
-      bonus: 0,
+      bonus: guaranteed.bonus,
     };
     player.hand.push(instance);
   }

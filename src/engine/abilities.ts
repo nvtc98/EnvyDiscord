@@ -32,6 +32,8 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: If played in a side lane, place a copy of this card in the other side lane.";
       case "nexusSum":
         return "Active: If played in the middle lane, gain power equal to the two cards beside it in the same row.";
+      case "gentlePush":
+        return `Active: At the end of your turn, push The Eye Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -78,7 +80,7 @@ export function abilityText(ability: Ability | undefined): string {
   if (timing === "endOfRound") {
     switch (effect.kind) {
       case "oceanReturn":
-        return `Passive: At the end of the round, give allies +${effect.amount} power, then shuffle back into your deck.`;
+        return `Passive: At the end of your turn, shuffle back into your deck and give every card in your deck +${effect.amount} power, including this one.`;
       case "teamBuffEndOfTurn":
         return `Passive: At the end of every turn, give your other cards +${effect.amount} power.`;
       default:

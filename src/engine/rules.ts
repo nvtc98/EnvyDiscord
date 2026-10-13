@@ -4,8 +4,8 @@ import { hasContinuous, isPushImmune } from "./abilities";
 import { entryCell, pushAbsorbed, pushInto, wouldPush } from "./push";
 import {
   assertNever,
-  BALANCE_START,
   CELLS,
+  DEFAULT_SEAT_HP,
   LANES,
   MAX_ENERGY,
   MAX_HAND,
@@ -16,6 +16,7 @@ import {
   type CardInstance,
   type Cell,
   type ContinuousEffect,
+  type DeckCard,
   type GameEvent,
   type GameState,
   type LaneIndex,
@@ -69,11 +70,23 @@ function balanceFactor(state: GameState): number {
   return BASE_COEFFICIENT + sumCoefficientBonus(state);
 }
 
-/** Shuffles both decks, deals the opening hands, and starts the first player's first turn. */
+/** Wraps raw card defs into fresh deck entries (bonus 0) for one seat. */
+const freshDeck = (defs: readonly CardDef[]): DeckCard[] =>
+  defs.map((def) => ({ def, bonus: 0 }));
+
+/**
+ * Shuffles both decks, deals the opening hands, and starts the first player's first turn. `hp` sets
+ * each seat's starting HP: the meter total is `hp.bottom + hp.top` and the meter starts at `hp.bottom`.
+ * Both default to 50, so a default game is byte-identical to the old 0..100 meter starting at 50.
+ */
 export function newGame(
   decks: Record<Seat, CardDef[]>,
   first: Seat,
   rng: Rng,
+  hp: { bottom: number; top: number } = {
+    bottom: DEFAULT_SEAT_HP,
+    top: DEFAULT_SEAT_HP,
+  },
 ): Step {
   const second = opponentOf(first);
   const state: GameState = {
@@ -82,20 +95,22 @@ export function newGame(
       bottom: {
         energy: 0,
         turns: 0,
-        deck: shuffle(decks.bottom, rng),
+        deck: shuffle(freshDeck(decks.bottom), rng),
         hand: [],
       },
       top: {
         energy: 0,
         turns: 0,
-        deck: shuffle(decks.top, rng),
+        deck: shuffle(freshDeck(decks.top), rng),
         hand: [],
       },
     },
     first,
     active: first,
     round: 1,
-    balance: BALANCE_START,
+    bottomStartHP: hp.bottom,
+    topStartHP: hp.top,
+    balance: hp.bottom,
     turnsPlayed: 0,
     winner: null,
     nextUid: 1,
@@ -117,7 +132,8 @@ function draw(
 ): void {
   const player = state.players[seat];
   for (let i = 0; i < count && player.deck.length > 0; i++) {
-    const card = player.deck.shift()!;
+    const entry = player.deck.shift()!;
+    const card = entry.def;
     if (handFull(state, seat)) {
       // Over the cap: the drawn card leaves the deck but never enters the hand.
       events.push({ type: "burned", seat, card });
@@ -127,7 +143,8 @@ function draw(
       uid: state.nextUid++,
       def: card,
       owner: seat,
-      bonus: 0,
+      // Carry the bonus accumulated while the card sat in the deck (e.g. Ocean's whole-deck buff).
+      bonus: entry.bonus,
     };
     player.hand.push(instance);
     events.push({ type: "drew", seat, uid: instance.uid, card });
@@ -469,7 +486,12 @@ function collectOceanReturns(state: GameState): OceanReturn[] {
   return out;
 }
 
-/** Pass 2: buff friendlies +amount (excluding self), remove Ocean, splice its def back into the deck at a seeded slot. */
+/**
+ * Pass 2: Ocean buffs +amount onto EVERY card remaining in the owner's deck, then returns to the deck
+ * itself at a seeded slot — carrying its own accumulated bonus grown by `amount` ("including itself").
+ * Only the owner's deck is touched; the enemy's deck is never affected. A redrawn Ocean is therefore
+ * stronger each cycle, and so is every other deck card it buffed.
+ */
 function applyOceanReturn(
   state: GameState,
   o: OceanReturn,
@@ -481,22 +503,22 @@ function applyOceanReturn(
   if (idx < 0) return; // defensive: already gone
   const card = cells[idx]!;
 
-  for (const l of state.lanes)
-    for (const other of l)
-      if (other && other.owner === o.owner && other.uid !== card.uid)
-        other.bonus += o.amount;
+  const deck = state.players[o.owner].deck;
+  // Buff every card still in the owner's deck by `amount`.
+  for (const entry of deck) entry.bonus += o.amount;
   events.push({
     type: "ability",
     seat: o.owner,
     card: card.def,
-    text: `gave +${o.amount} power to allied cards`,
+    text: `gave +${o.amount} power to every card in the deck`,
   });
 
   cells[idx] = null;
 
-  const deck = state.players[o.owner].deck;
+  // Return to the deck carrying its own accumulated bonus, itself grown by `amount` ("including itself").
+  const returned: DeckCard = { def: card.def, bonus: card.bonus + o.amount };
   const pos = deck.length === 0 ? 0 : Math.floor(rng() * (deck.length + 1));
-  deck.splice(pos, 0, card.def); // CardDef only -> bonus discarded, returns clean
+  deck.splice(pos, 0, returned);
   events.push({
     type: "ability",
     seat: o.owner,
@@ -991,7 +1013,12 @@ function applyActive(
     case "shuffleRedraw": {
       // Phantom was already spliced from me.hand in playCard, so me.hand.length is the post-play size.
       const before = me.hand.length;
-      const pool = [...me.hand.map((c) => c.def), ...me.deck]; // defs only; board cards untouched
+      // Hand cards rejoin the deck as fresh entries (bonus discarded, as before); deck entries keep
+      // their accumulated bonus. Board cards are untouched.
+      const pool: DeckCard[] = [
+        ...me.hand.map((c) => ({ def: c.def, bonus: 0 })),
+        ...me.deck,
+      ];
       me.hand = []; // clear instances (defs preserved in pool)
       me.deck = shuffle(pool, rng);
       draw(state, seat, before, events); // redraw to the post-play size; draw() enforces MAX_HAND
@@ -1073,6 +1100,10 @@ function applyActive(
       say(`gained ${gain} power from its neighbors`);
       break;
     }
+    case "gentlePush":
+      // Gentle's push is deferred to the owner's end of turn (applyGentlePush in resolveTurn); it does
+      // nothing on play. This case keeps the active switch exhaustive for assertNever.
+      break;
     default:
       assertNever(effect);
   }
@@ -1179,14 +1210,69 @@ function applyCosmicBuff(state: GameState, events: GameEvent[]): void {
     }
 }
 
+/**
+ * Gentle's end-of-turn push, for the seat that just ended its turn (`state.active`). For each on-board
+ * Gentle (`active` timing, `gentlePush` effect) owned by that seat, count the owner's friendly on-board
+ * cards with `kind: "passive"` (Gentle is `kind: "active"`, so it never counts itself), snapshot the
+ * enemy side's current remaining HP, and push the meter `percent`% of that snapshot toward the enemy
+ * per passive card. Benefits the owner (bottom → + balance, top → − balance). Clamps to [0, total] and
+ * emits a tide_shifted event so the log shows it. Zero friendly passives → no push, no event. Re-checks
+ * knockout afterward so a Gentle push can win.
+ */
+function applyGentlePush(state: GameState, events: GameEvent[]): void {
+  const owner = state.active;
+  const total = state.bottomStartHP + state.topStartHP;
+  const board = cardsOnBoard(state);
+  const gentles = board.filter((c) => {
+    const ab = c.def.ability;
+    return (
+      c.owner === owner &&
+      ab?.timing === "active" &&
+      ab.effect.kind === "gentlePush"
+    );
+  });
+  if (gentles.length === 0) return;
+
+  const passiveCount = board.filter(
+    (c) => c.owner === owner && c.def.kind === "passive",
+  ).length;
+  if (passiveCount === 0) return; // nothing to push
+
+  for (const gentle of gentles) {
+    const ab = gentle.def.ability!;
+    if (ab.timing !== "active" || ab.effect.kind !== "gentlePush") continue; // narrow
+    const percent = ab.effect.percent;
+    // Snapshot the enemy's current HP once; `percent`% of it per passive card is the push.
+    const enemyHP = owner === "bottom" ? total - state.balance : state.balance;
+    const push = passiveCount * Math.round((percent / 100) * enemyHP);
+    if (push === 0) continue;
+    const signed = owner === "bottom" ? push : -push;
+    const before = state.balance;
+    state.balance = Math.max(0, Math.min(total, before + signed));
+    const applied = state.balance - before;
+    events.push({
+      type: "tide_shifted",
+      delta: applied,
+      rawDelta: signed,
+      balance: state.balance,
+      turn: state.turnsPlayed,
+    });
+    // A Gentle push can reach an edge and win.
+    if (state.balance >= total) finish(state, "bottom", "balance", events);
+    else if (state.balance <= 0) finish(state, "top", "balance", events);
+    if (state.winner) return;
+  }
+}
+
 function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   // 1. Read board power -> 2. apply tide shift -> 3. bump turnsPlayed -> 4. knockout
-  // -> 5. cap -> 6. Ocean pass (only if the game continues).
+  // -> 5. cap -> 6. end-of-turn passes (Gentle, Ocean), only if the game continues.
+  const total = state.bottomStartHP + state.topStartHP;
   applyCosmicBuff(state, events); // Cosmic's +1 lands before the tide is read this turn
   const k = balanceFactor(state);
   const delta = (totalPower(state, "bottom") - totalPower(state, "top")) * k;
   const before = state.balance;
-  state.balance = Math.max(0, Math.min(100, before + delta));
+  state.balance = Math.max(0, Math.min(total, before + delta));
   events.push({
     type: "tide_shifted",
     delta: state.balance - before,
@@ -1196,21 +1282,24 @@ function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   });
   state.turnsPlayed += 1;
 
-  // Knockout: balance hits an edge.
-  if (state.balance >= 100) finish(state, "bottom", "balance", events);
+  // Knockout: balance hits an edge (bottom's HP full / depleted).
+  if (state.balance >= total) finish(state, "bottom", "balance", events);
   else if (state.balance <= 0) finish(state, "top", "balance", events);
 
-  // Cap: run out of turns with no knockout -> whoever leads the tide wins.
+  // Cap: run out of turns with no knockout -> whoever has more remaining HP wins.
+  // Bottom's HP = balance, top's HP = total - balance.
   if (!state.winner && state.turnsPlayed >= MAX_TURNS) {
+    const topHP = total - state.balance;
     finish(
       state,
-      state.balance > 50 ? "bottom" : state.balance < 50 ? "top" : "draw",
+      state.balance > topHP ? "bottom" : state.balance < topHP ? "top" : "draw",
       "turns",
       events,
     );
   }
 
-  // Phase B: post-resolution end-of-turn effects (Ocean), only if the game continues.
+  // Phase B: post-resolution end-of-turn effects, only if the game continues.
+  if (!state.winner) applyGentlePush(state, events); // Gentle pushes the meter before Ocean
   if (!state.winner) {
     const oceans = collectOceanReturns(state); // Pass 1: snapshot
     for (const o of oceans) applyOceanReturn(state, o, events, rng); // Pass 2: process live

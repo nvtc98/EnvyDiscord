@@ -75,6 +75,8 @@ function forcedPushState(): GameState {
     first: "bottom",
     active: "bottom",
     round: 1,
+    bottomStartHP: 50,
+    topStartHP: 50,
     balance: BALANCE_START,
     turnsPlayed: 0,
     winner: null,

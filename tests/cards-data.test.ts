@@ -8,7 +8,7 @@ import {
   COLLECTIBLE_CARDS,
   COLLECTIBLE_CARD_INDEX,
 } from "../src/data/cards";
-import { cardFaction } from "../src/engine/abilities";
+import { cardFaction, cardText } from "../src/engine/abilities";
 import type { CardDef } from "../src/engine/types";
 
 // Pre-refactor CardDef values for the seven designed cards (from the plan). These are the
@@ -22,6 +22,7 @@ const DESIGNED: CardDef[] = [
     power: 0,
     faction: "the-eyes",
     ability: { timing: "active", effect: { kind: "destroyedPower" } },
+    kind: "active",
   },
   {
     id: "bedrock-eyes",
@@ -31,6 +32,7 @@ const DESIGNED: CardDef[] = [
     power: 5,
     faction: "the-eyes",
     ability: { timing: "continuous", effect: { kind: "pushImmune" } },
+    kind: "passive",
   },
   {
     id: "phoenix-eyes",
@@ -40,6 +42,7 @@ const DESIGNED: CardDef[] = [
     power: 4,
     faction: "the-eyes",
     ability: { timing: "onDestroy", effect: { kind: "rebirth", amount: 4 } },
+    kind: "passive",
   },
   {
     id: "venom-eyes",
@@ -52,6 +55,7 @@ const DESIGNED: CardDef[] = [
       timing: "continuous",
       effect: { kind: "drainStartOfTurn", amount: 1 },
     },
+    kind: "passive",
   },
   {
     id: "ocean-eyes",
@@ -64,6 +68,7 @@ const DESIGNED: CardDef[] = [
       timing: "endOfRound",
       effect: { kind: "oceanReturn", amount: 1 },
     },
+    kind: "passive",
   },
   {
     id: "siren-eyes",
@@ -73,6 +78,7 @@ const DESIGNED: CardDef[] = [
     power: 2,
     faction: "the-eyes",
     ability: { timing: "active", effect: { kind: "pushLane" } },
+    kind: "active",
   },
   {
     id: "laser-eyes",
@@ -82,6 +88,7 @@ const DESIGNED: CardDef[] = [
     power: 3,
     faction: "the-eyes",
     ability: { timing: "active", effect: { kind: "destroyLane" } },
+    kind: "active",
   },
 ];
 
@@ -216,6 +223,60 @@ describe("the four Bò Tuôi cards", () => {
           `${card.id} -> ${ab.effect.into}`,
         ).toBe(true);
     }
+  });
+});
+
+describe("card kind classification", () => {
+  it("every card's kind matches the Active:/Passive: prefix of its rendered text", () => {
+    for (const card of CARDS) {
+      const text = cardText(card);
+      if (text.startsWith("Active:")) {
+        expect(card.kind, `${card.id} should be active`).toBe("active");
+      } else if (text.startsWith("Passive:")) {
+        expect(card.kind, `${card.id} should be passive`).toBe("passive");
+      } else {
+        // Vanilla card (no ability, no text): kind omitted.
+        expect(card.kind, `${card.id} should omit kind`).toBeUndefined();
+      }
+    }
+  });
+
+  it("Astral Eyes is a passive costReduction 1 (eternal 5/15)", () => {
+    const astral = CARD_INDEX.get("astral-eyes");
+    expect(astral).toMatchObject({
+      rarity: "eternal",
+      cost: 5,
+      power: 15,
+      kind: "passive",
+    });
+    expect(astral?.ability).toEqual({
+      timing: "continuous",
+      effect: { kind: "costReduction", amount: 1 },
+    });
+  });
+
+  it("Gentle Eyes is a bargain 6/6 active gentlePush with the explicit text", () => {
+    const gentle = CARD_INDEX.get("gentle-eyes");
+    expect(gentle).toMatchObject({
+      rarity: "bargain",
+      cost: 6,
+      power: 6,
+      kind: "active",
+      text: "Active: At the end of your turn, push The Eye Privilege 5% toward the enemy for each of your other passive cards on the board.",
+    });
+    expect(gentle?.ability).toEqual({
+      timing: "active",
+      effect: { kind: "gentlePush", percent: 5 },
+    });
+  });
+
+  it("Wicked Eyes is a passive 4/5 wicked", () => {
+    const wicked = CARD_INDEX.get("wicked-eyes");
+    expect(wicked).toMatchObject({ cost: 4, power: 5, kind: "passive" });
+    expect(wicked?.ability).toEqual({
+      timing: "continuous",
+      effect: { kind: "wicked" },
+    });
   });
 });
 
