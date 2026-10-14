@@ -160,7 +160,7 @@ describe("/daily -> post-victory story hook", () => {
     expect(ctx.repo.get("u").story!.node).toBe("chapter_end");
   });
 
-  it("already-claimed-today: the fallback button advances with no second claim (gold unchanged)", async () => {
+  it("already-claimed-today: /daily reports it and the story stays parked (no fallback button)", async () => {
     const ctx = makeCtx(2);
     parkAtRoster(ctx, "u");
     // Pretend the player already claimed earlier today.
@@ -169,22 +169,14 @@ describe("/daily -> post-victory story hook", () => {
     player.coins = 55;
     void ctx.repo.save(player);
 
-    // /daily returns already-claimed and the hook never runs.
+    // /daily returns already-claimed and the hook never runs — the story remains parked at the
+    // roster node, which now carries NO buttons (only a fresh /daily advances it, tomorrow).
     const call = slashInteraction("u");
     await dailyCommand.execute(call as never, ctx);
     expect(lastPayload(call.reply).content).toMatch(/already claimed/);
     expect(ctx.repo.get("u").story!.node).toBe("victory_roster"); // still parked
     expect(ctx.repo.get("u").coins).toBe(55);
-
-    // The fallback button on victory_roster advances the story with no claim.
-    const press = buttonInteraction("u", "story:victory_roster:c:0");
-    (press as any).message = { id: "x" };
-    (press as any).channel = call.dm;
-    await storyCommand.component!(press as never, ctx);
-    const advanced = ctx.repo.get("u");
-    expect(advanced.story!.node).toBe("victory_daily_done");
-    expect(advanced.story!.awaitingDaily).toBe(false);
-    expect(advanced.coins).toBe(55); // no gold farmed
+    expect(ctx.repo.get("u").story!.awaitingDaily).toBe(true);
   });
 });
 

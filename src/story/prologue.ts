@@ -775,63 +775,29 @@ export const NODES: Record<string, NodeDef> = {
         { label: "Skip", style: "secondary" },
       ],
     }),
-    choose: (_p, index) => (index === 0 ? "tools_daily" : "victory_roster"),
+    choose: (_p, index) => (index === 0 ? "tools_explain" : "victory_roster"),
   },
 
-  tools_daily: {
+  // All the command explanations in ONE scene: each line is sent as its own DM bubble (with typing),
+  // and only the LAST bubble carries the single Continue button — so the player reads them all, then
+  // presses Continue once.
+  tools_explain: {
     view: () => ({
       title: TRIBE,
       lines: [
         stranger(
           "/daily — say it once each day and thou shalt get new cards and gold. Try not to miss a day.",
         ),
-      ],
-      choices: go("Continue"),
-    }),
-    choose: () => "tools_collection",
-  },
-
-  tools_collection: {
-    view: () => ({
-      title: TRIBE,
-      lines: [
-        stranger("/collection — there thou canst see every card you own."),
-      ],
-      choices: go("Continue"),
-    }),
-    choose: () => "tools_deck",
-  },
-
-  tools_deck: {
-    view: () => ({
-      title: TRIBE,
-      lines: [
+        stranger("/collection — there thou canst see every card thou ownest."),
         stranger(
-          "/deck — with it you choose the twelve you carry into battle.",
+          "/deck — with it thou choosest the twelve thou carriest into battle.",
         ),
-      ],
-      choices: go("Continue"),
-    }),
-    choose: () => "tools_shop",
-  },
-
-  tools_shop: {
-    view: () => ({
-      title: TRIBE,
-      lines: [
         stranger(
-          "/shop — there you spend thy gold on a new card, or a new variant.",
+          "/shop — there thou spendest thy gold on a new card, or a new variant.",
         ),
-      ],
-      choices: go("Continue"),
-    }),
-    choose: () => "tools_variants",
-  },
-
-  tools_variants: {
-    view: () => ({
-      title: TRIBE,
-      lines: [
+        stranger(
+          "/profile — there thou seest thy wins, thy gold, and thy standing.",
+        ),
         stranger(
           "And variants — the colour-forms a card can wear. Buy them or earn them, and thy cards take on new hues.",
         ),
@@ -852,10 +818,9 @@ export const NODES: Record<string, NodeDef> = {
           "Now — speak /daily, and claim thy cards and gold. I shall wait here while thou dost.",
         ),
       ],
-      // A single plain fallback button for the player who already claimed daily today, so the story
-      // never gets stuck. The daily command advances the story on a FRESH claim; this button advances
-      // it with NO second claim (no gold farming).
-      choices: [{ label: "I've already claimed today", style: "secondary" }],
+      // No buttons: the story parks here and only advances when the player actually runs /daily
+      // (the daily command's advanceParkedDaily hook moves it to victory_daily_done on a fresh claim).
+      choices: [],
     }),
     onEnter: (p) => {
       story(p).awaitingDaily = true;

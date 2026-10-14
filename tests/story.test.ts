@@ -648,29 +648,19 @@ describe("story: the prologue", () => {
         "Skip",
       ]);
 
-      // Listen (index 0) walks the whole tool chain to victory_roster.
+      // Listen (index 0) goes to the single tools_explain scene, then on to victory_roster.
       applyAction(
         player,
         "victory_tools_intro",
         { type: "choice", index: 0 },
         ctx(),
       );
-      for (const node of [
-        "tools_daily",
-        "tools_collection",
-        "tools_deck",
-        "tools_shop",
-        "tools_variants",
-      ]) {
-        expect(player.story!.node).toBe(node);
-        applyAction(player, node, { type: "choice", index: 0 }, ctx());
-      }
+      expect(player.story!.node).toBe("tools_explain");
+      applyAction(player, "tools_explain", { type: "choice", index: 0 }, ctx());
       expect(player.story!.node).toBe("victory_roster");
-      // Parked, waiting on /daily.
+      // Parked, waiting on /daily — no buttons (only a fresh /daily advances it).
       expect(player.story!.awaitingDaily).toBe(true);
-      expect(currentView(player, ctx()).choices.map((c) => c.label)).toEqual([
-        "I've already claimed today",
-      ]);
+      expect(currentView(player, ctx()).choices).toEqual([]);
 
       // advanceParkedDaily fires exactly once.
       const coinsBefore = player.coins;
@@ -724,43 +714,6 @@ describe("story: the prologue", () => {
       );
       expect(player.story!.node).toBe("victory_roster");
       expect(player.story!.awaitingDaily).toBe(true);
-    });
-
-    it("the already-claimed fallback button advances to victory_daily_done with no gold change", () => {
-      const { player } = toCave();
-      player.story!.battle = {
-        kind: "cave",
-        state: {} as never,
-        selectedUid: null,
-        log: [],
-        difficulty: "normal",
-        opponentPortrait: "boss-spd-battle",
-      };
-      resolveStoryBattle(player, "won", ctx());
-      applyAction(
-        player,
-        "victory_praise",
-        { type: "choice", index: 0 },
-        ctx(),
-      );
-      applyAction(
-        player,
-        "victory_tools_intro",
-        { type: "choice", index: 1 },
-        ctx(),
-      ); // Skip -> roster
-      expect(player.story!.node).toBe("victory_roster");
-      const coinsBefore = player.coins;
-      // Press the single fallback button (choice index 0).
-      applyAction(
-        player,
-        "victory_roster",
-        { type: "choice", index: 0 },
-        ctx(),
-      );
-      expect(player.story!.node).toBe("victory_daily_done");
-      expect(player.story!.awaitingDaily).toBe(false);
-      expect(player.coins).toBe(coinsBefore); // no second claim, no farming
     });
 
     it("resolveStoryBattle moves to cave_loss on a loss (keeps battle), and retry clears it and returns to the battle", () => {
