@@ -524,7 +524,7 @@ function applyOceanReturn(
     type: "ability",
     seat: o.owner,
     card: card.def,
-    text: "returned to the deck",
+    text: "vanished into the deck",
   });
 }
 
