@@ -106,17 +106,17 @@ describe("cards.json data refactor", () => {
     }
   });
 
-  it("cards.json has 233 entries, all with integer cost/power", () => {
-    expect(rawCards).toHaveLength(233);
+  it("cards.json has 260 entries, all with integer cost/power", () => {
+    expect(rawCards).toHaveLength(260);
     for (const c of rawCards) {
       expect(Number.isInteger(c.cost)).toBe(true);
       expect(Number.isInteger(c.power)).toBe(true);
     }
   });
 
-  it("CARDS has 233 unique ids", () => {
-    expect(CARDS).toHaveLength(233);
-    expect(new Set(CARDS.map((c) => c.id)).size).toBe(233);
+  it("CARDS has 260 unique ids", () => {
+    expect(CARDS).toHaveLength(260);
+    expect(new Set(CARDS.map((c) => c.id)).size).toBe(260);
   });
 
   it("the existing Eyes cards default to the-eyes faction", () => {
@@ -133,8 +133,8 @@ describe("the player-collectible pool is The Eyes only", () => {
     "bo-sieu-phan-ong-cap-3",
   ];
 
-  it("COLLECTIBLE_CARDS has 229 cards, none of them botuoi", () => {
-    expect(COLLECTIBLE_CARDS).toHaveLength(229);
+  it("COLLECTIBLE_CARDS has 256 cards, none of them botuoi", () => {
+    expect(COLLECTIBLE_CARDS).toHaveLength(256);
     expect(COLLECTIBLE_CARDS.every((c) => cardFaction(c) === "the-eyes")).toBe(
       true,
     );
@@ -143,13 +143,13 @@ describe("the player-collectible pool is The Eyes only", () => {
   });
 
   it("COLLECTIBLE_CARD_INDEX mirrors the collectible pool and omits the botuoi ids", () => {
-    expect(COLLECTIBLE_CARD_INDEX.size).toBe(229);
+    expect(COLLECTIBLE_CARD_INDEX.size).toBe(256);
     for (const id of BOTUOI_IDS)
       expect(COLLECTIBLE_CARD_INDEX.has(id)).toBe(false);
   });
 
   it("CARD_INDEX still resolves the botuoi cards for the engine/opponents", () => {
-    expect(CARD_INDEX.size).toBe(233);
+    expect(CARD_INDEX.size).toBe(260);
     for (const id of BOTUOI_IDS) expect(CARD_INDEX.has(id)).toBe(true);
     expect(CARD_INDEX.get("bo-sieu-phan-ong-cap-1")?.faction).toBe("botuoi");
   });
@@ -255,10 +255,10 @@ describe("card kind classification", () => {
     });
   });
 
-  it("Gentle Eyes is a bargain 6/6 active gentlePush with the explicit text", () => {
+  it("Gentle Eyes is an eternal 6/6 active gentlePush with the explicit text", () => {
     const gentle = CARD_INDEX.get("gentle-eyes");
     expect(gentle).toMatchObject({
-      rarity: "bargain",
+      rarity: "eternal",
       cost: 6,
       power: 6,
       kind: "active",

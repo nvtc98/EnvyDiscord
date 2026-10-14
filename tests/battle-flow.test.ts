@@ -31,7 +31,9 @@ async function start(
   const calls = interaction.reply.mock.calls.map((c) => c[0] as any);
   const payload =
     [...calls].reverse().find((p) => rows(p).length >= 3) ?? calls.at(-1);
-  return { payload, id: customIdOf(payload).split(":")[1] };
+  // The very first reply is always the ephemeral board (the control-less ack when the enemy opens, or
+  // the full board when the human goes first), so the ephemeral flag lives on calls[0], not `payload`.
+  return { payload, id: customIdOf(payload).split(":")[1], ack: calls[0] };
 }
 
 const customIdOf = (payload: any): string =>
@@ -109,8 +111,8 @@ describe("/battle", () => {
 
   it("starts a private battle with a hand, three control rows and a log", async () => {
     const ctx = makeCtx(3);
-    const { payload } = await start(ctx);
-    expect(payload.flags).toBeDefined(); // ephemeral
+    const { payload, ack } = await start(ctx);
+    expect(ack.flags).toBeDefined(); // the battle board is posted ephemerally
     const [menuRow, laneRow, actionRow] = rows(payload);
     expect(menuRow.components[0].options.length).toBeGreaterThanOrEqual(3);
     expect(laneRow.components.map((c: any) => c.label)).toEqual([

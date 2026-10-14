@@ -134,6 +134,13 @@
     "power": 3
   },
   {
+    "name": "Blackout Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Blank Eyes",
     "rarity": "common",
     "cost": 1,
@@ -146,10 +153,24 @@
     "power": 3
   },
   {
+    "name": "Boundless Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 9,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Broken Eyes",
     "rarity": "common",
     "cost": 1,
     "power": 3
+  },
+  {
+    "name": "Canopy Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
   },
   {
     "name": "Ceased Eyes",
@@ -188,6 +209,13 @@
     "power": 9
   },
   {
+    "name": "Cloaked Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 9,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Closed Eyes",
     "rarity": "common",
     "cost": 3,
@@ -201,7 +229,7 @@
   },
   {
     "name": "Cloudy Eyes",
-    "rarity": "common",
+    "rarity": "bargain",
     "cost": 2,
     "power": 6
   },
@@ -231,6 +259,13 @@
     "rarity": "common",
     "cost": 1,
     "power": 3
+  },
+  {
+    "name": "Cryptic Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 3,
+    "version": "2026-10-09"
   },
   {
     "name": "Crystal Eyes",
@@ -318,7 +353,7 @@
   },
   {
     "name": "Distorted Eyes",
-    "rarity": "common",
+    "rarity": "bargain",
     "cost": 2,
     "power": 6
   },
@@ -336,6 +371,13 @@
     "ability": "earlyBuff 4 6",
     "kind": "passive",
     "note": "Bị động khi ra sân: nếu lượt hiện tại ≤ 6 thì +4 power vĩnh viễn; từ lượt 7 trở đi không được gì. Tính một lần lúc ra bài. Lượt tính theo bộ đếm người chơi thấy (Math.min(turnsPlayed + (winner?0:1), 18))."
+  },
+  {
+    "name": "Dormant Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
   },
   {
     "name": "Dragon Eyes",
@@ -377,6 +419,13 @@
     "note": "Khi ra sân: nếu ra ở làn BÊN (trái=0 hoặc phải=2), tạo 1 bản sao ở làn bên còn lại — ưu tiên ô vào quân của chủ, nếu bận thì ô trống gần phía chủ nhất; làn giữa thì không làm gì. Bản sao mang power hiện tại của Dual."
   },
   {
+    "name": "Dusk Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Echo Eyes",
     "rarity": "common",
     "cost": 3,
@@ -384,6 +433,13 @@
     "ability": "cloneLane",
     "kind": "active",
     "note": "Khi ra sân: tạo bản sao vào mọi ô trống TRONG CÙNG LÀN (cột dọc Echo vừa ra). Bản sao mang power hiện tại của Echo. Không kích hoạt lại active."
+  },
+  {
+    "name": "Eclipse Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 3,
+    "version": "2026-10-09"
   },
   {
     "name": "Eden's Eyes",
@@ -399,7 +455,7 @@
   },
   {
     "name": "Elysian Eyes",
-    "rarity": "bargain",
+    "rarity": "common",
     "cost": 3,
     "power": 9
   },
@@ -411,7 +467,7 @@
   },
   {
     "name": "Emerald Eyes",
-    "rarity": "common",
+    "rarity": "bargain",
     "cost": 1,
     "power": 3
   },
@@ -495,7 +551,7 @@
   },
   {
     "name": "Gentle Eyes",
-    "rarity": "bargain",
+    "rarity": "eternal",
     "cost": 6,
     "power": 6,
     "ability": "gentlePush 5",
@@ -579,6 +635,13 @@
     "power": 9
   },
   {
+    "name": "Hazy Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 3,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Heavenly Eyes",
     "rarity": "common",
     "cost": 4,
@@ -642,6 +705,13 @@
     "note": "Hủy toàn bộ lane hiện tại (trừ bản thân)."
   },
   {
+    "name": "Latent Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Lavender Eyes",
     "rarity": "common",
     "cost": 1,
@@ -690,6 +760,20 @@
     "power": 3
   },
   {
+    "name": "Lurk Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
+    "name": "Luster Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Lustre Eyes",
     "rarity": "common",
     "cost": 1,
@@ -724,6 +808,13 @@
     "rarity": "common",
     "cost": 3,
     "power": 9
+  },
+  {
+    "name": "Mirage Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
   },
   {
     "name": "Monochrome Eyes",
@@ -793,6 +884,20 @@
     "power": 3
   },
   {
+    "name": "Numb Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 9,
+    "version": "2026-10-09"
+  },
+  {
+    "name": "Obscure Eyes",
+    "rarity": "common",
+    "cost": 3,
+    "power": 9,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Obsidian Eyes",
     "rarity": "common",
     "cost": 1,
@@ -844,10 +949,24 @@
     "power": 9
   },
   {
-    "name": "Onyx Eyes",
+    "name": "Omniscient Eyes",
     "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
+    "name": "Onyx Eyes",
+    "rarity": "bargain",
     "cost": 1,
     "power": 3
+  },
+  {
+    "name": "Ophanim Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
   },
   {
     "name": "Optic Eyes",
@@ -964,6 +1083,13 @@
     "power": 9
   },
   {
+    "name": "Prismatic Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Psyche Eyes",
     "rarity": "common",
     "cost": 1,
@@ -1069,6 +1195,13 @@
     "power": 3
   },
   {
+    "name": "Shrouded Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Shunned Eyes",
     "rarity": "common",
     "cost": 1,
@@ -1160,7 +1293,7 @@
   },
   {
     "name": "Starlit Eyes",
-    "rarity": "common",
+    "rarity": "bargain",
     "cost": 1,
     "power": 3
   },
@@ -1192,10 +1325,24 @@
     "power": 12
   },
   {
+    "name": "Stony Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Styx Eyes",
     "rarity": "common",
     "cost": 3,
     "power": 9
+  },
+  {
+    "name": "Subtle Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
   },
   {
     "name": "Sunbeam Eyes",
@@ -1220,6 +1367,13 @@
     "rarity": "common",
     "cost": 2,
     "power": 6
+  },
+  {
+    "name": "Sunlit Eyes",
+    "rarity": "bargain",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
   },
   {
     "name": "Sunr1se Eyes",
@@ -1262,6 +1416,20 @@
     "power": 12
   },
   {
+    "name": "Trance Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
+    "name": "Transcendent Eyes",
+    "rarity": "common",
+    "cost": 1,
+    "power": 3,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Translucent Eyes",
     "rarity": "common",
     "cost": 1,
@@ -1280,10 +1448,31 @@
     "power": 6
   },
   {
+    "name": "Vainglory Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
+  },
+  {
     "name": "Vanished Eyes",
     "rarity": "bargain",
     "cost": 3,
     "power": 9
+  },
+  {
+    "name": "Vanity Eyes",
+    "rarity": "common",
+    "cost": 4,
+    "power": 12,
+    "version": "2026-10-09"
+  },
+  {
+    "name": "Vapor Eyes",
+    "rarity": "common",
+    "cost": 2,
+    "power": 6,
+    "version": "2026-10-09"
   },
   {
     "name": "Veil Eyes",
