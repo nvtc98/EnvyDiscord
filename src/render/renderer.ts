@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { GlobalFonts, createCanvas } from "@napi-rs/canvas";
 import { cardFaction, hasContinuous } from "../engine/abilities";
-import { effectivePower, isAnchored } from "../engine/rules";
+import { effectivePower, instancePower, isAnchored } from "../engine/rules";
 import {
   CELLS,
   LANES,
@@ -523,7 +523,7 @@ export async function createImageRenderer({
           drawFullCard(
             ctx,
             cardLayout,
-            { def: card.def, variant },
+            { def: card.def, variant, livePower: instancePower(card) },
             await art.get(card.def.id),
             await frames.forCard(faction, variant),
           );

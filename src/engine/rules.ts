@@ -528,6 +528,15 @@ function applyOceanReturn(
   });
 }
 
+/**
+ * A card instance's current power with NO lane context: base power plus its accumulated `bonus`,
+ * floored at 0. Use this wherever a CardInstance is DISPLAYED off the board — in hand, in the pick
+ * menu, in a hand list — where lane doubling does not apply. On-board power (which also applies a
+ * friendly `laneDouble`) comes from `effectivePower(state, lane, card)` instead.
+ */
+export const instancePower = (card: CardInstance): number =>
+  Math.max(0, card.def.power + card.bonus);
+
 /** Power a card currently deals: base + permanent buffs, doubled by a friendly `laneDouble` in its lane (never below 0). */
 export function effectivePower(
   state: GameState,

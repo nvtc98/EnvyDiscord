@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 import { cardText } from "../engine/abilities";
 import { pushInto } from "../engine/push";
-import { canPlay, effectiveCost } from "../engine/rules";
+import { canPlay, effectiveCost, instancePower } from "../engine/rules";
 import {
   CELLS,
   LANE_NAMES,
@@ -87,7 +87,7 @@ function select(
             : "";
         return {
           label:
-            `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${card.def.power}${suffix}`.slice(
+            `${i + 1}. ${card.def.name} · cost ${card.def.cost}, power ${instancePower(card)}${suffix}`.slice(
               0,
               100,
             ),
@@ -211,7 +211,7 @@ function embed(
           state.players[viewer].hand
             .map(
               (c, i) =>
-                `${i + 1}. **${c.def.name}** (cost ${c.def.cost}, power ${c.def.power})`,
+                `${i + 1}. **${c.def.name}** (cost ${c.def.cost}, power ${instancePower(c)})`,
             )
             .join("\n")
             .slice(0, 1000) || "Empty",
