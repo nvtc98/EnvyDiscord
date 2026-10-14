@@ -33,17 +33,17 @@ export function abilityText(ability: Ability | undefined): string {
       case "nexusSum":
         return "Active: If played in the middle lane, gain power equal to the two cards beside it in the same row.";
       case "gentlePush":
-        return `Active: At the end of your turn, push The Eyes Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
+        return `Active: Push The Eyes Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
       case "watcherDig":
-        return "Active: At the end of your turn, draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.";
+        return "Active: Draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.";
       case "moonlitSacrifice":
-        return "Active: At the end of your turn, destroy all cards in your hand and add their total power to a random friendly card on the board.";
+        return "Active: Destroy all cards in your hand and add their total power to a random friendly card on the board.";
       case "titanShift":
-        return "Active: At the end of your turn, move the other cards in this lane to another lane (as many as fit).";
+        return "Active: Move the other cards in this lane to another lane (as many as fit).";
       case "apexSwap":
-        return "Active: At the end of your turn, swap places with your frontmost card in this lane.";
+        return "Active: Swap places with your frontmost card in this lane.";
       case "berserkKill":
-        return "Active: At the end of your turn, destroy the card directly in front of this one.";
+        return "Active: Destroy the card directly in front of this one.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every

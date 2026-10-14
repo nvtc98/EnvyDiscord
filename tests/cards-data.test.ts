@@ -262,7 +262,7 @@ describe("card kind classification", () => {
       cost: 6,
       power: 6,
       kind: "active",
-      text: "Active: At the end of your turn, push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
+      text: "Active: Push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
     });
     expect(gentle?.ability).toEqual({
       timing: "active",

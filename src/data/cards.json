@@ -48,7 +48,7 @@
     "power": 12,
     "ability": "apexSwap",
     "kind": "active",
-    "text": "Active: At the end of your turn, swap places with your frontmost card in this lane.",
+    "text": "Active: Swap places with your frontmost card in this lane.",
     "note": "Cuối lượt của chủ: trong làn đã đặt, hoán đổi vị trí với thẻ phe ta ở gần mép địch nhất. Nếu Apex đã ở trước nhất hoặc là thẻ phe ta duy nhất trong làn thì không làm gì. Hoán đổi tính là move cho cả hai thẻ."
   },
   {
@@ -124,7 +124,7 @@
     "power": 4,
     "ability": "berserkKill",
     "kind": "active",
-    "text": "Active: At the end of your turn, destroy the card directly in front of this one.",
+    "text": "Active: Destroy the card directly in front of this one.",
     "note": "Cuối lượt của chủ: hủy thẻ ở ô ngay phía trước Berserk (ô kế tiếp về phía mép địch trong cùng làn), bất kể phe ta hay địch. Ô trống thì không làm gì. Đi qua đường hủy thường nên onDestroy (Phoenix/Glacial) và các bộ đếm hủy vẫn tính."
   },
   {
@@ -556,7 +556,7 @@
     "power": 6,
     "ability": "gentlePush 5",
     "kind": "active",
-    "text": "Active: At the end of your turn, push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
+    "text": "Active: Push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
     "note": "Cuối lượt của phe ta (tuy ghi Active nhưng tính lúc kết thúc lượt): với MỖI thẻ bị động (kind passive) của phe ta đang trên sân, đẩy The Eyes Privilege về phía địch 5% HP hiện tại của địch (làm tròn). Gentle là active nên không tự tính mình. Không có thẻ bị động nào thì không làm gì."
   },
   {
@@ -829,7 +829,7 @@
     "power": 4,
     "ability": "moonlitSacrifice",
     "kind": "active",
-    "text": "Active: At the end of your turn, destroy all cards in your hand and add their total power to a random friendly card on the board.",
+    "text": "Active: Destroy all cards in your hand and add their total power to a random friendly card on the board.",
     "note": "Cuối lượt của chủ: hủy toàn bộ thẻ trên tay (bỏ đi, không tính vào bộ đếm hủy trên sân) và cộng tổng power của chúng vào MỘT thẻ phe ta ngẫu nhiên trên sân (có thể là chính Moonlit). Tay trống thì không làm gì."
   },
   {
@@ -1406,7 +1406,7 @@
     "power": 10,
     "ability": "titanShift",
     "kind": "active",
-    "text": "Active: At the end of your turn, move the other cards in this lane to another lane (as many as fit).",
+    "text": "Active: Move the other cards in this lane to another lane (as many as fit).",
     "note": "Cuối lượt của chủ: chuyển mọi thẻ KHÁC trong làn của Titan (cả hai phe, trừ Titan) sang MỘT làn khác ngẫu nhiên, mỗi thẻ vào ô trống gần phía chủ của nó nhất. Chuyển được bao nhiêu thì chuyển, hết chỗ thì phần còn lại ở nguyên (không hủy). Titan không di chuyển."
   },
   {
@@ -1574,7 +1574,7 @@
     "power": 5,
     "ability": "watcherDig",
     "kind": "active",
-    "text": "Active: At the end of your turn, draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.",
+    "text": "Active: Draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.",
     "note": "Cuối lượt của chủ: xem (không lộ) 3 lá trên cùng của deck và rút ĐÚNG 1 lá theo làn đã đặt Watcher's — TRÁI lấy power thấp nhất, GIỮA lấy power vừa, PHẢI lấy power cao nhất (power hiệu dụng = def.power + bonus). Các lá không chọn giữ nguyên thứ tự trên đỉnh deck. Ít hơn 3 lá: 1 lá rút lá đó; 2 lá thì trái=thấp hơn, phải=cao hơn, giữa=lá thấp hơn. Tay đầy thì lá rút bị đốt."
   },
   {
