@@ -35,16 +35,16 @@ export function describeEvent(event: GameEvent, viewer: Seat): string | null {
       return `${who(event.seat)} ${event.card.name} spawned a copy in the ${lane} lane.`;
     }
     case "tide_shifted": {
-      if (event.rawDelta === 0) return "The Eye Privilege holds.";
-      // The Eye Privilege is a BURDEN: it is pulled toward whoever had the weaker board this turn.
+      if (event.rawDelta === 0) return "The Eyes Privilege holds.";
+      // The Eyes Privilege is a BURDEN: it is pulled toward whoever had the weaker board this turn.
       // rawDelta > 0 means the bottom seat's board was stronger, so the burden pulls toward the TOP
       // (the enemy, from the bottom viewer's side); rawDelta < 0 pulls toward the bottom (you).
       const towardViewer =
         viewer === "bottom" ? event.rawDelta < 0 : event.rawDelta > 0;
       const mag = Math.abs(event.rawDelta);
       return towardViewer
-        ? `The Eye Privilege pulls ${mag} toward you.`
-        : `The Eye Privilege pulls ${mag} toward the enemy.`;
+        ? `The Eyes Privilege pulls ${mag} toward you.`
+        : `The Eyes Privilege pulls ${mag} toward the enemy.`;
     }
     case "game_over":
       if (event.winner === "draw") return "The battle is a draw.";

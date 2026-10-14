@@ -60,7 +60,7 @@ const STYLES: Record<NonNullable<StoryChoice["style"]>, ButtonStyle> = {
 // source (the prologue wraps ${name} in ** itself), so they are not listed here.
 const BOLD_NAMES = [
   "The Eyes Of Wisdom",
-  "The Eye Privilege",
+  "The Eyes Privilege",
   "Stranger Eyes",
   "Bò Tuôi",
   "SPD",

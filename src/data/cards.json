@@ -500,8 +500,8 @@
     "power": 6,
     "ability": "gentlePush 5",
     "kind": "active",
-    "text": "Active: At the end of your turn, push The Eye Privilege 5% toward the enemy for each of your other passive cards on the board.",
-    "note": "Cuối lượt của phe ta (tuy ghi Active nhưng tính lúc kết thúc lượt): với MỖI thẻ bị động (kind passive) của phe ta đang trên sân, đẩy The Eye Privilege về phía địch 5% HP hiện tại của địch (làm tròn). Gentle là active nên không tự tính mình. Không có thẻ bị động nào thì không làm gì."
+    "text": "Active: At the end of your turn, push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
+    "note": "Cuối lượt của phe ta (tuy ghi Active nhưng tính lúc kết thúc lượt): với MỖI thẻ bị động (kind passive) của phe ta đang trên sân, đẩy The Eyes Privilege về phía địch 5% HP hiện tại của địch (làm tròn). Gentle là active nên không tự tính mình. Không có thẻ bị động nào thì không làm gì."
   },
   {
     "name": "Glacial Eyes",
@@ -1478,7 +1478,7 @@
     "power": 2,
     "ability": "transformAt 1 bo-sieu-phan-ong-cap-2",
     "coefficient": 1,
-    "text": "Passive: Pulls The Eye Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
+    "text": "Passive: Pulls The Eyes Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
     "kind": "passive",
     "note": "Dạng cấp 1 của Bò SPD. The Tide coefficient +1 (field coefficient:1). Hóa thành Cấp 2 khi tổng số lá bị hủy trong trận chạm 1. Text player-facing tiếng Anh, prefix Passive. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-2' (slugify bỏ chữ đ)."
   },
@@ -1489,7 +1489,7 @@
     "power": 4,
     "ability": "transformAt 2 bo-sieu-phan-ong-cap-3",
     "coefficient": 2,
-    "text": "Passive: Pulls The Eye Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
+    "text": "Passive: Pulls The Eyes Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
     "kind": "passive",
     "note": "Dạng cấp 2. Hệ số cán cân = 2 (field coefficient:2). Hóa thành Cấp 3 khi tổng số lá bị hủy trong trận chạm 2. transformAt trỏ tới id thật 'bo-sieu-phan-ong-cap-3'."
   },
@@ -1499,7 +1499,7 @@
     "cost": 1,
     "power": 6,
     "ability": "balanceCoefficient 3",
-    "text": "Passive: Pulls The Eye Privilege 3 times harder.",
+    "text": "Passive: Pulls The Eyes Privilege 3 times harder.",
     "kind": "passive",
     "note": "Dạng cuối. Hệ số cán cân = 3 (ability balanceCoefficient 3). Không hóa thêm."
   }

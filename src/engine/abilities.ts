@@ -33,7 +33,7 @@ export function abilityText(ability: Ability | undefined): string {
       case "nexusSum":
         return "Active: If played in the middle lane, gain power equal to the two cards beside it in the same row.";
       case "gentlePush":
-        return `Active: At the end of your turn, push The Eye Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
+        return `Active: At the end of your turn, push The Eyes Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
       case "watcherDig":
         return "Active: At the end of your turn, draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.";
       case "moonlitSacrifice":
@@ -71,8 +71,8 @@ export function abilityText(ability: Ability | undefined): string {
         return `Passive: When ${s(effect.count, "card")} ${effect.count === 1 ? "has" : "have"} been destroyed this match, transform.`;
       case "balanceCoefficient":
         return effect.k === 1
-          ? "Passive: Pulls The Eye Privilege normally."
-          : `Passive: Pulls The Eye Privilege ${effect.k} times harder.`;
+          ? "Passive: Pulls The Eyes Privilege normally."
+          : `Passive: Pulls The Eyes Privilege ${effect.k} times harder.`;
       case "phasing":
         return "Passive: When an enemy push would destroy this, slip to a random empty lane instead.";
       case "wicked":

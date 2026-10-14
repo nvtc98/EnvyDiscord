@@ -172,7 +172,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 2,
       coefficient: 1,
-      text: "Passive: Pulls The Eye Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
+      text: "Passive: Pulls The Eyes Privilege normally. When 1 card has been destroyed, transform into Bò Siêu Phản Động Cấp 2.",
     });
     expect(c1?.ability).toEqual({
       timing: "continuous",
@@ -189,7 +189,7 @@ describe("the four Bò Tuôi cards", () => {
       cost: 1,
       power: 4,
       coefficient: 2,
-      text: "Passive: Pulls The Eye Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
+      text: "Passive: Pulls The Eyes Privilege 2 times harder. When 2 cards have been destroyed, transform into Bò Siêu Phản Động Cấp 3.",
     });
     expect(c2?.ability).toEqual({
       timing: "continuous",
@@ -205,7 +205,7 @@ describe("the four Bò Tuôi cards", () => {
       faction: "botuoi",
       cost: 1,
       power: 6,
-      text: "Passive: Pulls The Eye Privilege 3 times harder.",
+      text: "Passive: Pulls The Eyes Privilege 3 times harder.",
     });
     expect(c3?.ability).toEqual({
       timing: "continuous",
@@ -262,7 +262,7 @@ describe("card kind classification", () => {
       cost: 6,
       power: 6,
       kind: "active",
-      text: "Active: At the end of your turn, push The Eye Privilege 5% toward the enemy for each of your other passive cards on the board.",
+      text: "Active: At the end of your turn, push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
     });
     expect(gentle?.ability).toEqual({
       timing: "active",

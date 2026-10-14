@@ -136,7 +136,7 @@ const LANE_HEADER_GAP = 6;
 // Battle HUD avatars: a circle at the top of each identity block in the left rail.
 const AVATAR_SIZE = 44;
 const AVATAR_GAP = 12;
-// The vertical Eye Privilege meter lives in the left rail between the two identities.
+// The vertical Eyes Privilege meter lives in the left rail between the two identities.
 const METER_W = 14;
 // Board cells are full portrait cards at this scale; the hand uses smaller full cards.
 const BOARD_CARD_SCALE = 0.5;
@@ -318,7 +318,7 @@ export async function createImageRenderer({
 
       const yourTurn = state.active === viewer && !state.winner;
 
-      // --- Left rail: enemy identity (top), Eye Privilege meter (middle), player identity (bottom). ---
+      // --- Left rail: enemy identity (top), Eyes Privilege meter (middle), player identity (bottom). ---
       const RAIL_X = MARGIN;
       const enemyCenterY = BOARD_Y + AVATAR_SIZE / 2;
       drawAvatar(
@@ -357,7 +357,7 @@ export async function createImageRenderer({
         `HAND ${hand.length} · DECK ${me.deck.length}`,
       );
 
-      // The Eye Privilege meter runs between the two avatars. No numeric value on the bar. Drawn
+      // The Eyes Privilege meter runs between the two avatars. No numeric value on the bar. Drawn
       // before the win overlay so the overlay scrim dims it too.
       const meterX = RAIL_X + AVATAR_SIZE / 2 - METER_W / 2;
       const meterTop = enemyCenterY + AVATAR_SIZE / 2 + 12;
