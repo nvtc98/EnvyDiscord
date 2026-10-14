@@ -63,6 +63,12 @@ const TOKENS: Record<string, TokenSpec> = {
   cloneMirror: { timing: "active", kind: "cloneMirror" },
   nexusSum: { timing: "active", kind: "nexusSum" },
   gentlePush: { timing: "active", kind: "gentlePush", args: ["percent:int"] },
+  watcherDig: { timing: "active", kind: "watcherDig" },
+  moonlitSacrifice: { timing: "active", kind: "moonlitSacrifice" },
+  titanShift: { timing: "active", kind: "titanShift" },
+  apexSwap: { timing: "active", kind: "apexSwap" },
+  berserkKill: { timing: "active", kind: "berserkKill" },
+  wildShift: { timing: "endOfRound", kind: "wildShift" },
   glacialSpawn: {
     timing: "onDestroy",
     kind: "glacialSpawn",

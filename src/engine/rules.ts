@@ -6,6 +6,7 @@ import {
   assertNever,
   CELLS,
   DEFAULT_SEAT_HP,
+  LANE_NAMES,
   LANES,
   MAX_ENERGY,
   MAX_HAND,
@@ -640,6 +641,21 @@ function hasContinuousKind(
   return ab?.timing === "continuous" && ab.effect.kind === kind;
 }
 
+/*
+ * MOVE-EVENT CONVENTION (design D.4). EVERY positional displacement of an on-board card — a push,
+ * pull, swap/exchange, self-relocation, random hop, or lane-shift — emits one `moved` GameEvent for
+ * each card whose (lane,cell) changes. A swap emits `moved` for BOTH cards. A clone-spawn (cloneInto)
+ * does NOT move an existing card, so it emits `cloned`, not `moved`.
+ *
+ * Audit of existing movers: today only `moveCardToEmptyLane` (Phasing relocation) and `relocateCard`
+ * (the end-of-turn movers below) emit per-card `moved` events. The push machinery — `pushInto` (entry
+ * push), `sirenPush`, and `phantomPush` — rearranges cells WITHOUT emitting a per-card `moved` event;
+ * each only pushes an `ability` log line. That emission behavior is left UNCHANGED on purpose: making
+ * the pushers emit `moved` would alter the historical movement/push behavior and the push tests. The
+ * reworked Wicked (self-only, +2 once at end of turn) only reacts to its OWN `moved` events, which now
+ * come solely from the NEW end-of-turn movers (Wild/Titan/Apex), all of which DO emit `moved`.
+ */
+
 /**
  * Moves `card` (same uid/owner/bonus — the whole instance by reference) into `toLane` at the
  * entry cell for the card's owner, emitting a `moved` event. precondition: toLane is empty — this does a
@@ -663,6 +679,32 @@ function moveCardToEmptyLane(
     card: card.def,
     from,
     to: { lane: toLane, cell },
+  });
+}
+
+/**
+ * Moves the on-board card at `from` into the KNOWN-EMPTY cell at `to`, preserving uid/owner/bonus, and
+ * emits one `moved` event. Unlike `moveCardToEmptyLane` (which hard-codes the owner's entry cell and
+ * assumes a wholly empty lane), this places into a specific cell the caller chose (via nearestEmptyCell).
+ * precondition: `state.lanes[from.lane][from.cell]` holds the card and `state.lanes[to.lane][to.cell]`
+ * is null. Backs the end-of-turn movers (Wild, Titan).
+ */
+function relocateCard(
+  state: GameState,
+  from: { lane: LaneIndex; cell: number },
+  to: { lane: LaneIndex; cell: number },
+  events: GameEvent[],
+): void {
+  const card = state.lanes[from.lane][from.cell]!;
+  state.lanes[from.lane][from.cell] = null;
+  state.lanes[to.lane][to.cell] = card;
+  events.push({
+    type: "moved",
+    seat: card.owner,
+    uid: card.uid,
+    card: card.def,
+    from,
+    to,
   });
 }
 
@@ -843,25 +885,6 @@ function fireReflecting(
   }
 }
 
-/** Count every `moved` event and bump each on-board Wicked's bonus by that count (design D.2). */
-function applyMoveReactions(state: GameState, events: GameEvent[]): void {
-  const moves = events.filter((e) => e.type === "moved").length;
-  if (moves === 0) return;
-  for (let lane = 0; lane < LANES; lane++)
-    for (let i = 0; i < CELLS; i++) {
-      const c = state.lanes[lane][i];
-      if (c && hasContinuousKind(c.def, "wicked")) {
-        c.bonus += moves;
-        events.push({
-          type: "ability",
-          seat: c.owner,
-          card: c.def,
-          text: `gained ${moves} power from movement`,
-        });
-      }
-    }
-}
-
 /** Plays a card from the active player's hand into a lane. Does not modify `prev`. */
 export function playCard(
   prev: GameState,
@@ -933,8 +956,8 @@ export function playCard(
     applyActive(state, card, lane, events, rng, fires);
   if (ability?.timing === "onPlay") applyOnPlay(state, card, events);
 
-  // Wicked reads every `moved` event emitted in this action (entry/Siren Phasing relocations).
-  applyMoveReactions(state, events);
+  // Wicked no longer reacts per action. It is self-only and resolves at the owner's end of turn
+  // (applyEndOfTurnAbilities), reading the turn's accumulated `moved` events (design D.5).
 
   // After every destroy this action could cause (entry push + any active destroys), sweep the board
   // once so Bò SPD cards transform the instant the match tally crosses their threshold (§5).
@@ -1101,8 +1124,15 @@ function applyActive(
       break;
     }
     case "gentlePush":
-      // Gentle's push is deferred to the owner's end of turn (applyGentlePush in resolveTurn); it does
-      // nothing on play. This case keeps the active switch exhaustive for assertNever.
+    // Gentle's push is deferred to the owner's end of turn (applyGentlePush in resolveTurn); it does
+    // nothing on play. This case keeps the active switch exhaustive for assertNever.
+    // fallthrough: the five end-of-turn movers below behave the same way — no-op on play, resolved in
+    // applyEndOfTurnAbilities during the owner's end of turn.
+    case "watcherDig":
+    case "moonlitSacrifice":
+    case "titanShift":
+    case "apexSwap":
+    case "berserkKill":
       break;
     default:
       assertNever(effect);
@@ -1264,6 +1294,416 @@ function applyGentlePush(state: GameState, events: GameEvent[]): void {
   }
 }
 
+/** The effective power of an on-board card or deck entry: base + its accumulated bonus, floored at 0. */
+const effectivePowerOf = (def: CardDef, bonus: number): number =>
+  Math.max(0, def.power + bonus);
+
+/** Finds an on-board card by uid, returning its lane/cell/instance, or null if it has left the board. */
+function findOnBoard(
+  state: GameState,
+  uid: number,
+): { lane: LaneIndex; cell: number; card: CardInstance } | null {
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const card = state.lanes[lane][cell];
+      if (card && card.uid === uid)
+        return { lane: lane as LaneIndex, cell, card };
+    }
+  return null;
+}
+
+/** The two lanes other than `lane`, in ascending order. Always length 2. */
+const otherLanes = (lane: LaneIndex): LaneIndex[] =>
+  ([0, 1, 2] as LaneIndex[]).filter((l) => l !== lane);
+
+/**
+ * Watcher's (watcherDig): looks at the owner's top-3 deck entries WITHOUT revealing them and draws
+ * exactly one into hand by Watcher's current lane — LEFT(0) → weakest, CENTER(1) → middle, RIGHT(2) →
+ * strongest, by effective power (def.power + entry.bonus). Non-chosen entries stay in their original
+ * top order (no shuffle). Edge cases: 1 entry → that one; 2 entries → left=lower, right=higher,
+ * center=the lower. Drawn card respects MAX_HAND (a full hand burns it, mirroring draw()).
+ */
+function applyWatcherDig(
+  state: GameState,
+  watcher: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+): void {
+  const deck = state.players[watcher.owner].deck;
+  const topCount = Math.min(3, deck.length);
+  if (topCount === 0) return; // empty deck → nothing
+  // Candidates = the top `topCount` entries, tagged with their deck index and effective power.
+  const candidates = deck.slice(0, topCount).map((entry, idx) => ({
+    idx,
+    power: effectivePowerOf(entry.def, entry.bonus),
+  }));
+  // Order by power ascending, breaking ties by original top order (stable: lower idx first).
+  const byPower = [...candidates].sort((a, b) =>
+    a.power === b.power ? a.idx - b.idx : a.power - b.power,
+  );
+  // Pick position by lane: left → weakest (0), right → strongest (last), center → middle.
+  // Per the task's 2-card rule, center resolves to the lower of the two (floor of the midpoint).
+  const pos =
+    lane === 0
+      ? 0
+      : lane === 2
+        ? byPower.length - 1
+        : Math.floor((byPower.length - 1) / 2);
+  const chosenDeckIdx = byPower[pos].idx;
+  const [entry] = deck.splice(chosenDeckIdx, 1); // non-chosen entries keep their order
+  if (handFull(state, watcher.owner)) {
+    events.push({ type: "burned", seat: watcher.owner, card: entry.def });
+    events.push({
+      type: "ability",
+      seat: watcher.owner,
+      card: watcher.def,
+      text: "dug a card from the deck, but the hand was full",
+    });
+    return;
+  }
+  const drawn: CardInstance = {
+    uid: state.nextUid++,
+    def: entry.def,
+    owner: watcher.owner,
+    bonus: entry.bonus,
+  };
+  state.players[watcher.owner].hand.push(drawn);
+  events.push({
+    type: "drew",
+    seat: watcher.owner,
+    uid: drawn.uid,
+    card: entry.def,
+  });
+  events.push({
+    type: "ability",
+    seat: watcher.owner,
+    card: watcher.def,
+    // Do NOT reveal the non-chosen cards; name only the drawn one.
+    text: `dug ${entry.def.name} from the top of the deck`,
+  });
+}
+
+/**
+ * Moonlit (moonlitSacrifice): destroys ALL cards in the owner's hand (discarded, NOT routed through
+ * destroyCard — they never touch destroyedPower/destroyedCount), sums their effective power, and adds
+ * the total as permanent power to ONE RANDOM friendly on-board card (Moonlit itself eligible). Empty
+ * hand → nothing, no event.
+ */
+function applyMoonlitSacrifice(
+  state: GameState,
+  moonlit: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const hand = state.players[moonlit.owner].hand;
+  if (hand.length === 0) return;
+  const total = hand.reduce((n, c) => n + effectivePowerOf(c.def, c.bonus), 0);
+  state.players[moonlit.owner].hand = []; // discard the whole hand (no board-destroy tally)
+  const friendly: CardInstance[] = [];
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const c = state.lanes[lane][cell];
+      if (c && c.owner === moonlit.owner) friendly.push(c);
+    }
+  if (friendly.length === 0) return; // defensive: Moonlit itself should always qualify
+  const target = pick(friendly, rng);
+  target.bonus += total;
+  events.push({
+    type: "ability",
+    seat: moonlit.owner,
+    card: moonlit.def,
+    text: `destroyed its hand and gave +${total} power to ${target.def.name}`,
+  });
+}
+
+/**
+ * Titan (titanShift): moves every OTHER card in Titan's lane (both seats, Titan excluded) into ONE
+ * RANDOM other lane, each into the empty cell nearest THAT card's owner side; moves as many as fit,
+ * the rest stay (no destruction). Titan does not move. Each relocated card emits `moved`.
+ */
+function applyTitanShift(
+  state: GameState,
+  titan: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const dest = pick(otherLanes(lane), rng);
+  // Collect the other cards in Titan's lane top→bottom (deterministic placement order).
+  const movers: { cell: number; card: CardInstance }[] = [];
+  for (let cell = 0; cell < CELLS; cell++) {
+    const c = state.lanes[lane][cell];
+    if (c && c.uid !== titan.uid) movers.push({ cell, card: c });
+  }
+  let moved = 0;
+  for (const m of movers) {
+    const toCell = nearestEmptyCell(state, dest, m.card.owner);
+    if (toCell === null) continue; // destination full for this owner side → stays
+    relocateCard(
+      state,
+      { lane, cell: m.cell },
+      { lane: dest, cell: toCell },
+      events,
+    );
+    moved += 1;
+  }
+  if (moved > 0)
+    events.push({
+      type: "ability",
+      seat: titan.owner,
+      card: titan.def,
+      text: `shifted ${moved} card${moved === 1 ? "" : "s"} to the ${LANE_NAMES[dest]} lane`,
+    });
+}
+
+/**
+ * Apex (apexSwap): in Apex's lane, finds the OWNER's friendly card closest to the ENEMY edge (bottom
+ * owner → smallest cell index; top owner → largest), and swaps cells with it. If Apex is already that
+ * frontmost card, or it is the owner's only friendly card in the lane, nothing happens. The swap emits
+ * `moved` for BOTH cards.
+ */
+function applyApexSwap(
+  state: GameState,
+  apex: CardInstance,
+  lane: LaneIndex,
+  apexCell: number,
+  events: GameEvent[],
+): void {
+  const cells = state.lanes[lane];
+  // Enemy edge: bottom's is cell 0, top's is cell CELLS-1. Scan toward the owner to find the frontmost
+  // friendly card (first friendly starting from the enemy edge).
+  const order =
+    apex.owner === "bottom"
+      ? Array.from({ length: CELLS }, (_, i) => i) // 0,1,2
+      : Array.from({ length: CELLS }, (_, i) => CELLS - 1 - i); // 2,1,0
+  let frontCell: number | null = null;
+  for (const i of order) {
+    const c = cells[i];
+    if (c && c.owner === apex.owner) {
+      frontCell = i;
+      break;
+    }
+  }
+  if (frontCell === null || frontCell === apexCell) return; // Apex is already frontmost / only card
+  const front = cells[frontCell]!;
+  // Swap the two cells and emit a `moved` for each displaced card.
+  cells[apexCell] = front;
+  cells[frontCell] = apex;
+  events.push({
+    type: "moved",
+    seat: apex.owner,
+    uid: apex.uid,
+    card: apex.def,
+    from: { lane, cell: apexCell },
+    to: { lane, cell: frontCell },
+  });
+  events.push({
+    type: "moved",
+    seat: front.owner,
+    uid: front.uid,
+    card: front.def,
+    from: { lane, cell: frontCell },
+    to: { lane, cell: apexCell },
+  });
+  events.push({
+    type: "ability",
+    seat: apex.owner,
+    card: apex.def,
+    text: `swapped places with ${front.def.name}`,
+  });
+}
+
+/**
+ * Berserk (berserkKill): destroys the card in the cell directly IN FRONT of Berserk (one step toward
+ * the enemy edge: bottom → cell−1, top → cell+1), friendly OR enemy, routed through destroyCard so
+ * onDestroy (Phoenix/Glacial) and the destroyedPower/destroyedCount tallies apply. Empty front → nothing.
+ */
+function applyBerserkKill(
+  state: GameState,
+  berserk: CardInstance,
+  lane: LaneIndex,
+  berserkCell: number,
+  events: GameEvent[],
+): void {
+  const step = berserk.owner === "bottom" ? -1 : 1;
+  const frontCell = berserkCell + step;
+  if (frontCell < 0 || frontCell >= CELLS) return; // Berserk is at the enemy edge → no cell in front
+  const victim = state.lanes[lane][frontCell];
+  if (!victim) return; // empty front → nothing
+  state.lanes[lane][frontCell] = null;
+  // "laser" cause: a direct destroy (not a push/siren), so Glacial's push-only spawn does not fire.
+  destroyCard(state, victim, events, "laser", lane);
+  events.push({
+    type: "ability",
+    seat: berserk.owner,
+    card: berserk.def,
+    text: `destroyed ${victim.def.name} in front of it`,
+  });
+}
+
+/**
+ * Wild (wildShift): picks ONE RANDOM card in Wild's own lane excluding Wild (either seat) and moves it
+ * to a RANDOM destination lane — among the two OTHER lanes that have an empty cell for that card's
+ * owner side. If no other card is in the lane, or neither other lane has room, nothing happens. The
+ * moved card emits `moved`.
+ */
+function applyWildShift(
+  state: GameState,
+  wild: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const others: { cell: number; card: CardInstance }[] = [];
+  for (let cell = 0; cell < CELLS; cell++) {
+    const c = state.lanes[lane][cell];
+    if (c && c.uid !== wild.uid) others.push({ cell, card: c });
+  }
+  if (others.length === 0) return; // no other card to move
+  const chosen = pick(others, rng);
+  // Candidate destination lanes: the other two lanes that have room for the chosen card's owner.
+  const dests = otherLanes(lane).filter(
+    (l) => nearestEmptyCell(state, l, chosen.card.owner) !== null,
+  );
+  if (dests.length === 0) return; // neither other lane has room
+  const dest = pick(dests, rng);
+  const toCell = nearestEmptyCell(state, dest, chosen.card.owner)!;
+  relocateCard(
+    state,
+    { lane, cell: chosen.cell },
+    { lane: dest, cell: toCell },
+    events,
+  );
+  events.push({
+    type: "ability",
+    seat: wild.owner,
+    card: wild.def,
+    text: `moved ${chosen.card.def.name} to the ${LANE_NAMES[dest]} lane`,
+  });
+}
+
+/** The end-of-turn ability kind a card carries, if it is one the end-of-turn resolver handles. */
+type EndOfTurnKind =
+  | "watcherDig"
+  | "moonlitSacrifice"
+  | "titanShift"
+  | "apexSwap"
+  | "berserkKill"
+  | "wildShift";
+
+function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
+  const ab = def.ability;
+  if (!ab) return null;
+  if (ab.timing === "active") {
+    switch (ab.effect.kind) {
+      case "watcherDig":
+      case "moonlitSacrifice":
+      case "titanShift":
+      case "apexSwap":
+      case "berserkKill":
+        return ab.effect.kind;
+      default:
+        return null;
+    }
+  }
+  if (ab.timing === "endOfRound" && ab.effect.kind === "wildShift")
+    return "wildShift";
+  return null;
+}
+
+/**
+ * Resolves the end-of-turn board abilities for the seat that just ended its turn (`state.active`):
+ * Watcher's dig, Moonlit sacrifice, Titan/Apex/Berserk, and the passive Wild shift. These were armed
+ * by having been played earlier in the turn and deliberately deferred so a player cannot play, see the
+ * random result, then reset the turn to re-roll (design D1).
+ *
+ * One collection pass first (lanes L→R, cells top→bottom) records each (uid, kind) to resolve; then
+ * each is resolved by RE-FINDING the card by uid (skipping any that have since left the board). This
+ * mirrors collectOceanReturns and avoids double-processing a card that an earlier mover relocated into
+ * a not-yet-visited cell.
+ *
+ * The movers (Wild/Titan/Apex) run in this same pass BEFORE the Wicked end-of-turn check (design D5),
+ * so Wicked sees its own `moved` events from them. Wicked's self-only +2 is applied afterward.
+ */
+function applyEndOfTurnAbilities(
+  state: GameState,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const owner = state.active;
+  // Pass 1: collect this seat's end-of-turn carriers in deterministic board order.
+  const todo: { uid: number; kind: EndOfTurnKind }[] = [];
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const card = state.lanes[lane][cell];
+      if (!card || card.owner !== owner) continue;
+      const kind = endOfTurnKindOf(card.def);
+      if (kind) todo.push({ uid: card.uid, kind });
+    }
+  // Pass 2: resolve each by re-finding the card live (it may have moved or left the board).
+  for (const t of todo) {
+    const found = findOnBoard(state, t.uid);
+    if (!found) continue; // left the board (e.g. destroyed by a Berserk earlier in the pass)
+    const { lane, cell, card } = found;
+    switch (t.kind) {
+      case "watcherDig":
+        applyWatcherDig(state, card, lane, events);
+        break;
+      case "moonlitSacrifice":
+        applyMoonlitSacrifice(state, card, events, rng);
+        break;
+      case "titanShift":
+        applyTitanShift(state, card, lane, events, rng);
+        break;
+      case "apexSwap":
+        applyApexSwap(state, card, lane, cell, events);
+        break;
+      case "berserkKill":
+        applyBerserkKill(state, card, lane, cell, events);
+        break;
+      case "wildShift":
+        applyWildShift(state, card, lane, events, rng);
+        break;
+    }
+  }
+  // Wicked (self-only, +2 once per turn): after the movers above have run, bump each on-board Wicked
+  // owned by this seat by exactly +2 if its OWN uid appears in a `moved` event emitted this turn.
+  applyWickedEndOfTurn(state, owner, events);
+}
+
+/**
+ * Wicked's end-of-turn resolution for `owner`: for each on-board Wicked owned by this seat, if its own
+ * uid appears in any `moved` event accumulated in `events` this turn, add exactly +2 power ONCE (never
+ * stacking per move). Runs AFTER the end-of-turn movers so their `moved` events are visible (design D5).
+ */
+function applyWickedEndOfTurn(
+  state: GameState,
+  owner: Seat,
+  events: GameEvent[],
+): void {
+  const movedUids = new Set(
+    events.filter((e) => e.type === "moved").map((e) => e.uid),
+  );
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const c = state.lanes[lane][cell];
+      if (
+        c &&
+        c.owner === owner &&
+        hasContinuousKind(c.def, "wicked") &&
+        movedUids.has(c.uid)
+      ) {
+        c.bonus += 2;
+        events.push({
+          type: "ability",
+          seat: c.owner,
+          card: c.def,
+          text: "gained +2 power from moving this turn",
+        });
+      }
+    }
+}
+
 function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   // 1. Read board power -> 2. apply tide shift -> 3. bump turnsPlayed -> 4. knockout
   // -> 5. cap -> 6. end-of-turn passes (Gentle, Ocean), only if the game continues.
@@ -1299,6 +1739,12 @@ function resolveTurn(state: GameState, events: GameEvent[], rng: Rng): void {
   }
 
   // Phase B: post-resolution end-of-turn effects, only if the game continues.
+  // The board movers / draws / destroys (Watcher's, Moonlit, Wild, Titan, Apex, Berserk) and the
+  // self-only Wicked bump resolve FIRST (design D3), so board mutations settle before the meter
+  // pushes and Ocean's self-return read the board.
+  if (!state.winner) applyEndOfTurnAbilities(state, events, rng);
+  // A Berserk destroy can cross a transformAt threshold mid-end-of-turn; sweep so Bò SPD transforms.
+  if (!state.winner) applyTransforms(state, events);
   if (!state.winner) applyGentlePush(state, events); // Gentle pushes the meter before Ocean
   if (!state.winner) {
     const oceans = collectOceanReturns(state); // Pass 1: snapshot

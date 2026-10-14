@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { abilityText } from "../src/engine/abilities";
-import { canPlay, effectiveCost, playCard } from "../src/engine/rules";
+import { canPlay, effectiveCost, endTurn, playCard } from "../src/engine/rules";
 import type {
   Ability,
   CardInstance,
@@ -43,6 +43,10 @@ const reflecting = (): Ability => ({
 const gentle = (amount = 1): Ability => ({
   timing: "continuous",
   effect: { kind: "costReduction", amount },
+});
+const titanShift = (): Ability => ({
+  timing: "active",
+  effect: { kind: "titanShift" },
 });
 
 const onBoard = (state: GameState): CardInstance[] =>
@@ -346,31 +350,36 @@ describe("Phasing Eyes / phasing", () => {
 // --- Wicked Eyes --------------------------------------------------------------
 
 describe("Wicked Eyes / wicked", () => {
-  it("gains +1 power per moved event in the action (from either seat)", () => {
+  it("gains exactly +2 at end of turn when its own position moved this turn", () => {
     const state = emptyGame();
-    state.active = "top";
-    // A Phasing relocate (one moved event) with a Wicked on the board.
+    state.active = "bottom";
+    // Titan + Wicked share lane 0; a Titan shift at end of turn relocates Wicked (the only other
+    // card in Titan's lane) to another lane, emitting a `moved` event for Wicked's uid.
+    const wickedInst = instance(def("WIK", 4, 7, wicked()), "bottom");
+    const titanInst = instance(def("TTN", 4, 10, titanShift()), "bottom");
+    setLane(state, 0, [null, wickedInst, titanInst]);
+
+    const { state: after, events } = endTurn(state, mulberry32(1));
+
+    // Wicked moved once → gains +2 (not +1 per move, and never stacking).
+    const wikMoves = events.filter(
+      (e) => e.type === "moved" && e.uid === wickedInst.uid,
+    );
+    expect(wikMoves.length).toBe(1);
+    const wik = onBoard(after).find((c) => c.uid === wickedInst.uid)!;
+    expect(wik.bonus).toBe(2);
+  });
+
+  it("does not gain when it did not move this turn", () => {
+    const state = emptyGame();
+    state.active = "bottom";
     const wickedInst = instance(def("WIK", 4, 7, wicked()), "bottom");
     setLane(state, 2, [null, null, wickedInst]);
-    const phasingInst = instance(def("PHS", 2, 3, phasing()), "bottom");
-    setLane(state, 0, [
-      instance(def("M", 1, 1), "bottom"),
-      instance(def("N", 1, 1), "bottom"),
-      phasingInst,
-    ]);
-    // Lane 1 empty → Phasing relocates there, emitting one moved event.
 
-    const { state: after, events } = play(
-      state,
-      "top",
-      def("ATK", 1, 1),
-      0,
-      mulberry32(1),
-    );
+    const { state: after } = endTurn(state, mulberry32(1));
 
-    expect(events.filter((e) => e.type === "moved").length).toBe(1);
     const wik = onBoard(after).find((c) => c.uid === wickedInst.uid)!;
-    expect(wik.bonus).toBe(1);
+    expect(wik.bonus).toBe(0);
   });
 });
 

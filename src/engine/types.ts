@@ -31,7 +31,15 @@ export type ActiveEffect =
   | { kind: "cloneLane" } // Echo: clone self into every empty cell in the played lane
   | { kind: "cloneMirror" } // Dual: if played in a side lane, clone self into the other side lane
   | { kind: "nexusSum" } // Nexus: if played in the middle lane, gain the current power of both side-lane cards in its row
-  | { kind: "gentlePush"; percent: number }; // Gentle: at end of the owner's turn, push the meter `percent`% of the enemy's HP toward the enemy per friendly passive card
+  | { kind: "gentlePush"; percent: number } // Gentle: at end of the owner's turn, push the meter `percent`% of the enemy's HP toward the enemy per friendly passive card
+  // The five below carry `timing: "active"` (so they render "Active:") but are NO-OPS on play; they
+  // resolve during the OWNER's end-of-turn resolution (resolveTurn's applyEndOfTurnAbilities), mirroring
+  // gentlePush. The card having been played earlier that turn arms the effect.
+  | { kind: "watcherDig" } // Watcher's: end of turn, draw 1 of the top 3 deck cards by lane (left=weakest, center=middle, right=strongest); non-chosen stay on top
+  | { kind: "moonlitSacrifice" } // Moonlit: end of turn, destroy all cards in hand, add their total power to one random friendly on-board card
+  | { kind: "titanShift" } // Titan: end of turn, move every OTHER card in this lane (both seats) to one random other lane (as many as fit)
+  | { kind: "apexSwap" } // Apex: end of turn, swap places with the owner's frontmost friendly card in this lane
+  | { kind: "berserkKill" }; // Berserk: end of turn, destroy the card directly in front of this one (toward the enemy edge), friendly or enemy
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -40,13 +48,14 @@ export type ContinuousEffect =
   | { kind: "transformAt"; count: number; into: string } // Bò SPD: transform into `into` once `count` cards have been destroyed this match
   | { kind: "balanceCoefficient"; k: number } // Bò SPD: contributes `k` to the single global tide coefficient (§6)
   | { kind: "phasing" } // Phasing: an enemy push that would destroy it slips it to a random empty lane instead
-  | { kind: "wicked" } // Wicked: gains +1 power whenever any card moves (a `moved` event) while on board
+  | { kind: "wicked" } // Wicked: at the owner's end of turn, if THIS card itself moved during the turn, gain +2 power — at most once per turn, regardless of how many times it moved
   | { kind: "reflecting" } // Reflecting: an enemy push that displaces it shoves a random other lane one step
   | { kind: "costReduction"; amount: number }; // Gentle: owner's cards cost `amount` less while this is on the board
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
 export type EndOfRoundEffect =
   | { kind: "oceanReturn"; amount: number } // Ocean: +amount to friendlies, then return to deck (phase 2)
-  | { kind: "teamBuffEndOfTurn"; amount: number }; // Cosmic: at every end of turn, +amount to the owner's OTHER on-board cards
+  | { kind: "teamBuffEndOfTurn"; amount: number } // Cosmic: at every end of turn, +amount to the owner's OTHER on-board cards
+  | { kind: "wildShift" }; // Wild: at the OWNER's end of turn, move one random other card in Wild's lane (either seat) to a random other lane that has room
 export type OnDestroyEffect =
   | { kind: "rebirth"; amount: number } // Phoenix: return to hand with +amount
   | { kind: "glacialSpawn"; drop: number }; // Glacial: when pushed off the edge (push OR siren), spawn a (power − drop) clone into each other lane, stopping once spawn power ≤ 0

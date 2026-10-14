@@ -34,6 +34,16 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: If played in the middle lane, gain power equal to the two cards beside it in the same row.";
       case "gentlePush":
         return `Active: At the end of your turn, push The Eye Privilege ${effect.percent}% toward the enemy for each of your other passive cards on the board.`;
+      case "watcherDig":
+        return "Active: At the end of your turn, draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.";
+      case "moonlitSacrifice":
+        return "Active: At the end of your turn, destroy all cards in your hand and add their total power to a random friendly card on the board.";
+      case "titanShift":
+        return "Active: At the end of your turn, move the other cards in this lane to another lane (as many as fit).";
+      case "apexSwap":
+        return "Active: At the end of your turn, swap places with your frontmost card in this lane.";
+      case "berserkKill":
+        return "Active: At the end of your turn, destroy the card directly in front of this one.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -66,7 +76,7 @@ export function abilityText(ability: Ability | undefined): string {
       case "phasing":
         return "Passive: When an enemy push would destroy this, slip to a random empty lane instead.";
       case "wicked":
-        return "Passive: Whenever any card moves, this gains +1 power.";
+        return "Passive: If this card moves during a turn, it gains +2 power (at most once per turn).";
       case "reflecting":
         return "Passive: When an enemy push displaces this, shove a random other lane one step.";
       case "costReduction":
@@ -83,6 +93,8 @@ export function abilityText(ability: Ability | undefined): string {
         return `Passive: At the end of your turn, shuffle back into your deck and give every card in your deck +${effect.amount} power, including this one.`;
       case "teamBuffEndOfTurn":
         return `Passive: At the end of every turn, give your other cards +${effect.amount} power.`;
+      case "wildShift":
+        return "Passive: At the end of your turn, move a random other card in this lane to another lane with space.";
       default:
         return assertNever(effect);
     }

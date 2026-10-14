@@ -44,8 +44,12 @@
   {
     "name": "Apex Eyes",
     "rarity": "bargain",
-    "cost": 2,
-    "power": 6
+    "cost": 4,
+    "power": 12,
+    "ability": "apexSwap",
+    "kind": "active",
+    "text": "Active: At the end of your turn, swap places with your frontmost card in this lane.",
+    "note": "Cuối lượt của chủ: trong làn đã đặt, hoán đổi vị trí với thẻ phe ta ở gần mép địch nhất. Nếu Apex đã ở trước nhất hoặc là thẻ phe ta duy nhất trong làn thì không làm gì. Hoán đổi tính là move cho cả hai thẻ."
   },
   {
     "name": "Arcane Eyes",
@@ -116,8 +120,12 @@
   {
     "name": "Berserk Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 4,
+    "power": 4,
+    "ability": "berserkKill",
+    "kind": "active",
+    "text": "Active: At the end of your turn, destroy the card directly in front of this one.",
+    "note": "Cuối lượt của chủ: hủy thẻ ở ô ngay phía trước Berserk (ô kế tiếp về phía mép địch trong cùng làn), bất kể phe ta hay địch. Ô trống thì không làm gì. Đi qua đường hủy thường nên onDestroy (Phoenix/Glacial) và các bộ đếm hủy vẫn tính."
   },
   {
     "name": "Beyond Eyes",
@@ -726,8 +734,12 @@
   {
     "name": "Moonlit Eyes",
     "rarity": "bargain",
-    "cost": 2,
-    "power": 6
+    "cost": 6,
+    "power": 4,
+    "ability": "moonlitSacrifice",
+    "kind": "active",
+    "text": "Active: At the end of your turn, destroy all cards in your hand and add their total power to a random friendly card on the board.",
+    "note": "Cuối lượt của chủ: hủy toàn bộ thẻ trên tay (bỏ đi, không tính vào bộ đếm hủy trên sân) và cộng tổng power của chúng vào MỘT thẻ phe ta ngẫu nhiên trên sân (có thể là chính Moonlit). Tay trống thì không làm gì."
   },
   {
     "name": "Mortal Eyes",
@@ -796,7 +808,7 @@
     "name": "Ocean Eyes",
     "rarity": "eternal",
     "cost": 1,
-    "power": 2,
+    "power": 1,
     "ability": "oceanReturn 1",
     "kind": "passive",
     "note": "Cuối lượt: Ocean trở về vị trí ngẫu nhiên trong deck của chủ VÀ +1 power vĩnh viễn cho MỌI thẻ trong deck của chủ, GỒM CẢ chính nó (bonus tích lũy nên Ocean rút lại sẽ mạnh hơn). Chỉ ảnh hưởng deck của chủ, không đụng deck địch."
@@ -1236,8 +1248,12 @@
   {
     "name": "Titan Eyes",
     "rarity": "common",
-    "cost": 1,
-    "power": 3
+    "cost": 4,
+    "power": 10,
+    "ability": "titanShift",
+    "kind": "active",
+    "text": "Active: At the end of your turn, move the other cards in this lane to another lane (as many as fit).",
+    "note": "Cuối lượt của chủ: chuyển mọi thẻ KHÁC trong làn của Titan (cả hai phe, trừ Titan) sang MỘT làn khác ngẫu nhiên, mỗi thẻ vào ô trống gần phía chủ của nó nhất. Chuyển được bao nhiêu thì chuyển, hết chỗ thì phần còn lại ở nguyên (không hủy). Titan không di chuyển."
   },
   {
     "name": "Tracking Eyes",
@@ -1365,8 +1381,12 @@
   {
     "name": "Watcher's Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 3,
+    "power": 5,
+    "ability": "watcherDig",
+    "kind": "active",
+    "text": "Active: At the end of your turn, draw from the top 3 cards of your deck — the weakest if left, the middle if center, the strongest if right.",
+    "note": "Cuối lượt của chủ: xem (không lộ) 3 lá trên cùng của deck và rút ĐÚNG 1 lá theo làn đã đặt Watcher's — TRÁI lấy power thấp nhất, GIỮA lấy power vừa, PHẢI lấy power cao nhất (power hiệu dụng = def.power + bonus). Các lá không chọn giữ nguyên thứ tự trên đỉnh deck. Ít hơn 3 lá: 1 lá rút lá đó; 2 lá thì trái=thấp hơn, phải=cao hơn, giữa=lá thấp hơn. Tay đầy thì lá rút bị đốt."
   },
   {
     "name": "Weaving Eyes",
@@ -1389,11 +1409,12 @@
   {
     "name": "Wicked Eyes",
     "rarity": "eternal",
-    "cost": 4,
-    "power": 5,
+    "cost": 2,
+    "power": 2,
     "ability": "wicked",
     "kind": "passive",
-    "note": "Mỗi khi có bất kỳ thẻ nào di chuyển (hiệu ứng move), thẻ này +1 power."
+    "text": "Passive: If this card moves during a turn, it gains +2 power (at most once per turn).",
+    "note": "Bị động: nếu chính thẻ này được di chuyển (đẩy, kéo, hoán đổi, nhảy... bất kỳ sự xê dịch vị trí nào) trong lượt thì +2 power — tối đa +2 mỗi lượt dù di chuyển bao nhiêu lần. Tính vào cuối lượt của chủ."
   },
   {
     "name": "Widow Eyes",
@@ -1405,7 +1426,11 @@
     "name": "Wild Eyes",
     "rarity": "common",
     "cost": 4,
-    "power": 12
+    "power": 4,
+    "ability": "wildShift",
+    "kind": "passive",
+    "text": "Passive: At the end of your turn, move a random other card in this lane to another lane with space.",
+    "note": "Bị động, cuối lượt của chủ khi còn trên sân: chọn ngẫu nhiên MỘT thẻ khác trong làn của Wild (phe nào cũng được, trừ Wild) và chuyển sang một làn khác ngẫu nhiên còn chỗ (ô trống gần phía chủ của thẻ đó). Nếu không còn chỗ ở cả hai làn kia, hoặc không có thẻ nào khác trong làn, thì không xảy ra."
   },
   {
     "name": "Wise Eyes",

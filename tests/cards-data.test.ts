@@ -62,7 +62,7 @@ const DESIGNED: CardDef[] = [
     name: "Ocean Eyes",
     rarity: "eternal",
     cost: 1,
-    power: 2,
+    power: 1,
     faction: "the-eyes",
     ability: {
       timing: "endOfRound",
@@ -270,9 +270,9 @@ describe("card kind classification", () => {
     });
   });
 
-  it("Wicked Eyes is a passive 4/5 wicked", () => {
+  it("Wicked Eyes is a passive 2/2 wicked", () => {
     const wicked = CARD_INDEX.get("wicked-eyes");
-    expect(wicked).toMatchObject({ cost: 4, power: 5, kind: "passive" });
+    expect(wicked).toMatchObject({ cost: 2, power: 2, kind: "passive" });
     expect(wicked?.ability).toEqual({
       timing: "continuous",
       effect: { kind: "wicked" },
