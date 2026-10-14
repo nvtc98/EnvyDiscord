@@ -97,9 +97,9 @@ describe("tutorialLineFor — teach-once content selection", () => {
     expect(joined).toMatch(/cost/i);
     expect(joined).toMatch(/lane/i);
     expect(joined).toMatch(/past the far edge/i);
-    // Names SPD's turn-1 card and warns about the transform-on-destroy caution. The warning names
-    // only Cấp 1 and the dreaded Cấp 3 — it must NOT name Cấp 2 (deliberately hidden).
-    expect(joined).toMatch(/Bò Siêu Phản Động Cấp 1/);
+    // Warns about the transform-on-destroy caution, naming only the dreaded Cấp 3. The card is not
+    // named by rank up front ("Mark his first card." — no Cấp 1), and Cấp 2 is deliberately hidden.
+    expect(joined).not.toMatch(/Cấp 1/);
     expect(joined).not.toMatch(/Cấp 2/);
     expect(joined).toMatch(/Bò Siêu Phản Động Cấp 3/);
     expect(joined).toMatch(/destroy/i);

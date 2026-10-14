@@ -79,7 +79,7 @@ export function tutorialLineFor(
       if (!t.ability) {
         t.ability = true;
         bubbles.push(
-          "Mark his first card — **Bò Siêu Phản Động Cấp 1**. A card may bear an art: an *Active*, which wakes but once when it is played, or a *Passive*, ever at work while it holds the field.",
+          "Mark his first card. A card may bear an art: an *Active*, which wakes but once when it is played, or a *Passive*, ever at work while it holds the field.",
           "This one bears a Passive, and a cruel one. Now that thou knowest the push: let a single card fall in this duel, his or thine, and the beast stirs — it changes its shape, and grows stronger. So striking cards from the field is mighty — yet beware, for each one that falls feeds it. And should it climb to its final, fell shape — **Bò Siêu Phản Động Cấp 3** — pray thou dost not live to see such a horror. Tread with care.",
         );
       }
