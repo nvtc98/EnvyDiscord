@@ -93,14 +93,20 @@ describe("tutorialLineFor — teach-once content selection", () => {
     expect(joined).toMatch(/The Eyes Privilege/);
     expect(joined).toMatch(/Active/);
     expect(joined).toMatch(/Passive/);
+    // The play (cost/power/lane) and push lessons are taught here too, BEFORE the player's first move.
+    expect(joined).toMatch(/cost/i);
+    expect(joined).toMatch(/lane/i);
+    expect(joined).toMatch(/past the far edge/i);
     // Names SPD's turn-1 card and warns about the transform-on-destroy caution. The warning names
-    // only Cấp 1 and hints at a dreaded THIRD shape — it must NOT name Cấp 2 (deliberately hidden).
+    // only Cấp 1 and the dreaded Cấp 3 — it must NOT name Cấp 2 (deliberately hidden).
     expect(joined).toMatch(/Bò Siêu Phản Động Cấp 1/);
     expect(joined).not.toMatch(/Cấp 2/);
-    expect(joined).toMatch(/third shape/i);
+    expect(joined).toMatch(/Bò Siêu Phản Động Cấp 3/);
     expect(joined).toMatch(/destroy/i);
-    // Both teach-once flags are now set.
+    // All the first-move teach-once flags are now set.
     expect(player.story!.tutorial!.tideSeen).toBe(true);
+    expect(player.story!.tutorial!.play).toBe(true);
+    expect(player.story!.tutorial!.push).toBe(true);
     expect(player.story!.tutorial!.ability).toBe(true);
     // A second fire with both taught is silent.
     expect(tutorialLineFor(beat("after-enemy-turn"), player)).toBeNull();

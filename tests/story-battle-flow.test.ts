@@ -410,10 +410,11 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     const dm = await walkToBattle(ctx, "beat");
     const { sessions } = await import("../src/discord/battle-session");
     const session = sessions.get("beat")!;
-    // after-player-play has NOT been taught yet (only battle-start + after-enemy-turn fired at launch),
-    // so the first drive teaches it; the second is silent (teach-once).
+    // after-player-end-turn has NOT been taught yet (battle-start + after-enemy-turn fired at launch,
+    // and after-enemy-turn now also teaches play+push), so the first drive teaches it; the second is
+    // silent (teach-once).
     const sentBefore = dm.sent.length;
-    const b1 = fakeBeat(session, "after-player-play");
+    const b1 = fakeBeat(session, "after-player-end-turn");
     // The callback now BLOCKS on the Continue gate: start it, don't await yet.
     const parked = session.onBeat!(b1.ev);
     await flush(); // let the bubble sends land
@@ -426,7 +427,7 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     expect(b1.reanchor).toHaveBeenCalledTimes(1);
 
     const sentAfterFirst = dm.sent.length;
-    const b2 = fakeBeat(session, "after-player-play");
+    const b2 = fakeBeat(session, "after-player-end-turn");
     await session.onBeat!(b2.ev);
     // The repeat is silent: nothing sent, no re-anchor, no Continue wait to resolve.
     expect(dm.sent.length).toBe(sentAfterFirst);
@@ -439,7 +440,7 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     const { sessions } = await import("../src/discord/battle-session");
     const session = sessions.get("gate")!;
     const sentBefore = dm.sent.length;
-    const b = fakeBeat(session, "after-player-play");
+    const b = fakeBeat(session, "after-player-end-turn");
     const parked = session.onBeat!(b.ev);
     // Let the bubbles flush (sendTyping/pause/send are async) before inspecting.
     await flush();
@@ -461,7 +462,7 @@ describe("in-battle tutorial wiring (first cave duel only)", () => {
     const { sessions } = await import("../src/discord/battle-session");
     const session = sessions.get("lock")!;
     const boardId = session.boardMessageId!;
-    const b = fakeBeat(session, "after-player-play");
+    const b = fakeBeat(session, "after-player-end-turn");
     const parked = session.onBeat!(b.ev);
     await flush();
     // While the lesson is up (before Continue), the live board's buttons were stripped: the tutorial

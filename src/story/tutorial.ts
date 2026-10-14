@@ -48,13 +48,14 @@ export function tutorialLineFor(
       ];
 
     case "after-enemy-turn": {
-      // Three taught-once lessons share this beat, in reading order so the card's ability makes sense
-      // only AFTER the player understands the board moves and the push/destroy rule:
+      // Four taught-once lessons share this beat, in reading order and ALL before the player's first
+      // move, so each lesson lands before it is needed (not after the fact):
       //   1) The Eyes Privilege shift (tideSeen)
-      //   2) the push -> fall-off -> destroy rule (push)   ← taught here, up front
-      //   3) Active/Passive + SPD's Cấp 1 transform caution (ability), which builds on (2)
-      // Each fires once; when all three are taught, stay silent. The `push` flag is shared with the
-      // (now silent) after-push beat, so the push rule is never re-taught when a real push happens.
+      //   2) how to play a card — cost/power/lane/energy (play)   ← before the first move
+      //   3) the push -> fall-off -> destroy rule (push)
+      //   4) Active/Passive + SPD's Cấp 1 transform caution (ability), which builds on (3)
+      // Each fires once; when all are taught, stay silent. The `play`/`push` flags are shared with the
+      // (now silent) after-player-play / after-push beats, so neither lesson is ever re-taught.
       const bubbles: string[] = [];
       if (!t.tideSeen) {
         t.tideSeen = true;
@@ -62,32 +63,39 @@ export function tutorialLineFor(
           "There — seest thou The Eyes Privilege shift? It moves only when a turn ends, dragged toward the weaker field. Now it has spoken.",
         );
       }
+      if (!t.play) {
+        t.play = true;
+        bubbles.push(
+          "Now it is thy move. A card bears its cost at the top-left, its power at the top-right.",
+          "Choose a card, then a lane — left, middle, or right — to set it down. Thy energy marks what thou canst yet afford.",
+        );
+      }
       if (!t.push) {
         t.push = true;
         bubbles.push(
-          "Now mark how cards are played and pushed. Set a card upon an occupied cell and it shoves the one there a step back; shove a card past the far edge, and it is destroyed. Thus dost thou strip power from the field.",
+          "And mark how cards push. Set a card upon an occupied cell and it shoves the one there a step back; shove a card past the far edge, and it is destroyed. Thus dost thou strip power from the field.",
         );
       }
       if (!t.ability) {
         t.ability = true;
         bubbles.push(
           "Mark his first card — **Bò Siêu Phản Động Cấp 1**. A card may bear an art: an *Active*, which wakes but once when it is played, or a *Passive*, ever at work while it holds the field.",
-          "This one bears a Passive, and a cruel one. Now that thou knowest the push: let a single card fall in this duel, his or thine, and the beast stirs — it changes its shape, and grows stronger. So striking cards from the field is mighty — yet beware, for each one that falls feeds it. And should it ever reach its third shape... pray thou dost not live to see such a horror. Tread with care.",
+          "This one bears a Passive, and a cruel one. Now that thou knowest the push: let a single card fall in this duel, his or thine, and the beast stirs — it changes its shape, and grows stronger. So striking cards from the field is mighty — yet beware, for each one that falls feeds it. And should it climb to its final, fell shape — **Bò Siêu Phản Động Cấp 3** — pray thou dost not live to see such a horror. Tread with care.",
         );
       }
       return bubbles.length > 0 ? bubbles : null;
     }
 
+    // The play (cost/power/lane/energy) and push lessons are both taught up front at after-enemy-turn,
+    // BEFORE the player's first move — so these later beats stay silent (their flags are already set).
     case "after-player-play":
       if (t.play) return null;
       t.play = true;
       return [
-        "Well placed. A card bears its cost at the top-left, its power at the top-right.",
-        "Choose a card, then a lane — left, middle, or right. Thy energy marks what thou canst yet afford.",
+        "Now it is thy move. A card bears its cost at the top-left, its power at the top-right.",
+        "Choose a card, then a lane — left, middle, or right — to set it down. Thy energy marks what thou canst yet afford.",
       ];
 
-    // The push rule is now taught up front at after-enemy-turn (its `push` flag is set there), so a
-    // real push later says nothing — the flag is already true.
     case "after-push":
       if (t.push) return null;
       t.push = true;
