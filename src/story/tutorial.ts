@@ -62,7 +62,7 @@ export function tutorialLineFor(
         t.ability = true;
         bubbles.push(
           "Mark his first card — **Bò Siêu Phản Động Cấp 1**. A card may bear an art: an *Active*, which wakes but once when it is played, or a *Passive*, ever at work while it holds the field.",
-          "This one bears a Passive, and a cruel one. Shove any card past the far edge and it is destroyed — but let a single card fall in this duel, his or thine, and the beast stirs: it transforms into a stronger form, **Bò Siêu Phản Động Cấp 2**. So striking cards from the field is mighty — yet beware, for the first to fall rouses him. Tread with care.",
+          "This one bears a Passive, and a cruel one. Shove any card past the far edge and it is destroyed — but let a single card fall in this duel, his or thine, and the beast stirs: it changes its shape, and grows stronger. So striking cards from the field is mighty — yet beware, for each one that falls feeds it. And should it ever reach its third shape... pray thou dost not live to see such a horror. Tread with care.",
         );
       }
       return bubbles.length > 0 ? bubbles : null;

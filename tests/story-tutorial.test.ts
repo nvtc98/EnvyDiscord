@@ -84,7 +84,7 @@ describe("tutorialLineFor — teach-once content selection", () => {
     expect(lines!.some((l) => l.includes("SPD"))).toBe(true);
   });
 
-  it("teaches the Active/Passive + transform lesson once at after-enemy-turn, then stays silent", () => {
+  it("teaches the Active/Passive + transform-caution lesson once at after-enemy-turn, then stays silent", () => {
     const player = tutorialPlayer();
     const first = tutorialLineFor(beat("after-enemy-turn"), player)!;
     expect(first).not.toBeNull();
@@ -93,9 +93,11 @@ describe("tutorialLineFor — teach-once content selection", () => {
     expect(joined).toMatch(/The Eye Privilege/);
     expect(joined).toMatch(/Active/);
     expect(joined).toMatch(/Passive/);
-    // Names SPD's turn-1 card and warns about the transform-on-destroy caution.
+    // Names SPD's turn-1 card and warns about the transform-on-destroy caution. The warning names
+    // only Cấp 1 and hints at a dreaded THIRD shape — it must NOT name Cấp 2 (deliberately hidden).
     expect(joined).toMatch(/Bò Siêu Phản Động Cấp 1/);
-    expect(joined).toMatch(/Bò Siêu Phản Động Cấp 2/);
+    expect(joined).not.toMatch(/Cấp 2/);
+    expect(joined).toMatch(/third shape/i);
     expect(joined).toMatch(/destroy/i);
     // Both teach-once flags are now set.
     expect(player.story!.tutorial!.tideSeen).toBe(true);
