@@ -442,7 +442,7 @@
     "name": "Echo Eyes",
     "rarity": "common",
     "cost": 3,
-    "power": 3,
+    "power": 4,
     "ability": "cloneLane",
     "kind": "active",
     "note": "Khi ra sân: tạo bản sao vào mọi ô trống TRONG CÙNG LÀN (cột dọc Echo vừa ra). Bản sao mang power hiện tại của Echo. Không kích hoạt lại active."
