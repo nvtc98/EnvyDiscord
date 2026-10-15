@@ -603,6 +603,18 @@ describe("Siren Eyes push lane", () => {
     // Anchor does not stop Siren's resolved shove: FAR is pushed off.
     expect(after.destroyedPower).toBe(2);
   });
+
+  it("does NOT push itself: Siren stays at its own cell while other cards shift", () => {
+    const state = emptyGame("bottom");
+    // bottom near edge = cell 2, far edge = cell 0. An ally sits at cell 1; Siren enters at cell 2.
+    setLane(state, 0, [null, instance(def("ALLY", 1, 3), "bottom"), null]);
+    const after = play(state, "bottom", def("SIREN", 4, 2, siren()), 0);
+    const ally = after.lanes[0].findIndex((c) => c?.def.id === "ALLY");
+    const siren_ = after.lanes[0].findIndex((c) => c?.def.id === "SIREN");
+    // The ally is shoved one step toward the far edge (cell 1 -> cell 0); Siren stays at cell 2.
+    expect(ally).toBe(0);
+    expect(siren_).toBe(2);
+  });
 });
 
 describe("Laser Eyes destroy lane", () => {

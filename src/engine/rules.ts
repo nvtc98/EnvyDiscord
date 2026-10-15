@@ -506,6 +506,7 @@ function sirenPush(
   lane: LaneIndex,
   seat: Seat,
   sirenDef: CardDef,
+  sirenUid: number,
   events: GameEvent[],
   rng: Rng,
   fires: { n: number },
@@ -523,6 +524,12 @@ function sirenPush(
     const occupant = cells[i];
     if (!occupant) continue;
     const dest = i + step;
+    // Siren does NOT push itself: it stays in its cell and acts as a WALL for the cards behind it,
+    // so only the OTHER cards in the lane are shoved one step toward the far edge.
+    if (occupant.uid === sirenUid) {
+      blockedAt = i;
+      continue;
+    }
     // Immune/Guardian-protected card at the far edge: it stays, and it becomes a wall for the cards
     // behind it (a friendly Guardian in this lane shields owner cards exactly like Bedrock pushImmune).
     if (
@@ -643,7 +650,7 @@ function applyOceanReturn(
     type: "ability",
     seat: o.owner,
     card: card.def,
-    text: "vanished into the deck",
+    text: "concealed itself in the deck",
   });
 }
 
@@ -1159,7 +1166,7 @@ function applyActive(
       break;
     }
     case "pushLane":
-      sirenPush(state, lane, seat, card.def, events, rng, fires);
+      sirenPush(state, lane, seat, card.def, card.uid, events, rng, fires);
       break;
     case "destroyLane": {
       const cells = state.lanes[lane];
