@@ -13,8 +13,10 @@ export function abilityText(ability: Ability | undefined): string {
         return `Active: Gain ${effect.amount} energy this turn.`;
       case "buffLane":
         return `Active: Your other cards in this lane get +${effect.amount} power.`;
-      case "destroyedPower":
-        return "Active: Gain power equal to the total power of all cards destroyed this match.";
+      case "stellaPush":
+        return "Active: Push The Eyes Privilege toward the enemy by the total power of all cards destroyed this match.";
+      case "astralDiscount":
+        return "Active: Reduce the cost of the cards in your hand by 1.";
       case "pushLane":
         return "Active: Push this lane one step away from you; cards forced off the edge are destroyed.";
       case "destroyLane":

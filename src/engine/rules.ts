@@ -1158,11 +1158,6 @@ function applyActive(
       );
       break;
     }
-    case "destroyedPower":
-      // Base power is 0, so effective power = tally. Mutates the live board instance by reference.
-      card.bonus = state.destroyedPower;
-      say(`gained ${state.destroyedPower} power from destroyed cards`);
-      break;
     case "pushLane":
       sirenPush(state, lane, seat, card.def, events, rng, fires);
       break;
@@ -1304,6 +1299,10 @@ function applyActive(
     case "killingDeck":
     case "numbDeck":
     case "sunlitScatter":
+    // Stella's EP push and Astral's hand discount are also no-ops on play; they resolve during the
+    // owner's end-of-turn pass (applyEndOfTurnAbilities). Listed here to keep the switch exhaustive.
+    case "stellaPush":
+    case "astralDiscount":
       break;
     default:
       assertNever(effect);
@@ -2024,7 +2023,7 @@ function applyJoyfulBuff(
 
 /**
  * Goliath (goliathGain): at the owner's end of turn, gain permanent power
- * `round(10 * (1 - ownerRemainingHP/total))` clamped to 0..10, from the OWNER's perspective. The more
+ * `Math.round(10 * (1 - ownerRemainingHP/total))` clamped to 0..10, from the OWNER's perspective. The more
  * The Eyes Privilege favors the enemy (owner HP low), the more power. Seat-correct: ownerRemainingHP is
  * `balance` for bottom, `total - balance` for top.
  */
@@ -2036,11 +2035,10 @@ function applyGoliathGain(
   const total = state.bottomStartHP + state.topStartHP;
   const ownerHP =
     goliath.owner === "bottom" ? state.balance : total - state.balance;
-  // Floor matches BOTH of the user's worked examples: 15/100 → floor(8.5) = 8 and 99/100 → floor(0.1)
-  // = 0 (Math.round would give 9 for the first, contradicting the spec's stated result of 8).
+  // Round the gain (an x.5 fraction rounds up): 15/100 → round(8.5) = 9 and 99/100 → round(0.1) = 0.
   const gain = Math.max(
     0,
-    Math.min(10, Math.floor(10 * (1 - ownerHP / total))),
+    Math.min(10, Math.round(10 * (1 - ownerHP / total))),
   );
   goliath.bonus += gain;
   events.push({
@@ -2048,6 +2046,67 @@ function applyGoliathGain(
     seat: goliath.owner,
     card: goliath.def,
     text: `gained ${gain} power from The Eyes Privilege`,
+  });
+}
+
+/**
+ * Stella (stellaPush): at the owner's end of turn, push The Eyes Privilege toward the ENEMY by a flat
+ * point amount equal to the current `destroyedPower` tally (total power of every card destroyed this
+ * match). A single one-shot shove — it READS the running tally, never zeroes or persists it, and is not
+ * recurring beyond the normal once-per-end-of-turn resolution. Mirrors applyGentlePush's meter math:
+ * benefits the owner (bottom → +balance, top → −balance), clamps to [0, total], emits a tide_shifted
+ * event, and re-checks knockout so a big Stella push can reach an edge and win. Tally 0 → nothing.
+ */
+function applyStellaPush(
+  state: GameState,
+  stella: CardInstance,
+  events: GameEvent[],
+): void {
+  const push = state.destroyedPower;
+  if (push <= 0) return;
+  const total = state.bottomStartHP + state.topStartHP;
+  const signed = stella.owner === "bottom" ? push : -push;
+  const before = state.balance;
+  state.balance = Math.max(0, Math.min(total, before + signed));
+  const applied = state.balance - before;
+  events.push({
+    type: "tide_shifted",
+    delta: applied,
+    rawDelta: signed,
+    balance: state.balance,
+    turn: state.turnsPlayed,
+  });
+  events.push({
+    type: "ability",
+    seat: stella.owner,
+    card: stella.def,
+    text: `pushed The Eyes Privilege by ${push}`,
+  });
+  // A big Stella push can reach an edge and win.
+  if (state.balance >= total) finish(state, "bottom", "balance", events);
+  else if (state.balance <= 0) finish(state, "top", "balance", events);
+  if (state.winner) return;
+}
+
+/**
+ * Astral (astralDiscount): at the owner's end of turn, reduce by 1 the cost of EVERY card currently in
+ * the owner's HAND — a one-shot, permanent −1 to each card in hand right now (floored at 0 by
+ * instanceCost). Reuses the per-instance `costReduction` storage (Ancient's field), so canPlay/playCard/
+ * display all reflect it. Does NOT touch board cards or cards drawn later: iterating the live hand
+ * snapshot at resolution time is exactly the current hand.
+ */
+function applyAstralDiscount(
+  state: GameState,
+  astral: CardInstance,
+  events: GameEvent[],
+): void {
+  const hand = state.players[astral.owner].hand;
+  for (const card of hand) card.costReduction = (card.costReduction ?? 0) + 1;
+  events.push({
+    type: "ability",
+    seat: astral.owner,
+    card: astral.def,
+    text: "made the cards in your hand cost 1 less",
   });
 }
 
@@ -2310,6 +2369,8 @@ type EndOfTurnKind =
   | "killingDeck"
   | "numbDeck"
   | "sunlitScatter"
+  | "stellaPush"
+  | "astralDiscount"
   | "flowerBuff";
 
 function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
@@ -2335,6 +2396,8 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
       case "killingDeck":
       case "numbDeck":
       case "sunlitScatter":
+      case "stellaPush":
+      case "astralDiscount":
         return ab.effect.kind;
       default:
         return null;
@@ -2438,6 +2501,12 @@ function applyEndOfTurnAbilities(
         break;
       case "sunlitScatter":
         applySunlitScatter(state, card, events, rng);
+        break;
+      case "stellaPush":
+        applyStellaPush(state, card, events);
+        break;
+      case "astralDiscount":
+        applyAstralDiscount(state, card, events);
         break;
       case "flowerBuff":
         applyFlowerBuff(state, card, events, rng);

@@ -22,7 +22,8 @@ export type ActiveEffect =
   | { kind: "draw"; count: number }
   | { kind: "energy"; amount: number }
   | { kind: "buffLane"; amount: number }
-  | { kind: "destroyedPower" } // Stella: set bonus so effective power = destroyedPower tally
+  | { kind: "stellaPush" } // Stella: end of turn, push The Eyes Privilege toward the enemy by the destroyedPower tally — a single one-shot shove, not a per-turn recurring push
+  | { kind: "astralDiscount" } // Astral: end of turn, −1 to the cost of each card currently in the owner's hand (one-shot, floors at 0)
   | { kind: "pushLane" } // Siren: extra push step on the lane, far direction
   | { kind: "destroyLane" } // Laser: destroy every other card in the lane
   | { kind: "shuffleRedraw" } // Phantom: shuffle hand+deck together, redraw to the post-play hand size

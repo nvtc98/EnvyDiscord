@@ -83,10 +83,11 @@
     "name": "Astral Eyes",
     "rarity": "eternal",
     "cost": 5,
-    "power": 15,
-    "ability": "costReduction 1",
-    "kind": "passive",
-    "note": "Bị động: khi còn trên sân, mọi thẻ của phe ta giảm 1 cost (tối thiểu 0). Rời sân thì không còn tính."
+    "power": 7,
+    "ability": "astralDiscount",
+    "kind": "active",
+    "text": "Active: Reduce the cost of the cards in your hand by 1.",
+    "note": "Cuối lượt của chủ: giảm 1 cost cho mỗi thẻ đang trên tay lúc đó (một lần, tối thiểu 0). Không ảnh hưởng thẻ rút sau hay thẻ trên sân."
   },
   {
     "name": "Aura Eyes",
@@ -642,11 +643,11 @@
     "name": "Goliath Eyes",
     "rarity": "bargain",
     "cost": 5,
-    "power": 0,
+    "power": 10,
     "ability": "goliathGain",
     "kind": "active",
     "text": "Active: Gain up to 10 power — more the more The Eyes Privilege favors the enemy.",
-    "note": "Cuối lượt của chủ: +0..10 power vĩnh viễn = floor(10 × tỷ lệ The Eyes Privilege đang bất lợi cho chủ). Ví dụ chủ còn 15/100 HP → +8; 99/100 → +0."
+    "note": "Cuối lượt của chủ: +0..10 power vĩnh viễn = round(10 × tỷ lệ The Eyes Privilege đang bất lợi cho chủ). Ví dụ chủ còn 15/100 HP → +9; 99/100 → +0."
   },
   {
     "name": "Grim Eyes",
@@ -1369,9 +1370,10 @@
     "rarity": "eternal",
     "cost": 5,
     "power": 0,
-    "ability": "destroyedPower",
+    "ability": "stellaPush",
     "kind": "active",
-    "note": "Nhận power bằng tổng power của mọi thẻ đã bị hủy trong trận (cả hai phe)."
+    "text": "Active: Push The Eyes Privilege toward the enemy by the total power of all cards destroyed this match.",
+    "note": "Cuối lượt của chủ: đẩy The Eyes Privilege về phía địch một lượng bằng tổng power của mọi thẻ đã bị hủy trong trận (cả hai phe). Chỉ 1 lần (một cú đẩy duy nhất), không hồi mỗi lượt."
   },
   {
     "name": "Stellar Eyes",

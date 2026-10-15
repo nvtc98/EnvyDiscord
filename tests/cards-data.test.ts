@@ -21,7 +21,8 @@ const DESIGNED: CardDef[] = [
     cost: 5,
     power: 0,
     faction: "the-eyes",
-    ability: { timing: "active", effect: { kind: "destroyedPower" } },
+    ability: { timing: "active", effect: { kind: "stellaPush" } },
+    text: "Active: Push The Eyes Privilege toward the enemy by the total power of all cards destroyed this match.",
     kind: "active",
   },
   {
@@ -241,17 +242,18 @@ describe("card kind classification", () => {
     }
   });
 
-  it("Astral Eyes is a passive costReduction 1 (eternal 5/15)", () => {
+  it("Astral Eyes is an active astralDiscount (eternal 5/7)", () => {
     const astral = CARD_INDEX.get("astral-eyes");
     expect(astral).toMatchObject({
       rarity: "eternal",
       cost: 5,
-      power: 15,
-      kind: "passive",
+      power: 7,
+      kind: "active",
+      text: "Active: Reduce the cost of the cards in your hand by 1.",
     });
     expect(astral?.ability).toEqual({
-      timing: "continuous",
-      effect: { kind: "costReduction", amount: 1 },
+      timing: "active",
+      effect: { kind: "astralDiscount" },
     });
   });
 

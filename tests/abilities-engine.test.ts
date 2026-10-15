@@ -3,6 +3,7 @@ import {
   canPlay,
   effectivePower,
   endTurn,
+  instanceCost,
   playCard,
   totalPower,
 } from "../src/engine/rules";
@@ -26,7 +27,11 @@ import {
 // Ability constructors for the seven designed cards (mirrors their shorthand in cards.json).
 const stella = (): Ability => ({
   timing: "active",
-  effect: { kind: "destroyedPower" },
+  effect: { kind: "stellaPush" },
+});
+const astral = (): Ability => ({
+  timing: "active",
+  effect: { kind: "astralDiscount" },
 });
 const bedrock = (): Ability => ({
   timing: "continuous",
@@ -124,27 +129,100 @@ describe("destroyCard tally + Phoenix revive", () => {
 });
 
 describe("Stella Eyes", () => {
-  it("gains power equal to the destroyed-power tally when played", () => {
-    const state = emptyGame();
-    state.destroyedPower = 11;
-    const after = play(state, "bottom", def("STELLA", 5, 0, stella()), 1);
-    const stellaCard = after.lanes[1].find((c) => c?.def.id === "STELLA")!;
-    expect(stellaCard.bonus).toBe(11);
-    expect(effectivePower(after, 1, stellaCard)).toBe(11);
+  // A lone power-0 Stella keeps board power 0 on both sides, so resolveTurn's own tide shift is 0 and
+  // Stella's end-of-turn EP push is the only thing that moves the meter.
+  const runStella = (
+    owner: "bottom" | "top",
+    balance: number,
+    tally: number,
+  ) => {
+    const state = emptyGame(owner);
+    state.active = owner;
+    state.balance = balance; // total HP is 100 (50 + 50 default)
+    state.destroyedPower = tally;
+    const stellaCard = instance(def("STELLA", 5, 0, stella()), owner);
+    setLane(state, 0, [
+      owner === "bottom" ? null : stellaCard,
+      null,
+      owner === "bottom" ? stellaCard : null,
+    ]);
+    return { stellaCard, step: endTurn(state, mulberry32(1)) };
+  };
+
+  // resolveTurn always emits one baseline tide_shifted (rawDelta 0 here, since board power is 0 on
+  // both sides); Stella's end-of-turn push emits a SECOND one. Grab the last tide_shifted = Stella's.
+  const lastShift = (step: ReturnType<typeof endTurn>) =>
+    [...step.events].reverse().find((e) => e.type === "tide_shifted");
+
+  it("pushes The Eyes Privilege toward the enemy by the destroyed-power tally (bottom owner)", () => {
+    const { step } = runStella("bottom", 50, 11);
+    // Bottom owner pushes toward the enemy = balance up by the tally.
+    expect(step.state.balance).toBe(61);
+    expect(lastShift(step)).toMatchObject({
+      rawDelta: 11,
+      delta: 11,
+      balance: 61,
+    });
   });
 
-  it("includes the card her own entry push just shoved off", () => {
-    const state = emptyGame();
-    state.destroyedPower = 3; // from earlier this match
-    setLane(state, 0, [
-      instance(def("E1", 1, 6), "top"),
-      instance(def("E2", 1, 1), "top"),
-      instance(def("P1", 1, 1), "bottom"),
-    ]);
-    const after = play(state, "bottom", def("STELLA", 5, 0, stella()), 0);
-    const stellaCard = after.lanes[0].find((c) => c?.def.id === "STELLA")!;
-    // destroyCard (push, +6) runs before applyActive, so Stella reads 3 + 6 = 9.
-    expect(stellaCard.bonus).toBe(9);
+  it("is seat-correct for a top owner (balance drops by the tally)", () => {
+    const { step } = runStella("top", 50, 11);
+    expect(step.state.balance).toBe(39);
+    expect(lastShift(step)).toMatchObject({
+      rawDelta: -11,
+      delta: -11,
+      balance: 39,
+    });
+  });
+
+  it("clamps at the edge and wins when the push reaches the top of the meter", () => {
+    const { step } = runStella("bottom", 95, 40); // 95 + 40 clamps to 100
+    expect(step.state.balance).toBe(100);
+    expect(step.state.winner).toBe("bottom");
+    expect(
+      step.events.some((e) => e.type === "game_over" && e.winner === "bottom"),
+    ).toBe(true);
+  });
+
+  it("does nothing when nothing has been destroyed this match", () => {
+    const { step } = runStella("bottom", 50, 0);
+    expect(step.state.balance).toBe(50);
+    // Only the baseline resolveTurn tide_shifted (rawDelta 0) fires — Stella adds no second shift.
+    const shifts = step.events.filter((e) => e.type === "tide_shifted");
+    expect(shifts).toHaveLength(1);
+    expect(shifts[0]).toMatchObject({ rawDelta: 0 });
+  });
+});
+
+describe("Astral Eyes", () => {
+  it("reduces every current hand card's cost by 1 at end of turn, leaving board and later draws alone", () => {
+    const state = emptyGame("bottom");
+    state.active = "bottom";
+    const astralCard = instance(def("ASTRAL", 5, 7, astral()), "bottom");
+    setLane(state, 0, [null, null, astralCard]);
+    // Current hand: a 3-cost and a 0-cost card (0-cost floors at 0, not negative).
+    const h3 = give(state, "bottom", def("H3", 3, 1));
+    const h0 = give(state, "bottom", def("H0", 0, 1));
+    // A board card's cost must be unaffected by the hand discount.
+    const boardCard = instance(def("ONBOARD", 4, 1), "bottom");
+    setLane(state, 1, [null, null, boardCard]);
+    const { state: after } = endTurn(state, mulberry32(1));
+    const hand = after.players.bottom.hand;
+    const a3 = hand.find((c) => c.def.id === "H3")!;
+    const a0 = hand.find((c) => c.def.id === "H0")!;
+    expect(a3.costReduction).toBe(1);
+    expect(instanceCost(after, "bottom", a3)).toBe(2); // 3 - 1
+    expect(a0.costReduction).toBe(1);
+    expect(instanceCost(after, "bottom", a0)).toBe(0); // 0 - 1 floors at 0
+    // The board card carries no in-hand discount.
+    const boardAfter = after.lanes[1].find((c) => c?.def.id === "ONBOARD")!;
+    expect(boardAfter.costReduction).toBeUndefined();
+    // A card drawn afterward (opponent's turn drew into bottom? no — only bottom's hand snapshot was
+    // discounted) has no costReduction. The two originally-held uids are the only discounted ones.
+    const touched = hand
+      .filter((c) => (c.costReduction ?? 0) > 0)
+      .map((c) => c.uid);
+    expect(touched.sort()).toEqual([h3.uid, h0.uid].sort());
   });
 });
 

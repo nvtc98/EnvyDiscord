@@ -34,10 +34,10 @@ const evilHighest = (): Ability => ({
   timing: "active",
   effect: { kind: "evilHighest" },
 });
-// A simple active that gains +100 power on play, used to prove a summoned card fires its ability.
+// A simple active that grants the owner +5 energy on play, used to prove a summoned card fires its ability.
 const selfBuff = (): Ability => ({
   timing: "active",
-  effect: { kind: "destroyedPower" },
+  effect: { kind: "energy", amount: 5 },
 });
 
 // --- Helpers -----------------------------------------------------------------
@@ -116,16 +116,16 @@ describe("Mortal Eyes / summonHand", () => {
   it("the summoned card fires its own active ability", () => {
     const state = emptyGame("bottom");
     state.active = "bottom";
-    state.destroyedPower = 42; // a destroyedPower active sets bonus to this tally on play
+    const energyBefore = state.players.bottom.energy;
     const mortal = instance(def("MORTAL", 3, 3, summonHand()), "bottom");
     setLane(state, 0, [null, null, mortal]);
     state.players.bottom.hand = [
       instance(def("SELF", 1, 0, selfBuff()), "bottom"),
     ];
     const { state: after } = endTurn(state, mulberry32(1));
-    // SELF's destroyedPower active ran, so its bonus is the tally (42).
+    // SELF's energy active ran on summon, so the owner's energy grew by +5.
     expect(after.lanes[0][1]?.def.id).toBe("SELF");
-    expect(after.lanes[0][1]?.bonus).toBe(42);
+    expect(after.players.bottom.energy).toBe(energyBefore + 5);
   });
 });
 

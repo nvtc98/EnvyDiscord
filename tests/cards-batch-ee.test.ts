@@ -333,20 +333,20 @@ describe("Goliath Eyes / goliathGain", () => {
     return { goliath, step: endTurn(state, mulberry32(1)) };
   };
 
-  it("bottom owner at 15/100 gains +8", () => {
+  it("bottom owner at 15/100 gains +9 (round(8.5) rounds up)", () => {
     const { goliath, step } = runGoliath("bottom", 15);
-    expect(find(step.state, goliath.uid)!.bonus).toBe(8);
+    expect(find(step.state, goliath.uid)!.bonus).toBe(9);
   });
 
-  it("bottom owner at 99/100 gains +0", () => {
+  it("bottom owner at 99/100 gains +0 (round(0.1) = 0)", () => {
     const { goliath, step } = runGoliath("bottom", 99);
     expect(find(step.state, goliath.uid)!.bonus).toBe(0);
   });
 
   it("top owner is seat-correct (mirrored balance gives the symmetric gain)", () => {
-    // Top owner at balance 85 → top HP = 100 - 85 = 15 → +8, same as bottom at 15.
+    // Top owner at balance 85 → top HP = 100 - 85 = 15 → round(8.5) = +9, same as bottom at 15.
     const { goliath, step } = runGoliath("top", 85);
-    expect(find(step.state, goliath.uid)!.bonus).toBe(8);
+    expect(find(step.state, goliath.uid)!.bonus).toBe(9);
   });
 });
 
