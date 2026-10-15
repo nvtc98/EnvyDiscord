@@ -7,6 +7,7 @@ import {
   storyCommand,
 } from "../src/discord/commands/story";
 import { createImageRenderer } from "../src/render/renderer";
+import { STARTER_SIZE } from "../src/game/starter";
 import { GATE } from "../src/story/prologue";
 import {
   buttonWithModal,
@@ -394,13 +395,13 @@ describe("/story", () => {
     expect(labels(asked)).toEqual(["Open the book"]);
     p = (await click(ctx, dm, "Open the book")).payload;
 
-    // the book is a RICH scene (embed) with the twelve cards listed
+    // the book is a RICH scene (embed) with the sixteen cards listed
     const cardsText = embedOf(p).fields.find((f: any) => f.name === "The cards")
       .value as string;
-    expect(cardsText.split("\n")).toHaveLength(12);
+    expect(cardsText.split("\n")).toHaveLength(STARTER_SIZE);
     expect(cardsText.match(/eternal/g)).toHaveLength(2);
-    expect(cardsText.match(/bargain/g)).toHaveLength(2);
-    expect(cardsText.match(/common/g)).toHaveLength(8);
+    expect(cardsText.match(/bargain/g)).toHaveLength(4);
+    expect(cardsText.match(/common/g)).toHaveLength(10);
     expect(labels(p)).toEqual([
       "Take these cards",
       "Close the book and open it again",
@@ -426,8 +427,8 @@ describe("/story", () => {
       dm.sent.some((p) => content(p)?.match(/settle into your hands/)),
     ).toBe(true);
     const player = ctx.repo.get("u");
-    expect(Object.keys(player.cards)).toHaveLength(12);
-    expect(player.deck).toHaveLength(12);
+    expect(Object.keys(player.cards)).toHaveLength(STARTER_SIZE);
+    expect(player.deck).toHaveLength(STARTER_SIZE);
     expect(player.story!.starterClaimed).toBe(true);
     expect(
       ctx.log.entries.some(

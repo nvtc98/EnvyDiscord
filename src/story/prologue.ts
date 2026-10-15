@@ -91,13 +91,13 @@ const REROLL_LINES: StoryLine[] = [
   stranger(
     "Hold it by the spine this time. There — the pages fall open elsewhere.",
   ),
-  stranger("Close it. Breathe. Open it anew. Seest thou? A different twelve."),
+  stranger("Close it. Breathe. Open it anew. Seest thou? A different sixteen."),
   stranger(
     "'Tis a shy book, this. Grant it a moment, and new pages it shows thee.",
   ),
 ];
 
-/** Shows twelve cards in the book. When the player asks again, the new twelve is never the same set. */
+/** Shows the starter cards in the book. When the player asks again, the new draw is never the same set. */
 function showPack(
   player: Player,
   ctx: StoryContext,
@@ -505,7 +505,7 @@ export const NODES: Record<string, NodeDef> = {
         .filter((c) => c !== undefined);
       const lines: StoryLine[] = [
         stranger(
-          `Twelve pages, twelve cards. Do they suit thee, **${who(p)}**?`,
+          `Sixteen pages, sixteen cards. Do they suit thee, **${who(p)}**?`,
         ),
       ];
       return {
@@ -558,7 +558,7 @@ export const NODES: Record<string, NodeDef> = {
       title: PLACE_WISDOM,
       lines: [
         stranger(
-          `These twelve... a fortunate draw, **${who(p)}**. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
+          `These sixteen... a fortunate draw, **${who(p)}**. The book was kind to thee — I have seen it yield far meaner hands. Guard them well.`,
         ),
         stranger(
           `Now come. The deck is thine — let us make for the land of the ${TRIBE} before the hour grows late.`,
@@ -790,7 +790,7 @@ export const NODES: Record<string, NodeDef> = {
         ),
         stranger("/collection — there thou canst see every card thou ownest."),
         stranger(
-          "/deck — with it thou choosest the twelve thou carriest into battle.",
+          "/deck — with it thou choosest the sixteen thou carriest into battle.",
         ),
         stranger(
           "/shop — there thou spendest thy gold on a new card, or a new variant.",

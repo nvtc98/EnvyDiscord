@@ -110,12 +110,16 @@ describe("starter pack", () => {
     common: pack.filter((c) => c.rarity === "common").length,
   });
 
-  it("is always 12 different cards: 2 eternal, 2 bargain and 8 common", () => {
+  it("is always 16 different cards: 2 eternal, 4 bargain and 10 common", () => {
     for (let seed = 1; seed <= 100; seed++) {
       const pack = drawStarterPack(COLLECTIBLE_CARDS, mulberry32(seed));
       expect(pack).toHaveLength(STARTER_SIZE);
-      expect(new Set(pack.map((c) => c.id)).size).toBe(12);
-      expect(rarityCounts(pack)).toEqual({ eternal: 2, bargain: 2, common: 8 });
+      expect(new Set(pack.map((c) => c.id)).size).toBe(STARTER_SIZE);
+      expect(rarityCounts(pack)).toEqual({
+        eternal: 2,
+        bargain: 4,
+        common: 10,
+      });
     }
   });
 
@@ -224,8 +228,8 @@ describe("story: the prologue", () => {
       starterClaimed: true,
       chapter: "bo-tuoi",
     });
-    expect(Object.keys(player.cards)).toHaveLength(12);
-    expect(player.deck).toHaveLength(12);
+    expect(Object.keys(player.cards)).toHaveLength(STARTER_SIZE);
+    expect(player.deck).toHaveLength(STARTER_SIZE);
   });
 
   it("records every name the player typed, in order, and the final name", () => {
@@ -451,22 +455,22 @@ describe("story: the prologue", () => {
     const toBook = (seed = 1) => play([1, "nomad", 0, 1, 0, 0, 0, 1], seed);
     const idsOf = (p: Player) => p.story!.pack!.cards;
 
-    it("opens with twelve different cards in the 2-2-8 mix, and nothing is granted until the player takes them", () => {
+    it("opens with sixteen different cards in the 2-4-10 mix, and nothing is granted until the player takes them", () => {
       const { player } = toBook();
       expect(player.story!.node).toBe("book");
-      expect(idsOf(player)).toHaveLength(12);
-      expect(new Set(idsOf(player)).size).toBe(12);
+      expect(idsOf(player)).toHaveLength(STARTER_SIZE);
+      expect(new Set(idsOf(player)).size).toBe(STARTER_SIZE);
       expect(player.cards).toEqual({});
       expect(player.story!.starterClaimed).toBe(false);
       const view = currentView(player, ctx());
-      expect(view.pack!.cards).toHaveLength(12);
+      expect(view.pack!.cards).toHaveLength(STARTER_SIZE);
       expect(view.choices.map((c) => c.label)).toEqual([
         "Take these cards",
         "Close the book and open it again",
       ]);
     });
 
-    it("closing and reopening shows a different twelve with the same mix, counts the tries, and the stranger reacts", () => {
+    it("closing and reopening shows a different sixteen with the same mix, counts the tries, and the stranger reacts", () => {
       const c = ctx(2);
       const { player } = toBook(2);
       const first = [...idsOf(player)];
@@ -486,8 +490,8 @@ describe("story: the prologue", () => {
         previous = idsOf(player).join();
         const pack = idsOf(player).map((id) => CARD_INDEX.get(id)!);
         expect(pack.filter((x) => x.rarity === "eternal")).toHaveLength(2);
-        expect(pack.filter((x) => x.rarity === "bargain")).toHaveLength(2);
-        expect(pack.filter((x) => x.rarity === "common")).toHaveLength(8);
+        expect(pack.filter((x) => x.rarity === "bargain")).toHaveLength(4);
+        expect(pack.filter((x) => x.rarity === "common")).toHaveLength(10);
         const first = currentView(player, c).lines[0];
         expect(first.speaker).toBe(STRANGER);
         seen.add(first.text);
@@ -497,7 +501,7 @@ describe("story: the prologue", () => {
       expect(first.join()).not.toBe(idsOf(player).join());
     });
 
-    it("taking the cards grants exactly those twelve as metal, makes them the deck and unlocks /daily", () => {
+    it("taking the cards grants exactly those sixteen as metal, makes them the deck and unlocks /daily", () => {
       const c = ctx();
       const { player } = toBook();
       const shown = [...idsOf(player)];
@@ -534,7 +538,7 @@ describe("story: the prologue", () => {
         applyAction(player, "book", { type: "choice", index: 1 }, c);
       applyAction(player, "book", { type: "choice", index: 0 }, c);
       const owned = Object.keys(player.cards).map((id) => CARD_INDEX.get(id)!);
-      expect(owned).toHaveLength(12);
+      expect(owned).toHaveLength(STARTER_SIZE);
       expect(owned.filter((x) => x.rarity === "eternal")).toHaveLength(2);
       expect(player.story!.pack!.rerolls).toBe(10);
     });

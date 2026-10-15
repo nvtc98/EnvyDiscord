@@ -30,9 +30,9 @@ export interface StoryState {
   pendingName: { typed: string; suggestion: string | null } | null;
   /** A line shown once at the top of the next scene view (a reaction to the last action). */
   notice: StoryLine | null;
-  /** The twelve cards currently shown in the book, and how many times the player has had them redrawn. */
+  /** The starter cards currently shown in the book, and how many times the player has had them redrawn. */
   pack: { cards: string[]; rerolls: number } | null;
-  /** True once the player has taken their first twelve cards. /daily unlocks after this. */
+  /** True once the player has taken their starter cards. /daily unlocks after this. */
   starterClaimed: boolean;
   /**
    * The id of the DM message that currently carries this scene's live buttons. A button pressed on

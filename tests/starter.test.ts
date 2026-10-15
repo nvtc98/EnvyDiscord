@@ -9,7 +9,7 @@ import {
 import { mulberry32 } from "../src/util/rng";
 
 describe("drawStarterPackBalanced", () => {
-  it("always returns twelve unique cards whose mean cost is in the window, keeping the rarity mix", () => {
+  it("always returns STARTER_SIZE unique cards whose mean cost is in the window, keeping the rarity mix", () => {
     for (let seed = 0; seed <= 200; seed++) {
       const pack = drawStarterPackBalanced(COLLECTIBLE_CARDS, mulberry32(seed));
       // size + uniqueness
@@ -25,7 +25,7 @@ describe("drawStarterPackBalanced", () => {
       expect(mean, `seed ${seed} mean`).toBeLessThanOrEqual(
         STARTER_COST_WINDOW.max,
       );
-      // rarity composition intact (2 eternal + 2 bargain + 8 common)
+      // rarity composition intact (2 eternal + 4 bargain + 10 common)
       const counts = {
         eternal: pack.filter((c) => c.rarity === "eternal").length,
         bargain: pack.filter((c) => c.rarity === "bargain").length,
