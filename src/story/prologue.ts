@@ -677,7 +677,7 @@ export const NODES: Record<string, NodeDef> = {
           "This is **SPD** — kin to the tribe above, and the one who keeps the gate below. Best him at the cards, and the road is thine.",
         ),
       ],
-      choices: go("I am ready"),
+      choices: go("Continue"),
       portrait: { assetKey: "boss-spd-story", alt: "SPD" },
     }),
     choose: () => "cave_terms",

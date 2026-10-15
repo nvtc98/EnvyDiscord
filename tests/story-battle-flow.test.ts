@@ -126,7 +126,7 @@ async function walkToBattle(ctx: Ctx, userId = "u"): Promise<Dm> {
   await click(ctx, dm, "Continue", userId); // sea_cliff -> curse_underground
   await click(ctx, dm, "Enter the cave", userId); // curse_underground -> cave_mouth
   await click(ctx, dm, "Continue", userId); // cave_mouth -> reveal_face
-  await click(ctx, dm, "I am ready", userId); // reveal_face -> cave_terms
+  await click(ctx, dm, "Continue", userId); // reveal_face -> cave_terms
   // Accept launches the battle. On the FIRST (tutorial) duel the launch fires spoken beats
   // (battle-start, then the opening after-enemy-turn), each of which now BLOCKS on a "Continue" gate.
   // So the Accept handler does not resolve until those Continue presses arrive — drive the press loop
