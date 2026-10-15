@@ -189,7 +189,7 @@ describe("Watcher's Eyes / watcherDig", () => {
 // Moonlit Eyes (moonlitSacrifice)
 // =============================================================================
 describe("Moonlit Eyes / moonlitSacrifice", () => {
-  it("destroys the hand and adds the summed effective power to a random friendly card", () => {
+  it("destroys the hand (feeding Stella) and spreads the summed effective power across the board", () => {
     const state = emptyGame("bottom");
     state.active = "bottom";
     const moonlit = instance(def("MOON", 6, 4, moonlitSacrifice()), "bottom");
@@ -208,14 +208,13 @@ describe("Moonlit Eyes / moonlitSacrifice", () => {
     };
     const { state: after, events } = endTurn(state, mulberry32(1));
     expect(after.players.bottom.hand.length).toBe(0); // whole hand gone
-    // Hand destruction does NOT feed the board-destroy tallies.
-    expect(after.destroyedPower).toBe(before.destroyedPower);
-    expect(after.destroyedCount).toBe(before.destroyedCount);
-    // Exactly one friendly card gained the summed +10.
+    // Hand destruction now FEEDS Stella: +summed effective power, +hand size.
+    expect(after.destroyedPower).toBe(before.destroyedPower + 10);
+    expect(after.destroyedCount).toBe(before.destroyedCount + 3);
+    // The +10 is spread across ALL friendly board cards (Moonlit + ally); the total bonus added = 10.
     const moonAfter = find(after, moonlit.uid)!;
     const allyAfter = find(after, ally.uid)!;
-    const gained = [moonAfter, allyAfter].filter((c) => c.bonus === 10);
-    expect(gained.length).toBe(1);
+    expect(moonAfter.bonus + allyAfter.bonus).toBe(10);
     expect(events.some((e) => e.type === "ability")).toBe(true);
   });
 

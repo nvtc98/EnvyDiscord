@@ -83,6 +83,7 @@ function forcedPushState(): GameState {
     nextUid: 101,
     destroyedPower: 0,
     destroyedCount: 0,
+    turnLock: 0,
   };
 }
 

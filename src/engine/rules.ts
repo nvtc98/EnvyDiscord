@@ -117,6 +117,7 @@ export function newGame(
     nextUid: 1,
     destroyedPower: 0,
     destroyedCount: 0,
+    turnLock: 0,
   };
   const events: GameEvent[] = [];
   draw(state, first, OPENING_HAND.first, events);
@@ -163,6 +164,10 @@ function startTurn(state: GameState, events: GameEvent[]): void {
   // (their 2nd onward). The opening turn (turns === 1) keeps round at 1.
   if (state.active === state.first && player.turns > 1) state.round += 1;
   player.energy = Math.min(player.turns, MAX_ENERGY);
+  // Frozen's lock counts down one per turn start. Frozen resolves at the owner's end of turn (turnLock=3)
+  // BEFORE control passes, so the opponent's next startTurn decrements 3→2 (locked) and the owner's
+  // following startTurn decrements 2→1 (locked). The next opponent startTurn decrements 1→0, clearing it.
+  if (state.turnLock > 0) state.turnLock -= 1;
   draw(state, state.active, 1, events);
   applyStartOfTurnDrains(state, events);
   events.push({
@@ -358,6 +363,7 @@ function destroyCard(
   events: GameEvent[],
   cause: DestroyCause,
   lane: LaneIndex,
+  rng: Rng,
 ): void {
   const ability = card.def.ability;
   if (ability?.timing === "onDestroy" && ability.effect.kind === "rebirth") {
@@ -398,6 +404,33 @@ function destroyCard(
     state.destroyedCount += 1;
     if (cause === "push" || cause === "siren")
       spawnGlacial(state, card, ability.effect.drop, lane, events);
+    return;
+  }
+  if (
+    ability?.timing === "onDestroy" &&
+    ability.effect.kind === "dispersedSpread"
+  ) {
+    // Dispersed is really destroyed (tally first, like Glacial), then its power-at-death is spread
+    // randomly across the owner's OTHER remaining board cards. None → power lost.
+    const power = Math.max(0, card.def.power + card.bonus);
+    state.destroyedPower += power;
+    state.destroyedCount += 1;
+    const others: CardInstance[] = [];
+    for (let l = 0; l < LANES; l++)
+      for (let i = 0; i < CELLS; i++) {
+        const c = state.lanes[l][i];
+        if (c && c.owner === card.owner && c.uid !== card.uid) others.push(c);
+      }
+    const spread = spreadPowerRandomly(others, power, rng);
+    events.push({
+      type: "ability",
+      seat: card.owner,
+      card: card.def,
+      text:
+        spread > 0
+          ? `scattered ${spread} power across your other cards`
+          : "scattered, but no cards remained to receive its power",
+    });
     return;
   }
   state.destroyedPower += Math.max(0, card.def.power + card.bonus);
@@ -688,6 +721,8 @@ export function canPlay(
   lane: LaneIndex,
 ): PlayCheck {
   if (state.winner) return { ok: false, reason: "over" };
+  // Frozen's lock: while active, NEITHER seat may play any card this turn.
+  if (state.turnLock > 0) return { ok: false, reason: "blocked" };
   const player = state.players[state.active];
   const card = player.hand.find((c) => c.uid === uid);
   if (!card) return { ok: false, reason: "not-in-hand" };
@@ -860,7 +895,7 @@ function resolvePushedOffCard(
       return true;
     }
   }
-  destroyCard(state, card, events, cause, fromLane);
+  destroyCard(state, card, events, cause, fromLane, rng);
   return false;
 }
 
@@ -1142,7 +1177,7 @@ function applyActive(
           if (isGuardianProtected(state, lane, occupant)) continue;
           cells[i] = null;
           destroyedNames.push(occupant.def.name);
-          destroyCard(state, occupant, events, "laser", lane);
+          destroyCard(state, occupant, events, "laser", lane, rng);
         }
       }
       say(
@@ -1259,6 +1294,16 @@ function applyActive(
     case "vaporSummon":
     case "chronosSummon":
     case "evilHighest":
+    // The nine new actives below are also no-ops on play; they resolve during the owner's end-of-turn
+    // pass (applyEndOfTurnAbilities). Listed here to keep the active switch exhaustive for assertNever.
+    case "joyfulBuff":
+    case "goliathGain":
+    case "frozenLock":
+    case "gloomLane":
+    case "sunkenPull":
+    case "killingDeck":
+    case "numbDeck":
+    case "sunlitScatter":
       break;
     default:
       assertNever(effect);
@@ -1424,6 +1469,36 @@ function applyGentlePush(state: GameState, events: GameEvent[]): void {
 const effectivePowerOf = (def: CardDef, bonus: number): number =>
   Math.max(0, def.power + bonus);
 
+/**
+ * Central destroy tally for cards destroyed OFF the board (in hand or in the deck), where destroyCard
+ * does not run. Adds the card's effective power (floored at 0, same as destroyCard's board tally) to
+ * `destroyedPower` and increments `destroyedCount`, so Stella grows from hand/deck destruction too.
+ */
+export function tallyDestroyed(
+  state: GameState,
+  def: CardDef,
+  bonus: number,
+): void {
+  state.destroyedPower += effectivePowerOf(def, bonus);
+  state.destroyedCount += 1;
+}
+
+/**
+ * Distributes an integer `total` across `targets` one point at a time: `total` iterations, each adding
+ * +1 permanent power (`bonus`) to a uniformly-random target via the seeded `pick`. Empty target list
+ * or `total <= 0` → nothing happens and the power is lost. Returns the amount actually distributed
+ * (`total` when spread, else 0). The helper is event-free so each caller words its own log line.
+ */
+export function spreadPowerRandomly(
+  targets: CardInstance[],
+  total: number,
+  rng: Rng,
+): number {
+  if (targets.length === 0 || total <= 0) return 0;
+  for (let i = 0; i < total; i++) pick(targets, rng).bonus += 1;
+  return total;
+}
+
 /** Finds an on-board card by uid, returning its lane/cell/instance, or null if it has left the board. */
 function findOnBoard(
   state: GameState,
@@ -1510,10 +1585,10 @@ function applyWatcherDig(
 }
 
 /**
- * Moonlit (moonlitSacrifice): destroys ALL cards in the owner's hand (discarded, NOT routed through
- * destroyCard — they never touch destroyedPower/destroyedCount), sums their effective power, and adds
- * the total as permanent power to ONE RANDOM friendly on-board card (Moonlit itself eligible). Empty
- * hand → nothing, no event.
+ * Moonlit (moonlitSacrifice): destroys ALL cards in the owner's hand (each feeds Stella via
+ * tallyDestroyed — hand destruction now grows destroyedPower/destroyedCount), sums their effective
+ * power, and spreads that total RANDOMLY across ALL of the owner's on-board cards (Moonlit itself
+ * eligible), one point at a time. Empty hand → nothing, no event. Empty board → power lost.
  */
 function applyMoonlitSacrifice(
   state: GameState,
@@ -1524,21 +1599,20 @@ function applyMoonlitSacrifice(
   const hand = state.players[moonlit.owner].hand;
   if (hand.length === 0) return;
   const total = hand.reduce((n, c) => n + effectivePowerOf(c.def, c.bonus), 0);
-  state.players[moonlit.owner].hand = []; // discard the whole hand (no board-destroy tally)
+  for (const c of hand) tallyDestroyed(state, c.def, c.bonus); // hand destroys now feed Stella
+  state.players[moonlit.owner].hand = [];
   const friendly: CardInstance[] = [];
   for (let lane = 0; lane < LANES; lane++)
     for (let cell = 0; cell < CELLS; cell++) {
       const c = state.lanes[lane][cell];
       if (c && c.owner === moonlit.owner) friendly.push(c);
     }
-  if (friendly.length === 0) return; // defensive: Moonlit itself should always qualify
-  const target = pick(friendly, rng);
-  target.bonus += total;
+  const spread = spreadPowerRandomly(friendly, total, rng);
   events.push({
     type: "ability",
     seat: moonlit.owner,
     card: moonlit.def,
-    text: `destroyed its hand and gave +${total} power to ${target.def.name}`,
+    text: `destroyed its hand and spread ${spread} power across your cards`,
   });
 }
 
@@ -1650,6 +1724,7 @@ function applyBerserkKill(
   lane: LaneIndex,
   berserkCell: number,
   events: GameEvent[],
+  rng: Rng,
 ): void {
   const step = berserk.owner === "bottom" ? -1 : 1;
   const frontCell = berserkCell + step;
@@ -1660,7 +1735,7 @@ function applyBerserkKill(
   if (isGuardianProtected(state, lane, victim)) return;
   state.lanes[lane][frontCell] = null;
   // "laser" cause: a direct destroy (not a push/siren), so Glacial's push-only spawn does not fire.
-  destroyCard(state, victim, events, "laser", lane);
+  destroyCard(state, victim, events, "laser", lane, rng);
   events.push({
     type: "ability",
     seat: berserk.owner,
@@ -1831,8 +1906,8 @@ function applyVaporSummon(
 /**
  * Chronos (chronosSummon, design D3) — resolves over two of the owner's end-of-turns:
  * - Turn A (no `pending`): destroys the HIGHEST effective-cost card in the owner's hand (ties broken
- *   randomly), removing it WITHOUT a destroy tally (a hand discard, like Moonlit), and records it as
- *   `pending` to summon at the end of the owner's NEXT turn. Empty hand → no-op.
+ *   randomly). The destroyed hand card feeds Stella (tallyDestroyed), and it is recorded as `pending`
+ *   to summon at the end of the owner's NEXT turn. Empty hand → no-op.
  * - Turn B (`pending` set and the owner's turn counter has advanced): if Chronos is still alive (it is,
  *   since pass 2 re-found it live), summons the pending card into Chronos's CURRENT front cell (no-op if
  *   at the enemy edge or the front cell is occupied). Clears `pending` regardless of whether it placed.
@@ -1859,7 +1934,8 @@ function applyChronosSummon(
     );
     const removed = pick(topCost, rng);
     const idx = hand.findIndex((c) => c.uid === removed.uid);
-    hand.splice(idx, 1); // hand discard — NO destroyedPower/destroyedCount tally
+    hand.splice(idx, 1);
+    tallyDestroyed(state, removed.def, removed.bonus); // hand destroy now feeds Stella
     chronos.pending = {
       def: removed.def,
       fireOnTurn: state.players[owner].turns + 1,
@@ -1916,6 +1992,303 @@ function applyEvilHighest(
   });
 }
 
+/** Collects every on-board card owned by `owner`, lanes L→R, cells top→bottom (deterministic order). */
+function ownerBoardCards(state: GameState, owner: Seat): CardInstance[] {
+  const out: CardInstance[] = [];
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const c = state.lanes[lane][cell];
+      if (c && c.owner === owner) out.push(c);
+    }
+  return out;
+}
+
+/**
+ * Joyful (joyfulBuff): at the owner's end of turn, +1 permanent power to EVERY friendly on-board card
+ * (Joyful included). Enemies untouched.
+ */
+function applyJoyfulBuff(
+  state: GameState,
+  joyful: CardInstance,
+  events: GameEvent[],
+): void {
+  const mine = ownerBoardCards(state, joyful.owner);
+  for (const c of mine) c.bonus += 1;
+  events.push({
+    type: "ability",
+    seat: joyful.owner,
+    card: joyful.def,
+    text: `gave +1 power to ${mine.length} card${mine.length === 1 ? "" : "s"}`,
+  });
+}
+
+/**
+ * Goliath (goliathGain): at the owner's end of turn, gain permanent power
+ * `round(10 * (1 - ownerRemainingHP/total))` clamped to 0..10, from the OWNER's perspective. The more
+ * The Eyes Privilege favors the enemy (owner HP low), the more power. Seat-correct: ownerRemainingHP is
+ * `balance` for bottom, `total - balance` for top.
+ */
+function applyGoliathGain(
+  state: GameState,
+  goliath: CardInstance,
+  events: GameEvent[],
+): void {
+  const total = state.bottomStartHP + state.topStartHP;
+  const ownerHP =
+    goliath.owner === "bottom" ? state.balance : total - state.balance;
+  // Floor matches BOTH of the user's worked examples: 15/100 → floor(8.5) = 8 and 99/100 → floor(0.1)
+  // = 0 (Math.round would give 9 for the first, contradicting the spec's stated result of 8).
+  const gain = Math.max(
+    0,
+    Math.min(10, Math.floor(10 * (1 - ownerHP / total))),
+  );
+  goliath.bonus += gain;
+  events.push({
+    type: "ability",
+    seat: goliath.owner,
+    card: goliath.def,
+    text: `gained ${gain} power from The Eyes Privilege`,
+  });
+}
+
+/** Frozen (frozenLock): at the owner's end of turn, lock BOTH players out of playing for two upcoming plies. */
+function applyFrozenLock(
+  state: GameState,
+  frozen: CardInstance,
+  events: GameEvent[],
+): void {
+  // Lock the next two plies: the opponent's next turn AND the owner's own next turn.
+  // Frozen resolves inside resolveTurn (owner's end of turn), BEFORE control passes. startTurn
+  // decrements once per turn start, so set 3 here: opponent startTurn 3→2 (locked), owner
+  // startTurn 2→1 (locked), then the following opponent startTurn 1→0 clears it.
+  state.turnLock = 3;
+  events.push({
+    type: "ability",
+    seat: frozen.owner,
+    card: frozen.def,
+    text: "froze the board — no cards can be played next turn",
+  });
+}
+
+/**
+ * Gloom (gloomLane): at the owner's end of turn, every ENEMY card in Gloom's lane loses 1 permanent
+ * power (bonus -= 1; effective power floors at 0 at read time). Friendlies and other lanes untouched.
+ */
+function applyGloomLane(
+  state: GameState,
+  gloom: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+): void {
+  let hit = 0;
+  for (let cell = 0; cell < CELLS; cell++) {
+    const c = state.lanes[lane][cell];
+    if (c && c.owner !== gloom.owner) {
+      c.bonus -= 1;
+      hit += 1;
+    }
+  }
+  events.push({
+    type: "ability",
+    seat: gloom.owner,
+    card: gloom.def,
+    text: `drained 1 power from ${hit} enemy card${hit === 1 ? "" : "s"} in this lane`,
+  });
+}
+
+/**
+ * Pulls one `lane` a single step TOWARD `owner`'s near edge — the mirror of sirenPush (which shoves
+ * toward the far edge). Direction in cell-index terms: bottom owner → step +1 (toward cell 2), top
+ * owner → step -1 (toward cell 0). Visits cells NEAR-edge-first so each card slides into an
+ * already-vacated slot. A push-immune / Guardian-protected card at the near edge is never destroyed:
+ * it stays and walls the cards behind it. At most one non-immune card at the near edge is pulled off
+ * and routed through resolvePushedOffCard (cause "siren"), so it tallies Stella, fires onDestroy, and
+ * Guardian/pushImmune cards wall the pull. Emits a `moved` per shifted card.
+ */
+function pullLane(
+  state: GameState,
+  lane: LaneIndex,
+  owner: Seat,
+  events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
+): void {
+  const cells = state.lanes[lane];
+  const step = owner === "bottom" ? 1 : -1; // toward the owner's near edge
+  const nearEdge = entryCell(owner); // bottom → 2, top → 0
+  // Visit near edge first, then inward, so each card moves into an already-vacated slot.
+  const order: number[] = [];
+  for (let k = 0; k < CELLS; k++) order.push(nearEdge - step * k);
+  let destroyed: CardInstance | null = null;
+  let blockedAt: number | null = null;
+  for (const i of order) {
+    const occupant = cells[i];
+    if (!occupant) continue;
+    const dest = i + step;
+    if (
+      (dest < 0 || dest >= CELLS) &&
+      (isPushImmune(occupant.def) || isGuardianProtected(state, lane, occupant))
+    ) {
+      blockedAt = i;
+      continue;
+    }
+    if (blockedAt !== null && dest === blockedAt) {
+      blockedAt = i;
+      continue;
+    }
+    if (dest < 0 || dest >= CELLS) {
+      cells[i] = null;
+      destroyed = occupant; // at most one card falls off a single-step pull
+    } else {
+      relocateCard(state, { lane, cell: i }, { lane, cell: dest }, events);
+    }
+  }
+  if (destroyed)
+    resolvePushedOffCard(
+      state,
+      destroyed,
+      lane,
+      owner,
+      events,
+      "siren",
+      rng,
+      fires,
+    );
+}
+
+/**
+ * Sunken (sunkenPull): at the owner's end of turn, PULL the two OTHER lanes (not Sunken's own) one step
+ * toward the owner's near edge (mirror of Siren's push). A card at the owner's near edge pulled further
+ * falls off and is destroyed. Sunken's own lane is untouched. Emits one summary `ability` line.
+ */
+function applySunkenPull(
+  state: GameState,
+  sunken: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const fires = { n: 0 };
+  for (const other of otherLanes(lane))
+    pullLane(state, other, sunken.owner, events, rng, fires);
+  events.push({
+    type: "ability",
+    seat: sunken.owner,
+    card: sunken.def,
+    text: "pulled the other two lanes toward you",
+  });
+}
+
+/**
+ * Killing (killingDeck): at the owner's end of turn, destroy ONE RANDOM card in the OPPONENT's deck.
+ * The destroyed card feeds Stella (tallyDestroyed) and its NAME is written to the battle log. Empty
+ * enemy deck → nothing.
+ */
+function applyKillingDeck(
+  state: GameState,
+  killing: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const deck = state.players[opponentOf(killing.owner)].deck;
+  if (deck.length === 0) return; // empty enemy deck → nothing
+  const entry = pick(deck, rng);
+  const idx = deck.findIndex((e) => e === entry);
+  deck.splice(idx, 1);
+  tallyDestroyed(state, entry.def, entry.bonus);
+  events.push({
+    type: "ability",
+    seat: killing.owner,
+    card: killing.def,
+    text: `destroyed ${entry.def.name} from the enemy's deck`,
+  });
+}
+
+/**
+ * Numb (numbDeck): at the owner's end of turn, destroy ONE RANDOM card in the OWNER's OWN deck. Feeds
+ * Stella (tallyDestroyed) and logs the destroyed card's name. Empty deck → nothing.
+ */
+function applyNumbDeck(
+  state: GameState,
+  numb: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const deck = state.players[numb.owner].deck;
+  if (deck.length === 0) return; // empty deck → nothing
+  const entry = pick(deck, rng);
+  const idx = deck.findIndex((e) => e === entry);
+  deck.splice(idx, 1);
+  tallyDestroyed(state, entry.def, entry.bonus);
+  events.push({
+    type: "ability",
+    seat: numb.owner,
+    card: numb.def,
+    text: `destroyed ${entry.def.name} from your deck`,
+  });
+}
+
+/**
+ * Sunlit (sunlitScatter): at the owner's end of turn, Sunlit STAYS ALIVE and destroys every OTHER
+ * friendly on-board card via destroyCard (so each tallies Stella and fires onDestroy — Phoenix rebirth,
+ * Glacial spawn, Dispersed spread). Their summed effective power (read BEFORE destroying) is spread
+ * randomly across the owner's HAND cards. Empty hand → power lost. Victims collected in deterministic
+ * board order (lanes L→R, cells top→bottom).
+ */
+function applySunlitScatter(
+  state: GameState,
+  sunlit: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  // Collect victims (every other friendly board card) with their position and power-at-death.
+  const victims: { lane: LaneIndex; cell: number; card: CardInstance }[] = [];
+  for (let lane = 0; lane < LANES; lane++)
+    for (let cell = 0; cell < CELLS; cell++) {
+      const c = state.lanes[lane][cell];
+      if (c && c.owner === sunlit.owner && c.uid !== sunlit.uid)
+        victims.push({ lane: lane as LaneIndex, cell, card: c });
+    }
+  const fires = { n: 0 };
+  let total = 0;
+  for (const v of victims) {
+    total += effectivePowerOf(v.card.def, v.card.bonus); // read BEFORE destroy
+    state.lanes[v.lane][v.cell] = null;
+    destroyCard(state, v.card, events, "laser", v.lane, rng);
+  }
+  const hand = state.players[sunlit.owner].hand;
+  const spread = spreadPowerRandomly(hand, total, rng);
+  events.push({
+    type: "ability",
+    seat: sunlit.owner,
+    card: sunlit.def,
+    text: `destroyed your other cards and spread ${spread} power across your hand`,
+  });
+}
+
+/**
+ * Flower (flowerBuff): a recurring passive — at the owner's end of turn, +1 permanent power to ONE
+ * RANDOM friendly on-board card (Flower itself eligible). Empty (shouldn't happen; Flower qualifies) →
+ * no-op.
+ */
+function applyFlowerBuff(
+  state: GameState,
+  flower: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const mine = ownerBoardCards(state, flower.owner);
+  if (mine.length === 0) return; // defensive: Flower itself should always qualify
+  const target = pick(mine, rng);
+  target.bonus += 1;
+  events.push({
+    type: "ability",
+    seat: flower.owner,
+    card: flower.def,
+    text: `gave +1 power to ${target.def.name}`,
+  });
+}
+
 /** The end-of-turn ability kind a card carries, if it is one the end-of-turn resolver handles. */
 type EndOfTurnKind =
   | "watcherDig"
@@ -1928,7 +2301,16 @@ type EndOfTurnKind =
   | "summonDeck"
   | "vaporSummon"
   | "chronosSummon"
-  | "evilHighest";
+  | "evilHighest"
+  | "joyfulBuff"
+  | "goliathGain"
+  | "frozenLock"
+  | "gloomLane"
+  | "sunkenPull"
+  | "killingDeck"
+  | "numbDeck"
+  | "sunlitScatter"
+  | "flowerBuff";
 
 function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
   const ab = def.ability;
@@ -1945,6 +2327,14 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
       case "vaporSummon":
       case "chronosSummon":
       case "evilHighest":
+      case "joyfulBuff":
+      case "goliathGain":
+      case "frozenLock":
+      case "gloomLane":
+      case "sunkenPull":
+      case "killingDeck":
+      case "numbDeck":
+      case "sunlitScatter":
         return ab.effect.kind;
       default:
         return null;
@@ -1952,6 +2342,8 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
   }
   if (ab.timing === "endOfRound" && ab.effect.kind === "wildShift")
     return "wildShift";
+  if (ab.timing === "endOfRound" && ab.effect.kind === "flowerBuff")
+    return "flowerBuff";
   return null;
 }
 
@@ -2003,7 +2395,7 @@ function applyEndOfTurnAbilities(
         applyApexSwap(state, card, lane, cell, events);
         break;
       case "berserkKill":
-        applyBerserkKill(state, card, lane, cell, events);
+        applyBerserkKill(state, card, lane, cell, events, rng);
         break;
       case "wildShift":
         applyWildShift(state, card, lane, events, rng);
@@ -2022,6 +2414,33 @@ function applyEndOfTurnAbilities(
         break;
       case "evilHighest":
         applyEvilHighest(state, card, events);
+        break;
+      case "joyfulBuff":
+        applyJoyfulBuff(state, card, events);
+        break;
+      case "goliathGain":
+        applyGoliathGain(state, card, events);
+        break;
+      case "frozenLock":
+        applyFrozenLock(state, card, events);
+        break;
+      case "gloomLane":
+        applyGloomLane(state, card, lane, events);
+        break;
+      case "sunkenPull":
+        applySunkenPull(state, card, lane, events, rng);
+        break;
+      case "killingDeck":
+        applyKillingDeck(state, card, events, rng);
+        break;
+      case "numbDeck":
+        applyNumbDeck(state, card, events, rng);
+        break;
+      case "sunlitScatter":
+        applySunlitScatter(state, card, events, rng);
+        break;
+      case "flowerBuff":
+        applyFlowerBuff(state, card, events, rng);
         break;
     }
   }

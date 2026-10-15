@@ -54,6 +54,22 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: Destroy the highest-cost card in your hand. If this is still alive after your next turn, summon that card in front of it.";
       case "evilHighest":
         return "Active: Give your highest-cost cards power equal to their cost.";
+      case "joyfulBuff":
+        return "Active: Give all your cards +1 power.";
+      case "goliathGain":
+        return "Active: Gain up to 10 power — more the more The Eyes Privilege favors the enemy.";
+      case "frozenLock":
+        return "Active: Next turn, no cards can be played — for either player.";
+      case "gloomLane":
+        return "Active: Enemy cards in this lane lose 1 power.";
+      case "sunkenPull":
+        return "Active: Pull the other two lanes one step toward you.";
+      case "killingDeck":
+        return "Active: Destroy a random card in the enemy's deck.";
+      case "numbDeck":
+        return "Active: Destroy a random card in your own deck.";
+      case "sunlitScatter":
+        return "Active: Destroy your other cards on the board and spread their total power randomly among the cards in your hand.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -111,6 +127,8 @@ export function abilityText(ability: Ability | undefined): string {
         return `Passive: At the end of every turn, give your other cards +${effect.amount} power.`;
       case "wildShift":
         return "Passive: At the end of your turn, move a random other card in this lane to another lane with space.";
+      case "flowerBuff":
+        return "Passive: At the end of your turn, give +1 power to a random friendly card.";
       default:
         return assertNever(effect);
     }
@@ -121,6 +139,8 @@ export function abilityText(ability: Ability | undefined): string {
       return `Passive: When destroyed, return to your hand with +${effect.amount} power.`;
     case "glacialSpawn":
       return `Passive: When pushed off the board, spawn a copy with ${effect.drop} less power into each of the other two lanes.`;
+    case "dispersedSpread":
+      return "Passive: When this is destroyed, spread its power randomly among your other cards on the board.";
     default:
       return assertNever(effect);
   }

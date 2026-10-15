@@ -47,7 +47,9 @@ const find = (state: GameState, id: string) =>
   onBoard(state).find((c) => c.def.id === id);
 const abilityTexts = (events: readonly GameEvent[]) =>
   events
-    .filter((e): e is Extract<GameEvent, { type: "ability" }> => e.type === "ability")
+    .filter(
+      (e): e is Extract<GameEvent, { type: "ability" }> => e.type === "ability",
+    )
     .map((e) => e.text);
 const setDeck = (
   state: GameState,
@@ -255,7 +257,7 @@ describe("Chronos Eyes / chronosSummon", () => {
     return { a, b, c };
   };
 
-  it("turn A destroys the highest-cost hand card without a destroy tally", () => {
+  it("turn A destroys the highest-cost hand card, feeding Stella", () => {
     const build = (s: GameState) => {
       const chronos = instance(def("CHRONOS", 4, 8, chronosSummon()), "bottom");
       setLane(s, 0, [null, null, chronos]);
@@ -268,9 +270,9 @@ describe("Chronos Eyes / chronosSummon", () => {
     const { a } = runTwoTurns(build);
     // The 7-cost card was removed from hand; the 2-cost stays.
     expect(a.state.players.bottom.hand.map((c) => c.def.id)).toEqual(["CHEAP"]);
-    // Pure hand discard: no destroy tally.
-    expect(a.state.destroyedPower).toBe(0);
-    expect(a.state.destroyedCount).toBe(0);
+    // The hand destroy now FEEDS Stella: PRICEY's effective power (1) and +1 to the count.
+    expect(a.state.destroyedPower).toBe(1);
+    expect(a.state.destroyedCount).toBe(1);
     expect(abilityTexts(a.events)).toContain("destroyed PRICEY from its hand");
   });
 

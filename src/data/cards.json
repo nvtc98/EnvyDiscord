@@ -350,8 +350,12 @@
   {
     "name": "Dispersed Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 4,
+    "power": 7,
+    "ability": "dispersedSpread",
+    "kind": "passive",
+    "text": "Passive: When this is destroyed, spread its power randomly among your other cards on the board.",
+    "note": "Bị động: khi thẻ này bị hủy (bất kỳ kiểu nào), rải power lúc chết ngẫu nhiên cho các thẻ đồng minh KHÁC còn trên sân (mỗi lần +1 cho 1 thẻ ngẫu nhiên). Không còn thẻ nào thì power mất. Vẫn nuôi Stella như mọi lần bị hủy."
   },
   {
     "name": "Dissolved Eyes",
@@ -546,14 +550,22 @@
   {
     "name": "Flower Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 1,
+    "power": 2,
+    "ability": "flowerBuff",
+    "kind": "passive",
+    "text": "Passive: At the end of your turn, give +1 power to a random friendly card.",
+    "note": "Bị động cuối MỖI lượt của chủ: +1 power cho 1 thẻ đồng minh ngẫu nhiên trên sân (có thể là chính Flower)."
   },
   {
     "name": "Frozen Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 2,
+    "power": 4,
+    "ability": "frozenLock",
+    "kind": "active",
+    "text": "Active: Next turn, no cards can be played — for either player.",
+    "note": "Cuối lượt của chủ: khóa sân — cả 2 phe KHÔNG thể ra thẻ trong 2 lượt kế tiếp (lượt địch rồi tới lượt chủ), sau đó hết khóa."
   },
   {
     "name": "Galaxy Eyes",
@@ -601,8 +613,12 @@
   {
     "name": "Gloom Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 1,
+    "power": 1,
+    "ability": "gloomLane",
+    "kind": "active",
+    "text": "Active: Enemy cards in this lane lose 1 power.",
+    "note": "Cuối lượt của chủ: mọi thẻ ĐỊCH cùng làn với Gloom bị -1 power (vĩnh viễn; power tối thiểu 0 khi đọc). Không đụng thẻ phe ta hay làn khác."
   },
   {
     "name": "Glossy Eyes",
@@ -625,8 +641,12 @@
   {
     "name": "Goliath Eyes",
     "rarity": "bargain",
-    "cost": 3,
-    "power": 9
+    "cost": 5,
+    "power": 0,
+    "ability": "goliathGain",
+    "kind": "active",
+    "text": "Active: Gain up to 10 power — more the more The Eyes Privilege favors the enemy.",
+    "note": "Cuối lượt của chủ: +0..10 power vĩnh viễn = floor(10 × tỷ lệ The Eyes Privilege đang bất lợi cho chủ). Ví dụ chủ còn 15/100 HP → +8; 99/100 → +0."
   },
   {
     "name": "Grim Eyes",
@@ -696,8 +716,12 @@
   {
     "name": "Joyful Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 3,
+    "power": 3,
+    "ability": "joyfulBuff",
+    "kind": "active",
+    "text": "Active: Give all your cards +1 power.",
+    "note": "Cuối lượt của chủ: +1 power cho TOÀN BỘ thẻ đồng minh trên sân (gồm cả chính Joyful). Không đụng thẻ địch."
   },
   {
     "name": "Keen Eyes",
@@ -708,8 +732,12 @@
   {
     "name": "Killing Eyes",
     "rarity": "common",
-    "cost": 1,
-    "power": 3
+    "cost": 2,
+    "power": 5,
+    "ability": "killingDeck",
+    "kind": "active",
+    "text": "Active: Destroy a random card in the enemy's deck.",
+    "note": "Cuối lượt của chủ: hủy 1 thẻ ngẫu nhiên trong DECK của địch; ghi tên thẻ bị hủy lên log. Nuôi Stella. Deck địch rỗng thì không làm gì."
   },
   {
     "name": "Laser Eyes",
@@ -845,8 +873,8 @@
     "power": 4,
     "ability": "moonlitSacrifice",
     "kind": "active",
-    "text": "Active: Destroy all cards in your hand and add their total power to a random friendly card on the board.",
-    "note": "Cuối lượt của chủ: hủy toàn bộ thẻ trên tay (bỏ đi, không tính vào bộ đếm hủy trên sân) và cộng tổng power của chúng vào MỘT thẻ phe ta ngẫu nhiên trên sân (có thể là chính Moonlit). Tay trống thì không làm gì."
+    "text": "Active: Destroy all cards in your hand and spread their total power randomly among your cards on the board.",
+    "note": "Cuối lượt của chủ: hủy toàn bộ thẻ trên tay (có nuôi Stella) và rải tổng power của chúng NGẪU NHIÊN cho các thẻ phe ta trên sân (mỗi lần +1 cho 1 thẻ ngẫu nhiên, có thể là chính Moonlit). Tay trống thì không làm gì; sân trống thì power mất."
   },
   {
     "name": "Mortal Eyes",
@@ -907,8 +935,11 @@
     "name": "Numb Eyes",
     "rarity": "common",
     "cost": 3,
-    "power": 9,
-    "version": "2026-10-09"
+    "power": 11,
+    "ability": "numbDeck",
+    "kind": "active",
+    "text": "Active: Destroy a random card in your own deck.",
+    "note": "Cuối lượt của chủ: hủy 1 thẻ ngẫu nhiên trong DECK của chính mình; ghi tên thẻ bị hủy lên log. Nuôi Stella. Deck rỗng thì không làm gì."
   },
   {
     "name": "Obscure Eyes",
@@ -1389,15 +1420,22 @@
   {
     "name": "Sunken Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 3,
+    "power": 16,
+    "ability": "sunkenPull",
+    "kind": "active",
+    "text": "Active: Pull the other two lanes one step toward you.",
+    "note": "Cuối lượt của chủ: kéo 2 làn CÒN LẠI (không phải làn của Sunken) mỗi làn 1 ô về phía mép của chủ. Thẻ ở sát mép của chủ bị kéo tiếp sẽ rơi khỏi sân và bị hủy (nuôi Stella, kích onDestroy, bị Guardian/Bedrock chặn). Làn của Sunken không đổi."
   },
   {
     "name": "Sunlit Eyes",
     "rarity": "bargain",
-    "cost": 4,
-    "power": 12,
-    "version": "2026-10-09"
+    "cost": 6,
+    "power": 4,
+    "ability": "sunlitScatter",
+    "kind": "active",
+    "text": "Active: Destroy your other cards on the board and spread their total power randomly among the cards in your hand.",
+    "note": "Cuối lượt của chủ: Sunlit SỐNG; hủy mọi thẻ đồng minh KHÁC trên sân (nuôi Stella, kích onDestroy) và rải tổng power của chúng NGẪU NHIÊN cho các thẻ trên TAY. Tay trống thì power mất. Ngược với Moonlit."
   },
   {
     "name": "Sunr1se Eyes",

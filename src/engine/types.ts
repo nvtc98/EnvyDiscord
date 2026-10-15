@@ -46,7 +46,17 @@ export type ActiveEffect =
   | { kind: "summonDeck" } // Omen: end of turn, summon a random deck card to the cell in front of this one
   | { kind: "vaporSummon" } // Vapor: end of turn, vanish and summon a random higher-cost deck card into its own vacated cell
   | { kind: "chronosSummon" } // Chronos: end of turn, destroy the highest-cost hand card; if still alive next turn, summon it in front
-  | { kind: "evilHighest" }; // Evil: end of turn, give the owner's highest-cost cards (self included) power equal to that cost
+  | { kind: "evilHighest" } // Evil: end of turn, give the owner's highest-cost cards (self included) power equal to that cost
+  // The nine below also carry `timing: "active"` and are NO-OPS on play; they resolve during the
+  // OWNER's end-of-turn pass (see applyEndOfTurnAbilities), like the actives above.
+  | { kind: "joyfulBuff" } // Joyful: end of turn, +1 power to EVERY friendly on-board card (self included)
+  | { kind: "goliathGain" } // Goliath: end of turn, gain 0..10 permanent power, higher the more The Eyes Privilege favors the enemy
+  | { kind: "frozenLock" } // Frozen: end of turn, lock BOTH players out of playing for the next two upcoming plies
+  | { kind: "gloomLane" } // Gloom: end of turn, every enemy card in this lane loses 1 power (permanent)
+  | { kind: "sunkenPull" } // Sunken: end of turn, pull the two OTHER lanes one step toward the owner's edge
+  | { kind: "killingDeck" } // Killing: end of turn, destroy a random card in the OPPONENT's deck (feeds Stella)
+  | { kind: "numbDeck" } // Numb: end of turn, destroy a random card in the OWNER's OWN deck (feeds Stella)
+  | { kind: "sunlitScatter" }; // Sunlit: end of turn, destroy the owner's OTHER board cards and spread their power across the hand
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -65,10 +75,12 @@ export type ContinuousEffect =
 export type EndOfRoundEffect =
   | { kind: "oceanReturn"; amount: number } // Ocean: +amount to friendlies, then return to deck (phase 2)
   | { kind: "teamBuffEndOfTurn"; amount: number } // Cosmic: at every end of turn, +amount to the owner's OTHER on-board cards
-  | { kind: "wildShift" }; // Wild: at the OWNER's end of turn, move one random other card in Wild's lane (either seat) to a random other lane that has room
+  | { kind: "wildShift" } // Wild: at the OWNER's end of turn, move one random other card in Wild's lane (either seat) to a random other lane that has room
+  | { kind: "flowerBuff" }; // Flower: at the OWNER's end of turn, +1 power to ONE RANDOM friendly on-board card (self eligible)
 export type OnDestroyEffect =
   | { kind: "rebirth"; amount: number } // Phoenix: return to hand with +amount
-  | { kind: "glacialSpawn"; drop: number }; // Glacial: when pushed off the edge (push OR siren), spawn a (power − drop) clone into each other lane, stopping once spawn power ≤ 0
+  | { kind: "glacialSpawn"; drop: number } // Glacial: when pushed off the edge (push OR siren), spawn a (power − drop) clone into each other lane, stopping once spawn power ≤ 0
+  | { kind: "dispersedSpread" }; // Dispersed: when destroyed (any path), spread its power-at-death randomly across the owner's OTHER remaining board cards
 export type OnPlayEffect = {
   kind: "earlyBuff";
   amount: number;
@@ -174,6 +186,13 @@ export interface GameState {
   destroyedPower: number;
   /** Number of cards destroyed this match, both seats. Read by transformAt (§5). */
   destroyedCount: number;
+  /**
+   * Frozen's turn-lock counter. 0 = unlocked. Set to 3 when a Frozen resolves (owner end of turn),
+   * decremented by 1 at the start of each subsequent turn (startTurn). While > 0, NO card is playable
+   * by either seat (canPlay returns `blocked`, legalPlays returns `[]`), covering the opponent's next
+   * turn then the owner's next turn before clearing.
+   */
+  turnLock: number;
 }
 
 export interface Play {
