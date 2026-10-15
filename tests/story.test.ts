@@ -464,6 +464,9 @@ describe("story: the prologue", () => {
       expect(player.story!.starterClaimed).toBe(false);
       const view = currentView(player, ctx());
       expect(view.pack!.cards).toHaveLength(STARTER_SIZE);
+      // the book lists the cards cheapest-first, not grouped by rarity
+      const costs = view.pack!.cards.map((c) => c.cost);
+      expect(costs).toEqual([...costs].sort((a, b) => a - b));
       expect(view.choices.map((c) => c.label)).toEqual([
         "Take these cards",
         "Close the book and open it again",

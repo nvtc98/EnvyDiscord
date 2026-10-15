@@ -500,9 +500,11 @@ export const NODES: Record<string, NodeDef> = {
   book: {
     view: (p, ctx) => {
       const s = story(p);
+      // Shown ordered by cost (cheapest first), not by rarity, so the player reads the curve of the hand.
       const cards = (s.pack?.cards ?? [])
         .map((id) => ctx.cardIndex.get(id))
-        .filter((c) => c !== undefined);
+        .filter((c) => c !== undefined)
+        .sort((a, b) => a.cost - b.cost);
       const lines: StoryLine[] = [
         stranger(
           `Sixteen pages, sixteen cards. Do they suit thee, **${who(p)}**?`,

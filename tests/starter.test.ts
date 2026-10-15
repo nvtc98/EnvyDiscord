@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COLLECTIBLE_CARDS } from "../src/data/cards";
 import {
   STARTER_COST_WINDOW,
+  STARTER_MIN_ABILITY,
   STARTER_MIX,
   STARTER_SIZE,
   drawStarterPackBalanced,
@@ -9,7 +10,7 @@ import {
 import { mulberry32 } from "../src/util/rng";
 
 describe("drawStarterPackBalanced", () => {
-  it("always returns STARTER_SIZE unique cards whose mean cost is in the window, keeping the rarity mix", () => {
+  it("always returns STARTER_SIZE unique cards in the window, keeping the rarity mix and the ability floor", () => {
     for (let seed = 0; seed <= 200; seed++) {
       const pack = drawStarterPackBalanced(COLLECTIBLE_CARDS, mulberry32(seed));
       // size + uniqueness
@@ -17,7 +18,7 @@ describe("drawStarterPackBalanced", () => {
       expect(new Set(pack.map((c) => c.id)).size, `seed ${seed}`).toBe(
         STARTER_SIZE,
       );
-      // mean cost inside [2.75, 4.25]
+      // mean cost inside the window [3, 5]
       const mean = pack.reduce((sum, c) => sum + c.cost, 0) / pack.length;
       expect(mean, `seed ${seed} mean`).toBeGreaterThanOrEqual(
         STARTER_COST_WINDOW.min,
@@ -36,6 +37,11 @@ describe("drawStarterPackBalanced", () => {
         bargain: STARTER_MIX.bargain,
         common: STARTER_MIX.common,
       });
+      // at least half of the sixteen carry a real ability
+      const abilityCount = pack.filter((c) => c.ability).length;
+      expect(abilityCount, `seed ${seed} abilities`).toBeGreaterThanOrEqual(
+        STARTER_MIN_ABILITY,
+      );
     }
   });
 
