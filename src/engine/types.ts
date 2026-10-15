@@ -8,7 +8,7 @@ export const BALANCE_MIN = 0;
 export const BALANCE_MAX = 100;
 /** Default starting HP for each seat. The meter total = both seats' HP; the start = the bottom seat's HP. */
 export const DEFAULT_SEAT_HP = 50;
-export const DECK_SIZE = 12;
+export const DECK_SIZE = 16;
 /** Cards drawn before the first turn; every turn then starts with one more draw. */
 export const OPENING_HAND = { first: 2, second: 3 } as const;
 /** Maximum hand size. A draw past this burns the drawn card (it leaves the deck, never enters the hand). */
@@ -39,7 +39,14 @@ export type ActiveEffect =
   | { kind: "moonlitSacrifice" } // Moonlit: end of turn, destroy all cards in hand, add their total power to one random friendly on-board card
   | { kind: "titanShift" } // Titan: end of turn, move every OTHER card in this lane (both seats) to one random other lane (as many as fit)
   | { kind: "apexSwap" } // Apex: end of turn, swap places with the owner's frontmost friendly card in this lane
-  | { kind: "berserkKill" }; // Berserk: end of turn, destroy the card directly in front of this one (toward the enemy edge), friendly or enemy
+  | { kind: "berserkKill" } // Berserk: end of turn, destroy the card directly in front of this one (toward the enemy edge), friendly or enemy
+  // The five below also carry `timing: "active"` and are NO-OPS on play, resolving during the owner's
+  // end-of-turn pass (see applyEndOfTurnAbilities). They summon or buff; wiring lands in FEAT-002.
+  | { kind: "summonHand" } // Mortal: end of turn, summon a random hand card to the cell in front of this one
+  | { kind: "summonDeck" } // Omen: end of turn, summon a random deck card to the cell in front of this one
+  | { kind: "vaporSummon" } // Vapor: end of turn, vanish and summon a random higher-cost deck card into its own vacated cell
+  | { kind: "chronosSummon" } // Chronos: end of turn, destroy the highest-cost hand card; if still alive next turn, summon it in front
+  | { kind: "evilHighest" }; // Evil: end of turn, give the owner's highest-cost cards (self included) power equal to that cost
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -50,7 +57,10 @@ export type ContinuousEffect =
   | { kind: "phasing" } // Phasing: an enemy push that would destroy it slips it to a random empty lane instead
   | { kind: "wicked" } // Wicked: at the owner's end of turn, if THIS card itself moved during the turn, gain +2 power — at most once per turn, regardless of how many times it moved
   | { kind: "reflecting" } // Reflecting: an enemy push that displaces it shoves a random other lane one step
-  | { kind: "costReduction"; amount: number }; // Gentle: owner's cards cost `amount` less while this is on the board
+  | { kind: "costReduction"; amount: number } // Gentle: owner's cards cost `amount` less while this is on the board
+  | { kind: "ancientDiscount" } // Ancient: while in the owner's hand, costs 1 less at the end of each of the owner's turns (accumulates on costReduction)
+  | { kind: "vaingloryGate" } // Vainglory: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP)
+  | { kind: "guardianLane" }; // Guardian: the owner's cards sharing this card's lane cannot be destroyed
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
 export type EndOfRoundEffect =
   | { kind: "oceanReturn"; amount: number } // Ocean: +amount to friendlies, then return to deck (phase 2)
@@ -112,6 +122,10 @@ export interface CardInstance {
   owner: Seat;
   /** Permanent power changes from abilities. */
   bonus: number;
+  /** Chronos: a card destroyed from hand this turn, to be summoned at the end of the owner's NEXT turn. */
+  pending?: { def: CardDef; fireOnTurn: number };
+  /** Ancient: accumulated in-hand cost discount; absent → 0. Floors the live cost at 0 via instanceCost. */
+  costReduction?: number;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { CARDS } from "../src/data/cards";
 import { newGame } from "../src/engine/rules";
+import { DECK_SIZE } from "../src/engine/types";
 import type {
   Ability,
   CardDef,
@@ -19,10 +20,10 @@ export const def = (
   ability?: Ability,
 ): CardDef => ({ id, name: id.toUpperCase(), cost, power, ability });
 
-/** A 12-card deck of plain cards, so tests that do not care about the deck can ignore it. */
+/** A full-size deck of plain cards, so tests that do not care about the deck can ignore it. */
 export const plainDeck = (): CardDef[] =>
-  Array.from({ length: 12 }, (_, i) => def(`p${i}`, 1, 1));
-export const realDeck = (): CardDef[] => CARDS.slice(0, 12);
+  Array.from({ length: DECK_SIZE }, (_, i) => def(`p${i}`, 1, 1));
+export const realDeck = (): CardDef[] => CARDS.slice(0, DECK_SIZE);
 
 /** A started game with empty hands and boards, so tests can place exactly what they need. */
 export function emptyGame(

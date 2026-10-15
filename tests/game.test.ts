@@ -208,7 +208,7 @@ describe("decks", () => {
     if (unowned) expect(deck.guests).toContain(unowned);
   });
 
-  it("ownedCards sorts by cost then name; opponentDeck has 12 different cards", () => {
+  it("ownedCards sorts by cost then name; opponentDeck has DECK_SIZE different cards", () => {
     const player = createPlayer("u");
     for (const c of CARDS)
       player.cards[c.id] = { variants: ["metal"], active: "metal" };

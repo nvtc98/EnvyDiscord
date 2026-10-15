@@ -13,7 +13,7 @@ export interface NPCDef {
   id: string;
   /** Display name shown as the opponent HUD name, e.g. "Bò SPD". */
   name: string;
-  /** Exactly DECK_SIZE (12) card ids. DUPLICATES ALLOWED. Every id must resolve in CARD_INDEX. */
+  /** Exactly DECK_SIZE (16) card ids. DUPLICATES ALLOWED. Every id must resolve in CARD_INDEX. */
   deck: string[];
   /** Portrait asset key under assets/portraits/, e.g. "boss-spd-battle". */
   portrait: string;

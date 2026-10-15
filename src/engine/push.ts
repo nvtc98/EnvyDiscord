@@ -11,6 +11,28 @@ export interface PushResult {
 }
 
 /**
+ * True when the card at `lane[i]` cannot be shoved off the far edge: it is either Bedrock-style
+ * `pushImmune`, OR it is shielded by a friendly Guardian — some card in the SAME lane array sharing
+ * its owner carries the continuous `guardianLane` effect. A protected far-edge card acts as a WALL,
+ * exactly like `pushImmune`, instead of falling off and being destroyed. The ability checks are INLINE
+ * against `.def.ability` to keep push.ts free of an abilities.ts import (design D8).
+ */
+export const isPushProtected = (lane: readonly Cell[], i: number): boolean => {
+  const occupant = lane[i];
+  if (!occupant) return false;
+  const ab = occupant.def.ability;
+  if (ab?.timing === "continuous" && ab.effect.kind === "pushImmune")
+    return true;
+  return lane.some(
+    (g) =>
+      g !== null &&
+      g.owner === occupant.owner &&
+      g.def.ability?.timing === "continuous" &&
+      g.def.ability.effect.kind === "guardianLane",
+  );
+};
+
+/**
  * Inserts `card` at the seat's edge of the lane. An occupied entry cell pushes its card one step toward the
  * far edge, which may push the next one, and so on. The chain stops at the first empty cell, so a gap absorbs
  * the push. If the chain runs off the board, the card at the far edge is destroyed.
@@ -32,10 +54,7 @@ export function pushInto(
     // against occupant.def.ability (NOT via isPushImmune) to keep push.ts free of an abilities.ts
     // import. The test is on `occupant` (the card that would fall off), not `carried`.
     const atFarEdge = i + step < 0 || i + step >= CELLS;
-    const occImmune =
-      occupant?.def.ability?.timing === "continuous" &&
-      occupant.def.ability.effect.kind === "pushImmune";
-    if (occupant && atFarEdge && occImmune)
+    if (occupant && atFarEdge && isPushProtected(next, i))
       return { lane: [...lane], destroyed: null };
     next[i] = carried;
     if (!occupant) return { lane: next, destroyed: null };
@@ -64,11 +83,9 @@ export const pushAbsorbed = (lane: readonly Cell[], seat: Seat): boolean => {
     if (!occupant) return false; // a gap absorbs the push harmlessly; the card enters
     const next = i + step;
     if (next < 0 || next >= CELLS) {
-      // occupant is at the far edge and would be shoved off; absorbed iff it is push-immune
-      return (
-        occupant.def.ability?.timing === "continuous" &&
-        occupant.def.ability.effect.kind === "pushImmune"
-      );
+      // occupant is at the far edge and would be shoved off; absorbed iff it is push-protected
+      // (Bedrock pushImmune OR shielded by a friendly Guardian in this lane).
+      return isPushProtected(lane, i);
     }
     i = next;
   }

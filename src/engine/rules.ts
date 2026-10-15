@@ -249,6 +249,88 @@ function cloneInto(
 }
 
 /**
+ * The cell directly in front of `(owner, cell)` toward the enemy edge: bottom steps up (cell − 1),
+ * top steps down (cell + 1). Mirrors applyBerserkKill's `step` math. The result may be out of
+ * [0, CELLS); callers must range-check before using it as a summon target.
+ */
+function frontCell(owner: Seat, cell: number): number {
+  return cell + (owner === "bottom" ? -1 : 1);
+}
+
+/**
+ * A hand card's live cost: the board-discounted effectiveCost minus the card's accumulated per-instance
+ * Ancient reduction, floored at 0. Composes Gentle (board) and Ancient (in-hand) discounts.
+ */
+export function instanceCost(
+  state: GameState,
+  seat: Seat,
+  card: CardInstance,
+): number {
+  return Math.max(
+    0,
+    effectiveCost(state, seat, card.def) - (card.costReduction ?? 0),
+  );
+}
+
+/**
+ * True when `card` is Guardian-protected in `lane`: some card in that lane shares `card.owner` and
+ * carries the continuous `guardianLane` effect (a Guardian protects its own owner's cards in its lane,
+ * including itself; never the enemy's). Used to skip owner-friendly cards in every destruction path.
+ */
+function isGuardianProtected(
+  state: GameState,
+  lane: LaneIndex,
+  card: CardInstance,
+): boolean {
+  return state.lanes[lane].some(
+    (g) =>
+      g !== null &&
+      g.owner === card.owner &&
+      g.def.ability?.timing === "continuous" &&
+      g.def.ability.effect.kind === "guardianLane",
+  );
+}
+
+/**
+ * Summons a fresh card from off the board directly into the caller-verified-EMPTY cell
+ * `lanes[lane][cell]`, then runs the SAME on-play path playCard uses so a summoned card behaves
+ * identically to a played one. NO pushInto, NO cost charge. Unlike cloneInto, a summon DOES fire the
+ * card's active/onPlay. Emits an `ability` event on the SUMMONER ("summoned <name>"); does NOT emit
+ * `played` (would double-count) or `moved` (a placement is not a move of an existing board card).
+ * precondition: lanes[lane][cell] === null (verified by the caller).
+ */
+function summonInto(
+  state: GameState,
+  summoner: CardInstance,
+  def: CardDef,
+  bonus: number,
+  lane: LaneIndex,
+  cell: number,
+  events: GameEvent[],
+  rng: Rng,
+  fires: { n: number },
+): CardInstance {
+  const summoned: CardInstance = {
+    uid: state.nextUid++,
+    def,
+    owner: summoner.owner,
+    bonus,
+  };
+  state.lanes[lane][cell] = summoned;
+  const ability = def.ability;
+  if (ability?.timing === "active")
+    applyActive(state, summoned, lane, events, rng, fires);
+  if (ability?.timing === "onPlay") applyOnPlay(state, summoned, events);
+  events.push({
+    type: "ability",
+    seat: summoner.owner,
+    card: summoner.def,
+    text: `summoned ${def.name}`,
+  });
+  return summoned;
+}
+
+/**
  * The first empty cell in `lane` scanned from `owner`'s entry edge inward (owner's edge first),
  * or null if the lane has no empty cell. For bottom that is cell 2 → 1 → 0; for top, 0 → 1 → 2.
  */
@@ -408,8 +490,12 @@ function sirenPush(
     const occupant = cells[i];
     if (!occupant) continue;
     const dest = i + step;
-    // Immune card at the far edge: it stays, and it becomes a wall for the cards behind it.
-    if ((dest < 0 || dest >= CELLS) && isPushImmune(occupant.def)) {
+    // Immune/Guardian-protected card at the far edge: it stays, and it becomes a wall for the cards
+    // behind it (a friendly Guardian in this lane shields owner cards exactly like Bedrock pushImmune).
+    if (
+      (dest < 0 || dest >= CELLS) &&
+      (isPushImmune(occupant.def) || isGuardianProtected(state, lane, occupant))
+    ) {
       blockedAt = i;
       continue;
     }
@@ -605,8 +691,16 @@ export function canPlay(
   const player = state.players[state.active];
   const card = player.hand.find((c) => c.uid === uid);
   if (!card) return { ok: false, reason: "not-in-hand" };
-  if (effectiveCost(state, state.active, card.def) > player.energy)
+  if (instanceCost(state, state.active, card) > player.energy)
     return { ok: false, reason: "energy" };
+  // Vainglory: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP).
+  if (hasContinuousKind(card.def, "vaingloryGate")) {
+    const total = state.bottomStartHP + state.topStartHP;
+    const ownerHP =
+      state.active === "bottom" ? state.balance : total - state.balance;
+    const enemyHP = total - ownerHP;
+    if (!(ownerHP < enemyHP)) return { ok: false, reason: "blocked" };
+  }
   const cells = state.lanes[lane];
   if (isAnchored(cells) && wouldPush(cells, state.active))
     return { ok: false, reason: "anchored" };
@@ -739,6 +833,15 @@ function resolvePushedOffCard(
   rng: Rng,
   fires: { n: number },
 ): boolean {
+  // Defensive guard: a Guardian-protected card should never reach destruction (the push machinery
+  // walls it at the far edge). If one slips through, re-place it at its lane's far edge instead of
+  // destroying — mirroring Bedrock's pushImmune. The far-edge cell it just fell from is empty.
+  if (isGuardianProtected(state, fromLane, card)) {
+    const farEdge = actor === "bottom" ? 0 : CELLS - 1;
+    if (state.lanes[fromLane][farEdge] === null)
+      state.lanes[fromLane][farEdge] = card;
+    return false;
+  }
   if (card.owner !== actor && hasContinuousKind(card.def, "phasing")) {
     const empties = emptyLanes(state);
     if (empties.length > 0) {
@@ -801,8 +904,12 @@ function phantomPush(
     const occupant = cells[i];
     if (!occupant) continue;
     const dest = i + step;
-    // Immune card at the far edge: it stays, and it becomes a wall for the cards behind it.
-    if ((dest < 0 || dest >= CELLS) && isPushImmune(occupant.def)) {
+    // Immune/Guardian-protected card at the far edge: it stays, and it becomes a wall for the cards
+    // behind it (a friendly Guardian in this lane shields owner cards exactly like Bedrock pushImmune).
+    if (
+      (dest < 0 || dest >= CELLS) &&
+      (isPushImmune(occupant.def) || isGuardianProtected(state, lane, occupant))
+    ) {
       blockedAt = i;
       continue;
     }
@@ -911,8 +1018,8 @@ export function playCard(
   const player = state.players[seat];
   const handIndex = player.hand.findIndex((c) => c.uid === uid);
   const [card] = player.hand.splice(handIndex, 1);
-  // Charge the discounted cost (Gentle), the same value canPlay gated on.
-  player.energy -= effectiveCost(state, seat, card.def);
+  // Charge the discounted cost (Gentle board + Ancient in-hand), the same value canPlay gated on.
+  player.energy -= instanceCost(state, seat, card);
 
   const fires = { n: 0 }; // shared reaction-fire counter for this action (phantom-push cap)
 
@@ -1030,6 +1137,9 @@ function applyActive(
       for (let i = 0; i < cells.length; i++) {
         const occupant = cells[i];
         if (occupant && occupant.uid !== card.uid) {
+          // A card shielded by its own friendly Guardian in this lane is left in place (never the
+          // enemy's — an enemy card has no owner-matching Guardian here, so it is still destroyed).
+          if (isGuardianProtected(state, lane, occupant)) continue;
           cells[i] = null;
           destroyedNames.push(occupant.def.name);
           destroyCard(state, occupant, events, "laser", lane);
@@ -1142,6 +1252,13 @@ function applyActive(
     case "titanShift":
     case "apexSwap":
     case "berserkKill":
+    // The five summon/buff actives below are also no-ops on play; they resolve during the owner's
+    // end-of-turn pass (wiring lands in FEAT-002). Listed here to keep the active switch exhaustive.
+    case "summonHand":
+    case "summonDeck":
+    case "vaporSummon":
+    case "chronosSummon":
+    case "evilHighest":
       break;
     default:
       assertNever(effect);
@@ -1539,6 +1656,8 @@ function applyBerserkKill(
   if (frontCell < 0 || frontCell >= CELLS) return; // Berserk is at the enemy edge → no cell in front
   const victim = state.lanes[lane][frontCell];
   if (!victim) return; // empty front → nothing
+  // A victim shielded by its own friendly Guardian in this lane survives (enemy victims are not).
+  if (isGuardianProtected(state, lane, victim)) return;
   state.lanes[lane][frontCell] = null;
   // "laser" cause: a direct destroy (not a push/siren), so Glacial's push-only spawn does not fire.
   destroyCard(state, victim, events, "laser", lane);
@@ -1591,6 +1710,212 @@ function applyWildShift(
   });
 }
 
+/**
+ * Mortal (summonHand): at the owner's end of turn, summons a RANDOM card from the owner's hand into the
+ * cell directly in front of Mortal (toward the enemy edge). No-op when Mortal is at the enemy edge (no
+ * front cell), the front cell is occupied, or the hand is empty. The summoned card fires its ability
+ * via summonInto, exactly like a played card.
+ */
+function applyMortalSummon(
+  state: GameState,
+  mortal: CardInstance,
+  lane: LaneIndex,
+  cell: number,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const front = frontCell(mortal.owner, cell);
+  if (front < 0 || front >= CELLS) return; // Mortal is at the enemy edge → no cell in front
+  if (state.lanes[lane][front] !== null) return; // front occupied → no-op
+  const hand = state.players[mortal.owner].hand;
+  if (hand.length === 0) return; // empty hand → no-op
+  const picked = pick(hand, rng);
+  const idx = hand.findIndex((c) => c.uid === picked.uid);
+  hand.splice(idx, 1);
+  const fires = { n: 0 };
+  summonInto(
+    state,
+    mortal,
+    picked.def,
+    picked.bonus,
+    lane,
+    front,
+    events,
+    rng,
+    fires,
+  );
+}
+
+/**
+ * Omen (summonDeck): same as Mortal but pulls a RANDOM entry from the owner's DECK (carrying the deck
+ * entry's accumulated bonus) into the front cell. No-op when at the enemy edge, the front cell is
+ * occupied, or the deck is empty.
+ */
+function applyOmenSummon(
+  state: GameState,
+  omen: CardInstance,
+  lane: LaneIndex,
+  cell: number,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const front = frontCell(omen.owner, cell);
+  if (front < 0 || front >= CELLS) return; // at the enemy edge → no cell in front
+  if (state.lanes[lane][front] !== null) return; // front occupied → no-op
+  const deck = state.players[omen.owner].deck;
+  if (deck.length === 0) return; // empty deck → no-op
+  const picked = pick(deck, rng);
+  const idx = deck.findIndex((e) => e === picked);
+  deck.splice(idx, 1);
+  const fires = { n: 0 };
+  summonInto(
+    state,
+    omen,
+    picked.def,
+    picked.bonus,
+    lane,
+    front,
+    events,
+    rng,
+    fires,
+  );
+}
+
+/**
+ * Vapor (vaporSummon, design D5): at the owner's end of turn Vapor VANISHES — it is removed directly
+ * from its cell (NOT routed through destroyCard, so it never touches destroyedPower/destroyedCount and
+ * never fires onDestroy) — then summons a RANDOM deck card whose base cost is strictly GREATER than
+ * Vapor's current effective cost (base 4) into Vapor's just-vacated cell, carrying that deck entry's
+ * bonus. No higher-cost deck card → Vapor simply vanished (a "vanished" line, no summon).
+ */
+function applyVaporSummon(
+  state: GameState,
+  vapor: CardInstance,
+  lane: LaneIndex,
+  cell: number,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const owner = vapor.owner;
+  const vaporCost = effectiveCost(state, owner, vapor.def);
+  // Direct removal — a disappearance, not a destroy (no tally, no onDestroy).
+  state.lanes[lane][cell] = null;
+  const deck = state.players[owner].deck;
+  const candidates = deck.filter((e) => e.def.cost > vaporCost);
+  if (candidates.length === 0) {
+    events.push({
+      type: "ability",
+      seat: owner,
+      card: vapor.def,
+      text: "vanished",
+    });
+    return;
+  }
+  const picked = pick(candidates, rng);
+  const idx = deck.findIndex((e) => e === picked);
+  deck.splice(idx, 1);
+  const fires = { n: 0 };
+  summonInto(
+    state,
+    vapor,
+    picked.def,
+    picked.bonus,
+    lane,
+    cell,
+    events,
+    rng,
+    fires,
+  );
+}
+
+/**
+ * Chronos (chronosSummon, design D3) — resolves over two of the owner's end-of-turns:
+ * - Turn A (no `pending`): destroys the HIGHEST effective-cost card in the owner's hand (ties broken
+ *   randomly), removing it WITHOUT a destroy tally (a hand discard, like Moonlit), and records it as
+ *   `pending` to summon at the end of the owner's NEXT turn. Empty hand → no-op.
+ * - Turn B (`pending` set and the owner's turn counter has advanced): if Chronos is still alive (it is,
+ *   since pass 2 re-found it live), summons the pending card into Chronos's CURRENT front cell (no-op if
+ *   at the enemy edge or the front cell is occupied). Clears `pending` regardless of whether it placed.
+ * If Chronos is destroyed before turn B, pass 2 never re-finds it and `pending` is lost with it.
+ */
+function applyChronosSummon(
+  state: GameState,
+  chronos: CardInstance,
+  lane: LaneIndex,
+  cell: number,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const owner = chronos.owner;
+  if (chronos.pending === undefined) {
+    // Turn A: destroy the highest-cost hand card.
+    const hand = state.players[owner].hand;
+    if (hand.length === 0) return; // empty hand → no-op
+    const maxCost = Math.max(
+      ...hand.map((c) => effectiveCost(state, owner, c.def)),
+    );
+    const topCost = hand.filter(
+      (c) => effectiveCost(state, owner, c.def) === maxCost,
+    );
+    const removed = pick(topCost, rng);
+    const idx = hand.findIndex((c) => c.uid === removed.uid);
+    hand.splice(idx, 1); // hand discard — NO destroyedPower/destroyedCount tally
+    chronos.pending = {
+      def: removed.def,
+      fireOnTurn: state.players[owner].turns + 1,
+    };
+    events.push({
+      type: "ability",
+      seat: owner,
+      card: chronos.def,
+      text: `destroyed ${removed.def.name} from its hand`,
+    });
+    return;
+  }
+  // Turn B: fire only once the owner's turn counter has advanced past the arming turn.
+  if (state.players[owner].turns < chronos.pending.fireOnTurn) return;
+  const pendingDef = chronos.pending.def;
+  chronos.pending = undefined; // clear regardless of whether the summon places
+  const front = frontCell(owner, cell);
+  if (front < 0 || front >= CELLS) return; // at the enemy edge → no cell in front
+  if (state.lanes[lane][front] !== null) return; // front occupied → no-op
+  const fires = { n: 0 };
+  summonInto(state, chronos, pendingDef, 0, lane, front, events, rng, fires);
+}
+
+/**
+ * Evil (evilHighest, design D7): among ALL of the owner's cards on the board INCLUDING Evil itself,
+ * finds the maximum base `def.cost`; every owner card whose base cost equals that maximum gains power
+ * equal to that cost (permanent). Uses base cost per the task example (two 8-cost cards each gain +8).
+ */
+function applyEvilHighest(
+  state: GameState,
+  evil: CardInstance,
+  events: GameEvent[],
+): void {
+  const owner = evil.owner;
+  const mine: CardInstance[] = [];
+  for (let l = 0; l < LANES; l++)
+    for (let i = 0; i < CELLS; i++) {
+      const c = state.lanes[l][i];
+      if (c && c.owner === owner) mine.push(c);
+    }
+  if (mine.length === 0) return; // defensive: Evil itself should always qualify
+  const maxCost = Math.max(...mine.map((c) => c.def.cost));
+  let buffed = 0;
+  for (const c of mine)
+    if (c.def.cost === maxCost) {
+      c.bonus += maxCost;
+      buffed += 1;
+    }
+  events.push({
+    type: "ability",
+    seat: owner,
+    card: evil.def,
+    text: `gave +${maxCost} power to ${buffed} highest-cost card${buffed === 1 ? "" : "s"}`,
+  });
+}
+
 /** The end-of-turn ability kind a card carries, if it is one the end-of-turn resolver handles. */
 type EndOfTurnKind =
   | "watcherDig"
@@ -1598,7 +1923,12 @@ type EndOfTurnKind =
   | "titanShift"
   | "apexSwap"
   | "berserkKill"
-  | "wildShift";
+  | "wildShift"
+  | "summonHand"
+  | "summonDeck"
+  | "vaporSummon"
+  | "chronosSummon"
+  | "evilHighest";
 
 function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
   const ab = def.ability;
@@ -1610,6 +1940,11 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
       case "titanShift":
       case "apexSwap":
       case "berserkKill":
+      case "summonHand":
+      case "summonDeck":
+      case "vaporSummon":
+      case "chronosSummon":
+      case "evilHighest":
         return ab.effect.kind;
       default:
         return null;
@@ -1673,11 +2008,52 @@ function applyEndOfTurnAbilities(
       case "wildShift":
         applyWildShift(state, card, lane, events, rng);
         break;
+      case "summonHand":
+        applyMortalSummon(state, card, lane, cell, events, rng);
+        break;
+      case "summonDeck":
+        applyOmenSummon(state, card, lane, cell, events, rng);
+        break;
+      case "vaporSummon":
+        applyVaporSummon(state, card, lane, cell, events, rng);
+        break;
+      case "chronosSummon":
+        applyChronosSummon(state, card, lane, cell, events, rng);
+        break;
+      case "evilHighest":
+        applyEvilHighest(state, card, events);
+        break;
     }
   }
   // Wicked (self-only, +2 once per turn): after the movers above have run, bump each on-board Wicked
   // owned by this seat by exactly +2 if its OWN uid appears in a `moved` event emitted this turn.
   applyWickedEndOfTurn(state, owner, events);
+  // Ancient (in-hand ancientDiscount): at the owner's end of turn, each Ancient still in hand accrues
+  // +1 permanent cost reduction (applied live through instanceCost; floors the cost at 0).
+  applyAncientDiscount(state, owner, events);
+}
+
+/**
+ * Ancient (ancientDiscount, design D4): for the seat that just ended its turn, every card in its HAND
+ * carrying the continuous `ancientDiscount` effect gains +1 accumulated `costReduction`. The reduction
+ * is read live by instanceCost (floored at 0) at every instance-aware cost site. Emits one `ability`
+ * line per Ancient so the log shows the discount ticking.
+ */
+function applyAncientDiscount(
+  state: GameState,
+  owner: Seat,
+  events: GameEvent[],
+): void {
+  for (const card of state.players[owner].hand) {
+    if (!hasContinuousKind(card.def, "ancientDiscount")) continue;
+    card.costReduction = (card.costReduction ?? 0) + 1;
+    events.push({
+      type: "ability",
+      seat: owner,
+      card: card.def,
+      text: "grew cheaper while waiting in hand",
+    });
+  }
 }
 
 /**

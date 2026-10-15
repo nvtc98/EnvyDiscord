@@ -44,6 +44,16 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: Swap places with your frontmost card in this lane.";
       case "berserkKill":
         return "Active: Destroy the card directly in front of this one.";
+      case "summonHand":
+        return "Active: Summon a random card from your hand to the space in front of this card.";
+      case "summonDeck":
+        return "Active: Summon a random card from your deck to the space in front of this card.";
+      case "vaporSummon":
+        return "Active: Vanish, then summon a random higher-cost card from your deck in its place.";
+      case "chronosSummon":
+        return "Active: Destroy the highest-cost card in your hand. If this is still alive after your next turn, summon that card in front of it.";
+      case "evilHighest":
+        return "Active: Give your highest-cost cards power equal to their cost.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -83,6 +93,12 @@ export function abilityText(ability: Ability | undefined): string {
         return effect.amount === 1
           ? "Passive: Your cards cost 1 less (minimum 0)."
           : `Passive: Your cards cost ${effect.amount} less (minimum 0).`;
+      case "ancientDiscount":
+        return "Passive: While in your hand, this costs 1 less at the end of each of your turns.";
+      case "vaingloryGate":
+        return "Passive: Playable only while The Eyes Privilege favors the enemy.";
+      case "guardianLane":
+        return "Passive: Your cards in this lane cannot be destroyed.";
       default:
         return assertNever(effect);
     }

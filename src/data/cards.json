@@ -32,8 +32,12 @@
   {
     "name": "Ancient Eyes",
     "rarity": "bargain",
-    "cost": 3,
-    "power": 9
+    "cost": 8,
+    "power": 18,
+    "ability": "ancientDiscount",
+    "kind": "passive",
+    "text": "Passive: While in your hand, this costs 1 less at the end of each of your turns.",
+    "note": "Khi còn trên tay chủ: cuối mỗi lượt của chủ, cost giảm vĩnh viễn 1 (cộng dồn, sàn 0). Giảm cost được tính trực tiếp khi tung ra sân và hiển thị trên bài."
   },
   {
     "name": "Angel Eyes",
@@ -200,7 +204,11 @@
     "name": "Chronos Eyes",
     "rarity": "bargain",
     "cost": 4,
-    "power": 12
+    "power": 8,
+    "ability": "chronosSummon",
+    "kind": "active",
+    "text": "Active: Destroy the highest-cost card in your hand. If this is still alive after your next turn, summon that card in front of it.",
+    "note": "Cuối lượt của chủ (lượt A): hủy lá có cost cao nhất trên tay (hòa thì random), bỏ đi không tính vào bộ đếm hủy. Nếu đến cuối lượt kế tiếp của chủ (lượt B) mà Chronos còn sống thì triệu hồi lá đã hủy vào ô ngay trước mặt Chronos; ô trống/không có ô trước thì không ra. Chronos chết trước lượt B thì mất lá đang chờ."
   },
   {
     "name": "Circuit Eyes",
@@ -493,7 +501,11 @@
     "name": "Evil Eyes",
     "rarity": "eternal",
     "cost": 4,
-    "power": 12
+    "power": 6,
+    "ability": "evilHighest",
+    "kind": "active",
+    "text": "Active: Give your highest-cost cards power equal to their cost.",
+    "note": "Cuối lượt của chủ: trong toàn bộ thẻ phe ta trên sân (tính cả chính Evil), tìm cost (gốc) cao nhất; mỗi thẻ phe ta có cost bằng mức cao nhất đó được +power đúng bằng cost của nó. Ví dụ có 2 thẻ 8 cost và 3 thẻ 7 cost thì chỉ 2 thẻ 8 cost mỗi thẻ +8 power."
   },
   {
     "name": "Facet Eyes",
@@ -625,8 +637,12 @@
   {
     "name": "Guardian Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 5,
+    "power": 10,
+    "ability": "guardianLane",
+    "kind": "passive",
+    "text": "Passive: Your cards in this lane cannot be destroyed.",
+    "note": "Thẻ phe ta cùng làn với Guardian (gồm cả chính nó) không thể bị phá hủy — cả đẩy rơi khỏi mép lẫn phá hủy trực tiếp (Laser, Berserk). Không bảo vệ thẻ địch trong làn. Thẻ được bảo vệ ở mép xa trở thành bức tường chặn đẩy như Bedrock."
   },
   {
     "name": "Haze Eyes",
@@ -835,8 +851,12 @@
   {
     "name": "Mortal Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 3,
+    "power": 3,
+    "ability": "summonHand",
+    "kind": "active",
+    "text": "Active: Summon a random card from your hand to the space in front of this card.",
+    "note": "Cuối lượt của chủ: triệu hồi một lá ngẫu nhiên trên tay vào ô ngay trước mặt Mortal (về phía mép địch). Không có ô trước (đang ở sát mép địch), ô trước đã có thẻ, hoặc tay trống thì không làm gì. Lá triệu hồi kích hoạt active/onPlay như ra bài thường."
   },
   {
     "name": "Mysterious Eyes",
@@ -940,7 +960,11 @@
     "name": "Omen Eyes",
     "rarity": "common",
     "cost": 2,
-    "power": 6
+    "power": 0,
+    "ability": "summonDeck",
+    "kind": "active",
+    "text": "Active: Summon a random card from your deck to the space in front of this card.",
+    "note": "Cuối lượt của chủ: triệu hồi một lá ngẫu nhiên trong deck vào ô ngay trước mặt Omen (mang theo bonus của lá trong deck). Không có ô trước, ô trước đã có thẻ, hoặc deck trống thì không làm gì. Lá triệu hồi kích hoạt active/onPlay như ra bài thường."
   },
   {
     "name": "Omni Eyes",
@@ -1450,8 +1474,12 @@
   {
     "name": "Vainglory Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6,
+    "cost": 8,
+    "power": 24,
+    "ability": "vaingloryGate",
+    "kind": "passive",
+    "text": "Passive: Playable only while The Eyes Privilege favors the enemy.",
+    "note": "Chỉ ra được khi The Eyes Privilege đang nghiêng về phía địch (HP phe ta thấp hơn HP địch). Hòa hoặc đang có lợi thì không ra được; khi bị chặn thì ẩn khỏi nước đi hợp lệ.",
     "version": "2026-10-09"
   },
   {
@@ -1470,9 +1498,13 @@
   {
     "name": "Vapor Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6,
-    "version": "2026-10-09"
+    "cost": 4,
+    "power": 0,
+    "ability": "vaporSummon",
+    "kind": "active",
+    "text": "Active: Vanish, then summon a random higher-cost card from your deck in its place.",
+    "version": "2026-10-09",
+    "note": "Cuối lượt của chủ: Vapor tan biến (bỏ khỏi sân trực tiếp, KHÔNG tính vào bộ đếm hủy, không kích onDestroy) rồi triệu hồi một lá ngẫu nhiên trong deck có cost (gốc) lớn hơn cost hiện tại của Vapor (gốc 4) vào đúng ô vừa trống. Không có lá cost cao hơn thì chỉ tan biến."
   },
   {
     "name": "Veil Eyes",

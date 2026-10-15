@@ -4,17 +4,18 @@ import { COLLECTIBLE_CARDS } from "../src/data/cards";
 import { seedGuaranteedOpening } from "../src/engine/opening";
 import { newGame } from "../src/engine/rules";
 import type { CardDef, GameState, Seat } from "../src/engine/types";
+import { DECK_SIZE } from "../src/engine/types";
 import { mulberry32 } from "../src/util/rng";
 
 const boSpdDeck = (): CardDef[] => npcDeck(NPC_INDEX.get("bo-spd")!);
-/** A plain 12-card player deck of distinct collectible cards (contents are irrelevant to these tests). */
-const playerDeck = (): CardDef[] => COLLECTIBLE_CARDS.slice(0, 12);
+/** A plain full-size player deck of distinct collectible cards (contents are irrelevant to these tests). */
+const playerDeck = (): CardDef[] => COLLECTIBLE_CARDS.slice(0, DECK_SIZE);
 
 /** All uids across a seat's hand + deck instances (deck holds CardDefs, so uids come from the hand only). */
 const handIds = (state: GameState, seat: Seat): string[] =>
   state.players[seat].hand.map((c) => c.def.id);
 
-/** Count of a given card id across hand + deck for a seat (the 12-card multiset). */
+/** Count of a given card id across hand + deck for a seat (the deck multiset). */
 const multiset = (state: GameState, seat: Seat, id: string): number =>
   handIds(state, seat).filter((x) => x === id).length +
   state.players[seat].deck.filter((d) => d.def.id === id).length;
@@ -37,12 +38,12 @@ describe("seedGuaranteedOpening holds the guaranteed card deterministically", ()
       ).toHaveLength(1);
       expect(state.players.top.hand).toHaveLength(handBefore);
 
-      // The 12-card multiset is intact: 1 cap-1 + 11 bo-tuoi across hand + deck.
+      // The deck multiset is intact: 1 cap-1 + (DECK_SIZE - 1) bo-tuoi across hand + deck.
       expect(multiset(state, "top", "bo-sieu-phan-ong-cap-1")).toBe(1);
-      expect(multiset(state, "top", "bo-tuoi")).toBe(11);
+      expect(multiset(state, "top", "bo-tuoi")).toBe(DECK_SIZE - 1);
       expect(
         state.players.top.hand.length + state.players.top.deck.length,
-      ).toBe(12);
+      ).toBe(DECK_SIZE);
 
       // All hand uids are unique.
       const uids = state.players.top.hand.map((c) => c.uid);

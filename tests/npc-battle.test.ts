@@ -7,11 +7,12 @@ import {
 import { CARD_INDEX, COLLECTIBLE_CARDS } from "../src/data/cards";
 import { NPC_INDEX, npcDeck } from "../src/data/npcs";
 import type { CardDef } from "../src/engine/types";
+import { DECK_SIZE } from "../src/engine/types";
 import { makeCtx } from "./discord-helpers";
 
 setBattleStepDelay(0); // no real timers
 
-const playerDeck = (): CardDef[] => COLLECTIBLE_CARDS.slice(0, 12);
+const playerDeck = (): CardDef[] => COLLECTIBLE_CARDS.slice(0, DECK_SIZE);
 const boSpd = () => NPC_INDEX.get("bo-spd")!;
 
 afterEach(() => {
@@ -91,18 +92,18 @@ describe("Bò SPD fixed deck + guaranteed opening", () => {
       topHand.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
     ).toHaveLength(1);
 
-    // The top deck+hand multiset is exactly 11 bo-tuoi + 1 cap-1.
+    // The top deck+hand multiset is exactly (DECK_SIZE - 1) bo-tuoi + 1 cap-1.
     const topAll = [
       ...topHand,
       ...session.state.players.top.deck.map((d) => d.def.id),
     ];
-    expect(topAll.filter((id) => id === "bo-tuoi")).toHaveLength(11);
+    expect(topAll.filter((id) => id === "bo-tuoi")).toHaveLength(DECK_SIZE - 1);
     expect(topAll.filter((id) => id === "bo-sieu-phan-ong-cap-1")).toHaveLength(
       1,
     );
   });
 
-  it("draws only from the 12-card Bò SPD deck (no outside card) when it goes first", () => {
+  it("draws only from the Bò SPD deck (no outside card) when it goes first", () => {
     const ctx = makeCtx(3);
     startBattle({
       ctx,
@@ -116,8 +117,10 @@ describe("Bò SPD fixed deck + guaranteed opening", () => {
       variants: {},
     });
     const enemyDeck = enemyDeckLog(ctx);
-    expect(enemyDeck).toHaveLength(12);
-    expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
+    expect(enemyDeck).toHaveLength(DECK_SIZE);
+    expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(
+      DECK_SIZE - 1,
+    );
     expect(
       enemyDeck.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
     ).toHaveLength(1);

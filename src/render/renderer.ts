@@ -1,7 +1,12 @@
 import { join } from "node:path";
 import { GlobalFonts, createCanvas } from "@napi-rs/canvas";
 import { cardFaction, hasContinuous } from "../engine/abilities";
-import { effectivePower, instancePower, isAnchored } from "../engine/rules";
+import {
+  effectivePower,
+  instanceCost,
+  instancePower,
+  isAnchored,
+} from "../engine/rules";
 import {
   CELLS,
   LANES,
@@ -508,7 +513,8 @@ export async function createImageRenderer({
           const cx = handX0 + i * (handCardW + gap);
           const cy = handY;
           const isSelected = card.uid === selectedUid;
-          const isDim = yourTurn && card.def.cost > me.energy;
+          const liveCost = instanceCost(state, viewer, card);
+          const isDim = yourTurn && liveCost > me.energy;
           const variant =
             card.owner === viewer
               ? (variants?.[card.def.id] ?? DEFAULT_VARIANT)
@@ -523,7 +529,12 @@ export async function createImageRenderer({
           drawFullCard(
             ctx,
             cardLayout,
-            { def: card.def, variant, livePower: instancePower(card) },
+            {
+              def: card.def,
+              variant,
+              livePower: instancePower(card),
+              liveCost,
+            },
             await art.get(card.def.id),
             await frames.forCard(faction, variant),
           );

@@ -19,6 +19,7 @@ import {
   totalPower,
 } from "../src/engine/rules";
 import {
+  DECK_SIZE,
   MAX_TURNS,
   MAX_HAND,
   OPENING_HAND,
@@ -135,8 +136,13 @@ describe("setup and turn flow", () => {
     expect(state.players.top.hand).toHaveLength(3);
     expect(state.players.bottom.energy).toBe(1);
     expect(state.active).toBe("bottom");
-    expect(state.players.bottom.deck).toHaveLength(9);
-    expect(state.players.top.deck).toHaveLength(9);
+    // Bottom (first) drew OPENING_HAND.first + 1 turn draw; top (second) drew OPENING_HAND.second.
+    expect(state.players.bottom.deck).toHaveLength(
+      DECK_SIZE - (OPENING_HAND.first + 1),
+    );
+    expect(state.players.top.deck).toHaveLength(
+      DECK_SIZE - OPENING_HAND.second,
+    );
     expect(state.balance).toBe(BALANCE_START);
     expect(state.turnsPlayed).toBe(0);
   });

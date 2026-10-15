@@ -8,23 +8,14 @@ import {
   validateNpcs,
   type NPCDef,
 } from "../src/data/npcs";
+import { DECK_SIZE } from "../src/engine/types";
 
 /** A valid Bò-SPD-shaped entry, cloned so tests can mutate a single field to craft a bad entry. */
 const goodEntry = (): NPCDef => ({
   id: "bo-spd",
   name: "SPD",
   deck: [
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
-    "bo-tuoi",
+    ...Array<string>(DECK_SIZE - 1).fill("bo-tuoi"),
     "bo-sieu-phan-ong-cap-1",
   ],
   portrait: "boss-spd-battle",
@@ -38,8 +29,10 @@ describe("npcs.json loads and validates", () => {
     const boSpd = NPC_INDEX.get("bo-spd");
     expect(boSpd).toBeDefined();
     expect(boSpd!.name).toBe("SPD");
-    expect(boSpd!.deck).toHaveLength(12);
-    expect(boSpd!.deck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
+    expect(boSpd!.deck).toHaveLength(DECK_SIZE);
+    expect(boSpd!.deck.filter((id) => id === "bo-tuoi")).toHaveLength(
+      DECK_SIZE - 1,
+    );
     expect(
       boSpd!.deck.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
     ).toHaveLength(1);
@@ -57,7 +50,9 @@ describe("validateNpc throws loudly on bad data", () => {
   it("throws on the wrong deck length", () => {
     const bad = goodEntry();
     bad.deck = bad.deck.slice(0, 11);
-    expect(() => validateNpc(bad)).toThrow(/deck has 11 cards, expected 12/);
+    expect(() => validateNpc(bad)).toThrow(
+      new RegExp(`deck has 11 cards, expected ${DECK_SIZE}`),
+    );
   });
 
   it("throws on an unknown card id in the deck", () => {
@@ -98,11 +93,11 @@ describe("validateNpcs throws on duplicate ids", () => {
 });
 
 describe("npcDeck resolves ids to CardDefs with duplicates preserved", () => {
-  it("returns 12 defs: 11 identical bo-tuoi refs + 1 cap-1", () => {
+  it("returns DECK_SIZE defs: identical bo-tuoi refs + 1 cap-1", () => {
     const boSpd = NPC_INDEX.get("bo-spd")!;
     const defs = npcDeck(boSpd);
-    expect(defs).toHaveLength(12);
-    expect(defs.filter((d) => d.id === "bo-tuoi")).toHaveLength(11);
+    expect(defs).toHaveLength(DECK_SIZE);
+    expect(defs.filter((d) => d.id === "bo-tuoi")).toHaveLength(DECK_SIZE - 1);
     expect(defs.filter((d) => d.id === "bo-sieu-phan-ong-cap-1")).toHaveLength(
       1,
     );

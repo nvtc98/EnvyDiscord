@@ -8,6 +8,7 @@ import {
   storyCommand,
 } from "../src/discord/commands/story";
 import { GATE } from "../src/story/prologue";
+import { DECK_SIZE } from "../src/engine/types";
 import { setFetchAvatar } from "../src/render/avatar";
 import {
   buttonInteraction,
@@ -237,10 +238,12 @@ describe("story -> cave battle integration", () => {
       (e) => e.type === "battle_started",
     )?.data;
     expect(started).toMatchObject({ origin: "story" });
-    // Bò SPD plays its fixed deck (11 bo-tuoi + 1 cap-1), not a random 12 — order-independent.
+    // Bò SPD plays its fixed deck ((DECK_SIZE - 1) bo-tuoi + 1 cap-1), not a random fill — order-independent.
     const enemyDeck = started!.enemyDeck as string[];
-    expect(enemyDeck).toHaveLength(12);
-    expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(11);
+    expect(enemyDeck).toHaveLength(DECK_SIZE);
+    expect(enemyDeck.filter((id) => id === "bo-tuoi")).toHaveLength(
+      DECK_SIZE - 1,
+    );
     expect(
       enemyDeck.filter((id) => id === "bo-sieu-phan-ong-cap-1"),
     ).toHaveLength(1);

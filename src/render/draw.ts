@@ -372,6 +372,8 @@ export interface FullFace {
   badge?: string;
   /** Power on the board right now (after buffs and lane effects). Drawn instead of the base power, green/red when it differs. */
   livePower?: number;
+  /** Cost to play right now (after Gentle board + Ancient in-hand discounts). Drawn instead of the base cost. */
+  liveCost?: number;
 }
 
 /** Layer 1: art, clipped to the card's rounded outline. Layer 2: the frame (transparent PNG). Layer 3: text. */
@@ -403,7 +405,7 @@ export function drawFullCard(
   // The card title (name) is drawn without a dark outline; cost and power keep theirs.
   drawLine(ctx, f.name, face.def.name, cardFont, f.name.color, false);
   drawParagraph(ctx, f.description, cardText(face.def));
-  drawLine(ctx, f.cost, String(face.def.cost), cardFont);
+  drawLine(ctx, f.cost, String(face.liveCost ?? face.def.cost), cardFont);
   const live = face.livePower ?? face.def.power;
   drawLine(
     ctx,

@@ -7,6 +7,7 @@ import { CARDS } from "../src/data/cards";
 import { playAiTurn } from "../src/engine/ai";
 import { endTurn, legalPlays, newGame, playCard } from "../src/engine/rules";
 import type { GameState } from "../src/engine/types";
+import { DECK_SIZE } from "../src/engine/types";
 import { parseLayout, DEFAULT_LAYOUT } from "../src/render/layout";
 import { ART_CROP_TOP, artCropOffset } from "../src/render/draw";
 import { createImageRenderer } from "../src/render/renderer";
@@ -65,7 +66,7 @@ async function pixel(png: Buffer, x: number, y: number): Promise<number[]> {
 function midGame(): GameState {
   const rng = mulberry32(21);
   let state = newGame(
-    { bottom: CARDS.slice(0, 12), top: CARDS.slice(3, 15) },
+    { bottom: CARDS.slice(0, DECK_SIZE), top: CARDS.slice(3, 3 + DECK_SIZE) },
     "bottom",
     rng,
   ).state;
@@ -271,7 +272,7 @@ describe("battle scene", () => {
   it("copes with an empty board, an empty hand, a full hand and the viewer sitting at the top", async () => {
     const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
     const fresh = newGame(
-      { bottom: CARDS.slice(0, 12), top: CARDS.slice(0, 12) },
+      { bottom: CARDS.slice(0, DECK_SIZE), top: CARDS.slice(0, DECK_SIZE) },
       "top",
       mulberry32(2),
     ).state;
@@ -287,7 +288,7 @@ describe("battle scene", () => {
         bonus: entry.bonus,
       });
     }
-    expect(full.players.bottom.hand).toHaveLength(12);
+    expect(full.players.bottom.hand).toHaveLength(DECK_SIZE);
     for (const [state, viewer] of [
       [fresh, "bottom"],
       [empty, "bottom"],
@@ -325,7 +326,7 @@ describe("battle scene", () => {
   it("holds a fixed 1268x1268 square across empty, full and top-viewer states", async () => {
     const renderer = await createImageRenderer({ assetsDir: REAL_ASSETS });
     const base = newGame(
-      { bottom: CARDS.slice(0, 12), top: CARDS.slice(0, 12) },
+      { bottom: CARDS.slice(0, DECK_SIZE), top: CARDS.slice(0, DECK_SIZE) },
       "bottom",
       mulberry32(4),
     ).state;
