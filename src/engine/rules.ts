@@ -1303,6 +1303,7 @@ function applyActive(
     case "frozenLock":
     case "gloomLane":
     case "sunkenPull":
+    case "opticGain":
     case "killingDeck":
     case "numbDeck":
     case "sunlitScatter":
@@ -1998,6 +1999,33 @@ function applyEvilHighest(
   });
 }
 
+/**
+ * Optic (opticGain): at the owner's end of turn, pick ONE RANDOM OTHER card in Optic's OWN lane (the
+ * target may belong to EITHER seat) and add that card's BASE cost (`def.cost`) to Optic's power,
+ * permanently and ONCE. Reads the lane live. If Optic is alone in its lane (no other card), nothing
+ * happens. Uses the seeded `pick` helper to choose the target.
+ */
+function applyOpticGain(
+  state: GameState,
+  optic: CardInstance,
+  lane: LaneIndex,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const others = state.lanes[lane].filter(
+    (c): c is CardInstance => c !== null && c.uid !== optic.uid,
+  );
+  if (others.length === 0) return; // alone in its lane: Optic keeps its base power
+  const target = pick(others, rng);
+  optic.bonus += target.def.cost;
+  events.push({
+    type: "ability",
+    seat: optic.owner,
+    card: optic.def,
+    text: `gained ${target.def.cost} power from ${target.def.name}`,
+  });
+}
+
 /** Collects every on-board card owned by `owner`, lanes L→R, cells top→bottom (deterministic order). */
 function ownerBoardCards(state: GameState, owner: Seat): CardInstance[] {
   const out: CardInstance[] = [];
@@ -2373,6 +2401,7 @@ type EndOfTurnKind =
   | "frozenLock"
   | "gloomLane"
   | "sunkenPull"
+  | "opticGain"
   | "killingDeck"
   | "numbDeck"
   | "sunlitScatter"
@@ -2400,6 +2429,7 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
       case "frozenLock":
       case "gloomLane":
       case "sunkenPull":
+      case "opticGain":
       case "killingDeck":
       case "numbDeck":
       case "sunlitScatter":
@@ -2499,6 +2529,9 @@ function applyEndOfTurnAbilities(
         break;
       case "sunkenPull":
         applySunkenPull(state, card, lane, events, rng);
+        break;
+      case "opticGain":
+        applyOpticGain(state, card, lane, events, rng);
         break;
       case "killingDeck":
         applyKillingDeck(state, card, events, rng);

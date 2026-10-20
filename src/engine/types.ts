@@ -55,6 +55,7 @@ export type ActiveEffect =
   | { kind: "frozenLock" } // Frozen: end of turn, lock BOTH players out of playing for the next two upcoming plies
   | { kind: "gloomLane" } // Gloom: end of turn, every enemy card in this lane loses 1 power (permanent)
   | { kind: "sunkenPull" } // Sunken: end of turn, pull the two OTHER lanes one step toward the owner's edge
+  | { kind: "opticGain" } // Optic: end of turn, add the cost of one random OTHER card in its own lane (either seat) to its power, once
   | { kind: "killingDeck" } // Killing: end of turn, destroy a random card in the OPPONENT's deck (feeds Stella)
   | { kind: "numbDeck" } // Numb: end of turn, destroy a random card in the OWNER's OWN deck (feeds Stella)
   | { kind: "sunlitScatter" }; // Sunlit: end of turn, destroy the owner's OTHER board cards and spread their power across the hand

@@ -1027,8 +1027,12 @@
   {
     "name": "Optic Eyes",
     "rarity": "common",
-    "cost": 3,
-    "power": 9
+    "cost": 2,
+    "power": 2,
+    "ability": "opticGain",
+    "kind": "active",
+    "text": "Active: Gain power equal to the cost of a random other card in this lane.",
+    "note": "Cuối lượt: +power bằng cost của 1 thẻ khác ngẫu nhiên cùng làn, kể cả thẻ địch; chỉ mình nó trong làn thì không xảy ra."
   },
   {
     "name": "Oracle Eyes",

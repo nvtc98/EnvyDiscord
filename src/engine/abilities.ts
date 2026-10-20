@@ -66,6 +66,8 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: Enemy cards in this lane lose 1 power.";
       case "sunkenPull":
         return "Active: Pull the other two lanes one step toward you.";
+      case "opticGain":
+        return "Active: Gain power equal to the cost of a random other card in this lane.";
       case "killingDeck":
         return "Active: Destroy a random card in the enemy's deck.";
       case "numbDeck":

@@ -79,6 +79,7 @@ const TOKENS: Record<string, TokenSpec> = {
   frozenLock: { timing: "active", kind: "frozenLock" },
   gloomLane: { timing: "active", kind: "gloomLane" },
   sunkenPull: { timing: "active", kind: "sunkenPull" },
+  opticGain: { timing: "active", kind: "opticGain" },
   killingDeck: { timing: "active", kind: "killingDeck" },
   numbDeck: { timing: "active", kind: "numbDeck" },
   sunlitScatter: { timing: "active", kind: "sunlitScatter" },
