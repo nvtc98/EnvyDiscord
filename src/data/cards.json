@@ -577,12 +577,12 @@
   {
     "name": "Gentle Eyes",
     "rarity": "eternal",
-    "cost": 6,
-    "power": 6,
-    "ability": "gentlePush 5",
-    "kind": "active",
-    "text": "Active: Push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
-    "note": "Cuối lượt của phe ta (tuy ghi Active nhưng tính lúc kết thúc lượt): với MỖI thẻ bị động (kind passive) của phe ta đang trên sân, đẩy The Eyes Privilege về phía địch 5% HP hiện tại của địch (làm tròn). Gentle là active nên không tự tính mình. Không có thẻ bị động nào thì không làm gì."
+    "cost": 2,
+    "power": 2,
+    "ability": "gentleDeckDiscount",
+    "kind": "passive",
+    "text": "Passive: At the end of your turn, if The Eyes Privilege favors the enemy, reduce the cost of a random card in your deck by 1.",
+    "note": "Cuối mỗi lượt của phe ta: nếu The Eyes Privilege đang nghiêng về phía địch (HP phe ta < HP địch, tức mình đang thua thế), giảm 1 cost cho MỘT lá bài ngẫu nhiên trong bộ bài (deck) của phe ta. Vĩnh viễn, cộng dồn, tối thiểu 0; giảm cost vẫn còn khi lá đó được rút lên tay. Không thua thế hoặc deck rỗng thì không làm gì."
   },
   {
     "name": "Glacial Eyes",
@@ -1291,8 +1291,12 @@
   {
     "name": "Sly Eyes",
     "rarity": "common",
-    "cost": 2,
-    "power": 6
+    "cost": 4,
+    "power": 14,
+    "ability": "slyLower",
+    "kind": "active",
+    "text": "Active: Pull The Eyes Privilege 10 toward you.",
+    "note": "Cuối lượt của phe ta (ghi Active nhưng tính lúc kết thúc lượt): kéo thanh The Eyes Privilege về phía mình 10, tức tự hạ HP phe ta đi 10 (kẹp trong [0, tổng]). Đây là cái giá tự chịu để đổi lấy thân 14 power lớn. Nếu HP phe ta chạm mép 0 của mình thì phe ta thua."
   },
   {
     "name": "Solstice Eyes",
@@ -1309,8 +1313,12 @@
   {
     "name": "Soulfire Eyes",
     "rarity": "common",
-    "cost": 4,
-    "power": 12
+    "cost": 2,
+    "power": 7,
+    "ability": "soulfireGate",
+    "kind": "passive",
+    "text": "Passive: Playable only while The Eyes Privilege favors the enemy.",
+    "note": "Chỉ ra được khi The Eyes Privilege đang nghiêng về phía địch (HP phe ta < HP địch, tức mình đang thua thế). Hòa (HP bằng nhau) hoặc đang dẫn thế thì không ra được, và bị ẩn khỏi các nước đi hợp lệ."
   },
   {
     "name": "Spectra Eyes",
@@ -1480,8 +1488,12 @@
   {
     "name": "Tracking Eyes",
     "rarity": "common",
-    "cost": 4,
-    "power": 12
+    "cost": 3,
+    "power": 1,
+    "ability": "trackingDraw",
+    "kind": "passive",
+    "text": "Passive: At the end of your turn, if The Eyes Privilege favors the enemy, draw a card.",
+    "note": "Cuối mỗi lượt của phe ta: nếu The Eyes Privilege đang nghiêng về phía địch (HP phe ta < HP địch, tức mình đang thua thế), rút 1 lá bài (tôn trọng giới hạn tay bài, quá tay thì cháy bài). Không thua thế thì không rút."
   },
   {
     "name": "Trance Eyes",
@@ -1700,8 +1712,12 @@
   {
     "name": "Wise Eyes",
     "rarity": "common",
-    "cost": 1,
-    "power": 3
+    "cost": 4,
+    "power": 2,
+    "ability": "wiseHandPower",
+    "kind": "active",
+    "text": "Active: Gain 2 power for each card in your hand.",
+    "note": "Cuối lượt của phe ta (ghi Active nhưng tính lúc kết thúc lượt): cộng vĩnh viễn 2 power cho mỗi lá bài đang trên tay phe ta tại thời điểm đó. Wise đã rời tay (đang ở trên sân) nên chỉ tính các lá còn lại trên tay. Tay rỗng thì cộng 0."
   },
   {
     "name": "Wither Eyes",

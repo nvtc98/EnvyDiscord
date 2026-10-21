@@ -74,6 +74,10 @@ export function abilityText(ability: Ability | undefined): string {
         return "Active: Destroy a random card in your own deck.";
       case "sunlitScatter":
         return "Active: Destroy your other cards on the board and spread their total power randomly among the cards in your hand.";
+      case "slyLower":
+        return "Active: Pull The Eyes Privilege 10 toward you.";
+      case "wiseHandPower":
+        return "Active: Gain 2 power for each card in your hand.";
       default:
         // Compiler belt: the active switch previously had no default and fell through to the
         // continuous block, leaving the two cases above unenforced. assertNever forces every
@@ -117,6 +121,12 @@ export function abilityText(ability: Ability | undefined): string {
         return "Passive: While in your hand, this costs 1 less at the end of each of your turns.";
       case "vaingloryGate":
         return "Passive: Playable only while The Eyes Privilege favors the enemy.";
+      case "soulfireGate":
+        return "Passive: Playable only while The Eyes Privilege favors the enemy.";
+      case "trackingDraw":
+        return "Passive: At the end of your turn, if The Eyes Privilege favors the enemy, draw a card.";
+      case "gentleDeckDiscount":
+        return "Passive: At the end of your turn, if The Eyes Privilege favors the enemy, reduce the cost of a random card in your deck by 1.";
       case "guardianLane":
         return "Passive: Your cards in this lane cannot be destroyed.";
       default:

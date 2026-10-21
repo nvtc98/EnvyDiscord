@@ -257,18 +257,18 @@ describe("card kind classification", () => {
     });
   });
 
-  it("Gentle Eyes is an eternal 6/6 active gentlePush with the explicit text", () => {
+  it("Gentle Eyes is an eternal 2/2 passive gentleDeckDiscount with the explicit text", () => {
     const gentle = CARD_INDEX.get("gentle-eyes");
     expect(gentle).toMatchObject({
       rarity: "eternal",
-      cost: 6,
-      power: 6,
-      kind: "active",
-      text: "Active: Push The Eyes Privilege 5% toward the enemy for each of your other passive cards on the board.",
+      cost: 2,
+      power: 2,
+      kind: "passive",
+      text: "Passive: At the end of your turn, if The Eyes Privilege favors the enemy, reduce the cost of a random card in your deck by 1.",
     });
     expect(gentle?.ability).toEqual({
-      timing: "active",
-      effect: { kind: "gentlePush", percent: 5 },
+      timing: "continuous",
+      effect: { kind: "gentleDeckDiscount" },
     });
   });
 

@@ -58,7 +58,11 @@ export type ActiveEffect =
   | { kind: "opticGain" } // Optic: end of turn, add the cost of one random OTHER card in its own lane (either seat) to its power, once
   | { kind: "killingDeck" } // Killing: end of turn, destroy a random card in the OPPONENT's deck (feeds Stella)
   | { kind: "numbDeck" } // Numb: end of turn, destroy a random card in the OWNER's OWN deck (feeds Stella)
-  | { kind: "sunlitScatter" }; // Sunlit: end of turn, destroy the owner's OTHER board cards and spread their power across the hand
+  | { kind: "sunlitScatter" } // Sunlit: end of turn, destroy the owner's OTHER board cards and spread their power across the hand
+  // The two below also carry `timing: "active"` and are NO-OPS on play; they resolve during the
+  // OWNER's end-of-turn pass (see applyEndOfTurnAbilities), like the actives above.
+  | { kind: "slyLower" } // Sly: end of turn, pull The Eyes Privilege 10 toward the owner (self-cost: lowers the owner's own remaining HP; reaching the owner's 0 edge loses)
+  | { kind: "wiseHandPower" }; // Wise: end of turn, gain 2 permanent power for each card currently in the owner's hand
 export type ContinuousEffect =
   | { kind: "laneDouble" }
   | { kind: "anchor" }
@@ -72,6 +76,9 @@ export type ContinuousEffect =
   | { kind: "costReduction"; amount: number } // Gentle: owner's cards cost `amount` less while this is on the board
   | { kind: "ancientDiscount" } // Ancient: while in the owner's hand, costs 1 less at the end of each of the owner's turns (accumulates on costReduction)
   | { kind: "vaingloryGate" } // Vainglory: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP)
+  | { kind: "soulfireGate" } // Soulfire: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP) — a play gate, modeled on vaingloryGate
+  | { kind: "trackingDraw" } // Tracking: at the owner's end of turn, if The Eyes Privilege favors the enemy (owner HP < enemy HP), draw 1 card
+  | { kind: "gentleDeckDiscount" } // Gentle: at the owner's end of turn, if The Eyes Privilege favors the enemy, reduce by 1 the cost of one random card in the owner's deck
   | { kind: "guardianLane" }; // Guardian: the owner's cards sharing this card's lane cannot be destroyed
 // "endOfRound" now means the end of each turn (resolution is per-turn, not per-round).
 export type EndOfRoundEffect =
@@ -150,6 +157,12 @@ export interface CardInstance {
 export interface DeckCard {
   def: CardDef;
   bonus: number;
+  /**
+   * Accumulated permanent cost discount applied while in the deck (Gentle's deck discount). Absent → 0.
+   * Travels onto the hand CardInstance when the card is drawn, with the same semantics as
+   * CardInstance.costReduction (floors the live cost at 0 via instanceCost).
+   */
+  costReduction?: number;
 }
 
 export interface PlayerState {

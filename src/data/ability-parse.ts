@@ -87,6 +87,11 @@ const TOKENS: Record<string, TokenSpec> = {
   dispersedSpread: { timing: "onDestroy", kind: "dispersedSpread" },
   ancientDiscount: { timing: "continuous", kind: "ancientDiscount" },
   vaingloryGate: { timing: "continuous", kind: "vaingloryGate" },
+  soulfireGate: { timing: "continuous", kind: "soulfireGate" },
+  trackingDraw: { timing: "continuous", kind: "trackingDraw" },
+  gentleDeckDiscount: { timing: "continuous", kind: "gentleDeckDiscount" },
+  slyLower: { timing: "active", kind: "slyLower" },
+  wiseHandPower: { timing: "active", kind: "wiseHandPower" },
   guardianLane: { timing: "continuous", kind: "guardianLane" },
   wildShift: { timing: "endOfRound", kind: "wildShift" },
   glacialSpawn: {

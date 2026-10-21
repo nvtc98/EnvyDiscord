@@ -147,6 +147,11 @@ function draw(
       owner: seat,
       // Carry the bonus accumulated while the card sat in the deck (e.g. Ocean's whole-deck buff).
       bonus: entry.bonus,
+      // Carry any cost discount accrued in the deck (Gentle's deck discount), same semantics as the
+      // per-instance costReduction. Absent → leave the field off so the instance stays minimal.
+      ...(entry.costReduction !== undefined
+        ? { costReduction: entry.costReduction }
+        : {}),
     };
     player.hand.push(instance);
     events.push({ type: "drew", seat, uid: instance.uid, card });
@@ -735,8 +740,11 @@ export function canPlay(
   if (!card) return { ok: false, reason: "not-in-hand" };
   if (instanceCost(state, state.active, card) > player.energy)
     return { ok: false, reason: "energy" };
-  // Vainglory: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP).
-  if (hasContinuousKind(card.def, "vaingloryGate")) {
+  // Vainglory / Soulfire: playable only while The Eyes Privilege favors the enemy (owner HP < enemy HP).
+  if (
+    hasContinuousKind(card.def, "vaingloryGate") ||
+    hasContinuousKind(card.def, "soulfireGate")
+  ) {
     const total = state.bottomStartHP + state.topStartHP;
     const ownerHP =
       state.active === "bottom" ? state.balance : total - state.balance;
@@ -1311,6 +1319,10 @@ function applyActive(
     // owner's end-of-turn pass (applyEndOfTurnAbilities). Listed here to keep the switch exhaustive.
     case "stellaPush":
     case "astralDiscount":
+    // Sly's self-pull and Wise's hand-power buff are also no-ops on play; they resolve during the
+    // owner's end-of-turn pass (applyEndOfTurnAbilities). Listed here to keep the switch exhaustive.
+    case "slyLower":
+    case "wiseHandPower":
       break;
     default:
       assertNever(effect);
@@ -2145,6 +2157,117 @@ function applyAstralDiscount(
   });
 }
 
+/**
+ * Tracking (trackingDraw): at the owner's end of turn, if The Eyes Privilege favors the enemy (owner
+ * HP < enemy HP), the owner draws 1 card via the normal draw() path (respects MAX_HAND burn). If the
+ * meter is even or in the owner's favor, nothing happens. Seat-correct owner-HP math mirrors
+ * applyGoliathGain / the vaingloryGate gate.
+ */
+function applyTrackingDraw(
+  state: GameState,
+  tracking: CardInstance,
+  events: GameEvent[],
+): void {
+  const total = state.bottomStartHP + state.topStartHP;
+  const ownerHP =
+    tracking.owner === "bottom" ? state.balance : total - state.balance;
+  const enemyHP = total - ownerHP;
+  if (!(ownerHP < enemyHP)) return; // not losing → no draw
+  draw(state, tracking.owner, 1, events);
+  events.push({
+    type: "ability",
+    seat: tracking.owner,
+    card: tracking.def,
+    text: "drew a card from The Eyes Privilege",
+  });
+}
+
+/**
+ * Gentle (gentleDeckDiscount): at the owner's end of turn, if The Eyes Privilege favors the enemy
+ * (owner HP < enemy HP), reduce by 1 the cost of ONE random card still in the owner's DECK (permanent,
+ * accumulates, floored at 0 via instanceCost once drawn). Uses the seeded `pick` to choose the deck
+ * entry. Empty deck or not-losing → nothing. Seat-correct owner-HP math mirrors applyGoliathGain.
+ */
+function applyGentleDeckDiscount(
+  state: GameState,
+  gentle: CardInstance,
+  events: GameEvent[],
+  rng: Rng,
+): void {
+  const total = state.bottomStartHP + state.topStartHP;
+  const ownerHP =
+    gentle.owner === "bottom" ? state.balance : total - state.balance;
+  const enemyHP = total - ownerHP;
+  if (!(ownerHP < enemyHP)) return; // not losing → no discount
+  const deck = state.players[gentle.owner].deck;
+  if (deck.length === 0) return; // empty deck → nothing
+  const entry = pick(deck, rng);
+  entry.costReduction = (entry.costReduction ?? 0) + 1;
+  events.push({
+    type: "ability",
+    seat: gentle.owner,
+    card: gentle.def,
+    text: `reduced the cost of ${entry.def.name} in your deck by 1`,
+  });
+}
+
+/**
+ * Sly (slyLower): at the owner's end of turn, PULL The Eyes Privilege 10 toward the OWNER's own edge —
+ * a self-cost that lowers the owner's own remaining HP by 10 (clamped to [0, total]). This is the
+ * mirror of applyStellaPush / applyGentlePush's owner-benefiting push: a bottom owner lowers `balance`,
+ * a top owner raises it. Emits a tide_shifted event and runs the SAME knockout check the other meter
+ * movers run, so pulling your own HP to its 0 edge LOSES the game.
+ */
+function applySlyLower(
+  state: GameState,
+  sly: CardInstance,
+  events: GameEvent[],
+): void {
+  const total = state.bottomStartHP + state.topStartHP;
+  // Self-harming: pull toward the owner's own edge. Bottom owner lowers balance; top owner raises it.
+  const signed = sly.owner === "bottom" ? -10 : 10;
+  const before = state.balance;
+  state.balance = Math.max(0, Math.min(total, before + signed));
+  events.push({
+    type: "tide_shifted",
+    delta: state.balance - before,
+    rawDelta: signed,
+    balance: state.balance,
+    turn: state.turnsPlayed,
+  });
+  events.push({
+    type: "ability",
+    seat: sly.owner,
+    card: sly.def,
+    text: "pulled The Eyes Privilege 10 toward itself",
+  });
+  // Pulling toward the owner's own edge can knock the owner out: balance 0 → top wins, total → bottom wins.
+  if (state.balance >= total) finish(state, "bottom", "balance", events);
+  else if (state.balance <= 0) finish(state, "top", "balance", events);
+  if (state.winner) return;
+}
+
+/**
+ * Wise (wiseHandPower): at the owner's end of turn, gain permanent power equal to 2 × the number of
+ * cards currently in the owner's HAND. Wise is already on the board (it left the hand when played), so
+ * this counts the OTHER cards still in hand. Empty hand → gain 0.
+ */
+function applyWiseHandPower(
+  state: GameState,
+  wise: CardInstance,
+  events: GameEvent[],
+): void {
+  const n = state.players[wise.owner].hand.length;
+  const gain = 2 * n;
+  wise.bonus += gain;
+  events.push({
+    type: "ability",
+    seat: wise.owner,
+    card: wise.def,
+    text: `gained ${gain} power from the cards in your hand`,
+  });
+}
+
 /** Frozen (frozenLock): at the owner's end of turn, lock BOTH players out of playing for two upcoming plies. */
 function applyFrozenLock(
   state: GameState,
@@ -2407,6 +2530,10 @@ type EndOfTurnKind =
   | "sunlitScatter"
   | "stellaPush"
   | "astralDiscount"
+  | "slyLower"
+  | "wiseHandPower"
+  | "trackingDraw"
+  | "gentleDeckDiscount"
   | "flowerBuff";
 
 function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
@@ -2435,11 +2562,20 @@ function endOfTurnKindOf(def: CardDef): EndOfTurnKind | null {
       case "sunlitScatter":
       case "stellaPush":
       case "astralDiscount":
+      case "slyLower":
+      case "wiseHandPower":
         return ab.effect.kind;
       default:
         return null;
     }
   }
+  // Tracking and Gentle are continuous passives that nonetheless resolve at the owner's end of turn.
+  if (
+    ab.timing === "continuous" &&
+    (ab.effect.kind === "trackingDraw" ||
+      ab.effect.kind === "gentleDeckDiscount")
+  )
+    return ab.effect.kind;
   if (ab.timing === "endOfRound" && ab.effect.kind === "wildShift")
     return "wildShift";
   if (ab.timing === "endOfRound" && ab.effect.kind === "flowerBuff")
@@ -2547,6 +2683,18 @@ function applyEndOfTurnAbilities(
         break;
       case "astralDiscount":
         applyAstralDiscount(state, card, events);
+        break;
+      case "slyLower":
+        applySlyLower(state, card, events);
+        break;
+      case "wiseHandPower":
+        applyWiseHandPower(state, card, events);
+        break;
+      case "trackingDraw":
+        applyTrackingDraw(state, card, events);
+        break;
+      case "gentleDeckDiscount":
+        applyGentleDeckDiscount(state, card, events, rng);
         break;
       case "flowerBuff":
         applyFlowerBuff(state, card, events, rng);
