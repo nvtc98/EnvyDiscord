@@ -1,7 +1,9 @@
 /** Body text and numbers. */
 export const FONT_FAMILY = "GameFont";
-/** Headings in the battle scene: a classical, engraved-looking serif. */
+/** Headings in the battle scene (names, lane titles, VICTORY, map labels): Oswald, a narrow bold sans. */
 export const TITLE_FONT = "GameTitle";
+/** The TURN counter and ENERGY label: Philosopher Bold, a classical serif that keeps the dark tone. */
+export const HUD_FONT = "GameHud";
 /** Card text (name, rules text, cost, power): the typeface used by the Dextrous frame design. */
 export const CARD_FONT = "CardText";
 

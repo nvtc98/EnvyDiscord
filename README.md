@@ -131,7 +131,7 @@ Art specs and the list of file names: [assets/cards/README.md](assets/cards/READ
 
 **Text fallback:** if the image library cannot run (for example on a NAS) or a single render fails, the bot falls back to text embeds and the game stays playable. On startup the terminal prints `Image rendering enabled`, or `Image rendering unavailable, falling back to text embeds: ...` with the reason.
 
-Fonts (SIL OFL license) are bundled in `assets/fonts/`: **Inter** (HUD numbers), **Cinzel** (headings) and **Aleo** (card text, the typeface of the Dextrous design). When moving to a NAS, copy the whole `assets/` folder.
+Fonts (SIL OFL license) are bundled in `assets/fonts/`: **Oswald** (names, headings, VICTORY), **Philosopher** (TURN and ENERGY), **Alegreya** (small text) and **Aleo** (card text, the typeface of the Dextrous design). When moving to a NAS, copy the whole `assets/` folder.
 
 ## Logs
 

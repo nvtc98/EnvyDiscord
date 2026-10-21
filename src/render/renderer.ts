@@ -35,7 +35,7 @@ import {
 } from "./draw";
 import { FrameLibrary } from "./frames";
 import { DEFAULT_LAYOUT, loadLayout, type CardLayout } from "./layout";
-import { CARD_FONT, FONT_FAMILY, PALETTE, TITLE_FONT } from "./theme";
+import { CARD_FONT, FONT_FAMILY, HUD_FONT, PALETTE, TITLE_FONT } from "./theme";
 import { DEFAULT_VARIANT, type VariantId } from "../data/variants";
 
 export interface CardView {
@@ -83,7 +83,8 @@ export interface RendererOptions {
 const GAP = 14;
 const FONT_FILES: [file: string, family: string][] = [
   ["Alegreya-Variable.ttf", FONT_FAMILY],
-  ["Cinzel-Bold.woff2", TITLE_FONT],
+  ["Oswald-Variable.ttf", TITLE_FONT],
+  ["Philosopher-Bold.ttf", HUD_FONT],
   ["Aleo-Regular.ttf", CARD_FONT],
   ["Aleo-Bold.ttf", CARD_FONT],
 ];
@@ -163,7 +164,7 @@ function drawEnergyPips(
 ): void {
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
-  ctx.font = `700 12px ${TITLE_FONT}`;
+  ctx.font = `700 12px ${HUD_FONT}`;
   ctx.fillStyle = PALETTE.energy;
   ctx.fillText("ENERGY", right, labelY);
 
@@ -385,7 +386,7 @@ export async function createImageRenderer({
       );
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
-      ctx.font = `700 14px ${TITLE_FONT}`;
+      ctx.font = `700 14px ${HUD_FONT}`;
       ctx.fillStyle = PALETTE.gold;
       ctx.fillText(
         `TURN ${turnNo} / ${MAX_TURNS}`,
